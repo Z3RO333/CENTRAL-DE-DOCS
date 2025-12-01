@@ -15,6 +15,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { supabase } from "@/lib/supabaseClient";
 import { FileSignature } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
+import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 
 type FormularioRecord = {
   id: string;
@@ -68,6 +69,10 @@ export default function AssinaturaDocumentoPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
+  const {
+    hasAccess: hasDocumentsAccess,
+    loading: accessLoading,
+  } = useDocumentsAccess();
   const searchParams = useSearchParams();
   const [registro, setRegistro] = useState<FormularioRecord | null>(null);
   const [publicUrl, setPublicUrl] = useState<string | null>(null);
@@ -276,12 +281,17 @@ export default function AssinaturaDocumentoPage() {
   }, []);
 
   useEffect(() => {
-    if (authLoading) {
+    if (authLoading || accessLoading) {
       return;
     }
 
     if (!user) {
       router.replace("/login");
+      return;
+    }
+
+    if (!hasDocumentsAccess) {
+      router.replace("/dashboard");
       return;
     }
 
@@ -292,20 +302,6 @@ export default function AssinaturaDocumentoPage() {
       setError(null);
       setSuccess(null);
 
-      const email = user.email?.toLowerCase() ?? "";
-      const isBemolEmail = email.endsWith("@bemol.com.br");
-
-      if (!isBemolEmail) {
-        if (active) {
-          setError(
-            "Você não tem acesso a esta área. Procure por richardoliveira@bemol.com para solicitar acesso.",
-          );
-          setRegistro(null);
-          setLoading(false);
-        }
-        return;
-      }
-
       try {
         const { data, error: fetchError } = await supabase
           .from("formularios")
@@ -315,7 +311,7 @@ export default function AssinaturaDocumentoPage() {
           .single();
 
         if (fetchError || !data) {
-          throw new Error("Documento não encontrado.");
+          throw new Error("Documento n?o encontrado.");
         }
 
         const record: FormularioRecord = {
@@ -356,7 +352,7 @@ export default function AssinaturaDocumentoPage() {
           setError(
             err instanceof Error
               ? err.message
-              : "Não foi possível carregar o documento.",
+              : "N?o foi poss?vel carregar o documento.",
           );
           setRegistro(null);
         }
@@ -372,7 +368,8 @@ export default function AssinaturaDocumentoPage() {
     return () => {
       active = false;
     };
-  }, [authLoading, user, params.id, router]);
+  }, [authLoading, accessLoading, user, params.id, router, hasDocumentsAccess]);
+
 
   useEffect(() => {
     if (typeof window === "undefined" || !user?.id) {
@@ -749,7 +746,7 @@ export default function AssinaturaDocumentoPage() {
     document.body.removeChild(link);
   };
 
-  if (loading) {
+  if (authLoading || accessLoading || loading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
         Carregando documento...

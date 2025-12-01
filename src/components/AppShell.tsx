@@ -5,13 +5,13 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   FileText,
-  Lock,
   LogOut,
   UserRound,
   BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabaseClient";
+import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 
 export default function AppShell({
   children,
@@ -21,11 +21,15 @@ export default function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const { user, isLoading, error: authError, refresh } = useAuth();
+  const {
+    hasAccess: documentsAccessGranted,
+    loading: documentsAccessLoading,
+  } = useDocumentsAccess();
   const showNav = pathname !== "/login";
 
   const isAuthenticated = !!user;
   const canAccessDocuments =
-    (user?.email?.toLowerCase() ?? "").endsWith("@bemol.com.br");
+    documentsAccessGranted && !documentsAccessLoading;
   const resolvedWithoutUser = !isLoading && !isAuthenticated;
 
   const handleLogout = async () => {
@@ -80,7 +84,7 @@ export default function AppShell({
               <LayoutDashboard className="h-4 w-4" />
               Formulário
             </Link>
-            {canAccessDocuments ? (
+            {canAccessDocuments && (
               <Link
                 href="/documentos"
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
@@ -92,15 +96,6 @@ export default function AppShell({
                 <FileText className="h-4 w-4" />
                 Documentos
               </Link>
-            ) : (
-              <button
-                type="button"
-                className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-slate-400"
-                title="Área restrita. Procure por richardoliveira@bemol.com para solicitar acesso."
-              >
-                <Lock className="h-4 w-4" />
-                Documentos
-              </button>
             )}
             {canAccessDocuments && (
               <Link

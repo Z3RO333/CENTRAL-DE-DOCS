@@ -11,6 +11,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
+import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 
 const SIGNATURE_STORAGE_PREFIX = "digital-signature:";
 
@@ -22,6 +23,10 @@ type StatusBanner = {
 export default function PerfilPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
+  const {
+    hasAccess: hasDocumentsAccess,
+    loading: accessLoading,
+  } = useDocumentsAccess();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
@@ -32,15 +37,20 @@ export default function PerfilPage() {
     ? `${SIGNATURE_STORAGE_PREFIX}${user.id}`
     : null;
 
-  const canAccessDocuments = (user?.email?.toLowerCase() ?? "").endsWith(
-    "@bemol.com.br",
-  );
-
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace("/login");
+    if (authLoading || accessLoading) {
+      return;
     }
-  }, [authLoading, user, router]);
+
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+
+    if (!hasDocumentsAccess) {
+      router.replace("/dashboard");
+    }
+  }, [authLoading, accessLoading, user, hasDocumentsAccess, router]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !storageKey) {
@@ -282,32 +292,10 @@ export default function PerfilPage() {
     setStatus(null);
   };
 
-  if (authLoading || !user) {
+  if (authLoading || accessLoading || !user) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
         {authError ?? "Carregando perfil..."}
-      </div>
-    );
-  }
-
-  if (!canAccessDocuments) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center text-sm text-slate-500">
-        <p>
-          Você não possui permissão para acessar a aba de perfil e assinatura
-          digital.
-        </p>
-        <p className="max-w-md text-xs text-slate-400">
-          Procure por richardoliveira@bemol.com e solicite liberacao para
-          utilizar esta funcionalidade.
-        </p>
-        <button
-          type="button"
-          onClick={() => router.push("/dashboard")}
-          className="rounded-full bg-sky-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-sky-300/80 transition hover:bg-sky-400"
-        >
-          Voltar para o inicio
-        </button>
       </div>
     );
   }
@@ -433,7 +421,7 @@ export default function PerfilPage() {
               <p className="mt-2 text-[11px] text-slate-500">
                 Dominio liberado para assinar:{" "}
                 <span className="font-semibold text-emerald-600">
-                {canAccessDocuments ? "@bemol.com.br" : "não autorizado"}
+                {hasDocumentsAccess ? "@bemol.com.br" : "não autorizado"}
                 </span>
               </p>
             </div>
@@ -468,4 +456,8 @@ export default function PerfilPage() {
     </div>
   );
 }
+
+
+
+
 

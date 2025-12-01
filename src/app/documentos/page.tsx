@@ -14,6 +14,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
+import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 
 type FormularioRecord = {
   id: string;
@@ -203,6 +204,11 @@ const anoAtual = new Date().getFullYear().toString();
 export default function DocumentosPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
+  const {
+    hasAccess: hasDocumentsAccess,
+    loading: accessLoading,
+    error: accessError,
+  } = useDocumentsAccess();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [registros, setRegistros] = useState<FormularioRecord[]>([]);
@@ -218,7 +224,7 @@ export default function DocumentosPage() {
   const [viewMode, setViewMode] = useState<"tabela" | "cards">("tabela");
 
   useEffect(() => {
-    if (authLoading) {
+    if (authLoading || accessLoading) {
       return;
     }
 
@@ -227,12 +233,8 @@ export default function DocumentosPage() {
       return;
     }
 
-    const email = user.email?.toLowerCase() ?? "";
-    if (!email.endsWith("@bemol.com.br")) {
-      setError(
-        "Você não tem acesso a está area. Procure por richardoliveira@bemol.com para solicitar acesso.",
-      );
-      setLoading(false);
+    if (!hasDocumentsAccess) {
+      router.replace("/dashboard");
       return;
     }
 
@@ -296,7 +298,7 @@ export default function DocumentosPage() {
     return () => {
       active = false;
     };
-  }, [authLoading, user, router]);
+  }, [authLoading, accessLoading, user, hasDocumentsAccess, router]);
 
   const getPathParaVisualizacao = (registro: FormularioRecord) =>
     resolveSignedPdfPath(registro.arquivo_assinado_path) ??
@@ -574,11 +576,11 @@ export default function DocumentosPage() {
     });
   }, [registros]);
 
-  const showErrorMessage = error ?? authError;
+  const showErrorMessage = error ?? authError ?? accessError;
   const hasSelection = selectedIds.length > 0;
   const totalResultados = registrosFiltrados.length;
 
-  if (authLoading || loading) {
+  if (authLoading || accessLoading || loading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
         Carregando documentos...
@@ -1239,3 +1241,4 @@ export default function DocumentosPage() {
     </div>
   );
 }
+
