@@ -40,7 +40,7 @@ const FORM_CONFIGS: FormConfig[] = [
       },
       {
         name: "cnpj",
-        label: "CNPJ",
+        label: "CNPJ do emitente",
         type: "text",
         placeholder: "00.000.000/0000-00",
       },
@@ -106,16 +106,16 @@ const FORM_CONFIGS: FormConfig[] = [
     defaultStatus: "em_analise",
     fields: [
       {
-        name: "numero_nf",
-        label: "Número da nota",
-        type: "text",
-        placeholder: "Número completo da nota fiscal",
-      },
-      {
         name: "numero_pedido",
         label: "Número do pedido",
         type: "text",
         placeholder: "Ex.: 12345",
+      },
+      {
+        name: "numero_nf",
+        label: "Número da nota",
+        type: "text",
+        placeholder: "Número completo da nota fiscal",
       },
       {
         name: "cnpj_emitente",
@@ -211,7 +211,13 @@ export default function FormularioPage() {
   }
 
   const handleChange = (name: string, value: string) => {
-    setValues((prev) => ({ ...prev, [name]: value }));
+    setValues((prev) => {
+      const updated = { ...prev, [name]: value };
+      if (config.slug === "notas-fiscais" && name === "numero_pedido") {
+        updated.numero_nf = value;
+      }
+      return updated;
+    });
   };
 
   const beginFormProgress = () => {
@@ -239,6 +245,41 @@ export default function FormularioPage() {
       formProgressTimer.current = null;
     }
     setFormProgress(0);
+  };
+
+  const salvarDocumentosSeparados = async (
+    arquivos: UploadedFileSummary[],
+    valoresFormulario: FormValues,
+    usuarioId: string,
+    tipoFormulario: string,
+    statusPadrao: string,
+  ) => {
+    for (const arquivo of arquivos) {
+      const payloadDados: Record<string, unknown> = {
+        ...valoresFormulario,
+        anexos: [
+          {
+            nome: arquivo.name,
+            path: arquivo.path,
+            tipo: arquivo.type,
+            tamanho: arquivo.size,
+          },
+        ],
+      };
+
+      const payload = {
+        user_id: usuarioId,
+        tipo: tipoFormulario,
+        dados: payloadDados,
+        arquivo_path: arquivo.path,
+        status: statusPadrao,
+      };
+
+      const { error } = await supabase.from("formularios").insert(payload);
+      if (error) {
+        throw error;
+      }
+    }
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -294,35 +335,21 @@ export default function FormularioPage() {
         return;
       }
 
-      const payloadDados: Record<string, unknown> = {
-        ...values,
-        anexos: uploadResults.map((fileInfo) => ({
-          nome: fileInfo.name,
-          path: fileInfo.path,
-          tipo: fileInfo.type,
-          tamanho: fileInfo.size,
-        })),
-      };
+      const valoresAtuais = { ...values };
+      const statusPadrao = config.defaultStatus ?? "pendente";
+      await salvarDocumentosSeparados(
+        uploadResults,
+        valoresAtuais,
+        user.id,
+        config.tipo,
+        statusPadrao,
+      );
 
-      const payload = {
-        user_id: user.id,
-        tipo: config.tipo,
-        dados: payloadDados,
-        arquivo_path: uploadResults[0]?.path ?? "",
-        status: config.defaultStatus ?? "pendente",
-      };
-
-      const { error: insertError } = await supabase
-        .from("formularios")
-        .insert(payload);
-
-      if (insertError) {
-        resetFormProgress();
-        setError(insertError.message);
-        return;
-      }
-
-      setSuccess("Formulário enviado com sucesso!");
+      setSuccess(
+        uploadResults.length > 1
+          ? `${uploadResults.length} documentos enviados separadamente!`
+          : "Formulário enviado com sucesso!",
+      );
       completeFormProgress();
       setFiles([]);
       setValues((prev) =>
@@ -482,5 +509,6 @@ export default function FormularioPage() {
     </div>
   );
 }
+
 
 
