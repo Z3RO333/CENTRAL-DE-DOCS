@@ -1,7 +1,14 @@
 ﻿"use client";
 
-import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { FilePlus2 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
@@ -151,12 +158,33 @@ type UploadedFileSummary = {
 export default function FormularioPage() {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isLoading: authLoading } = useAuth();
 
   const config = useMemo(
     () => FORM_CONFIGS.find((f) => f.slug === params.slug),
     [params.slug],
   );
+  const tipoServicoFiltro = searchParams.get("tipoServico") ?? "";
+
+  const getInitialValues = useCallback((): FormValues => {
+    if (!config) {
+      return {};
+    }
+    const initial: FormValues = {};
+    config.fields.forEach((field) => {
+      let initialValue = "";
+      if (
+        config.slug === "registro-laudos" &&
+        field.name === "tipo_laudo" &&
+        tipoServicoFiltro
+      ) {
+        initialValue = tipoServicoFiltro;
+      }
+      initial[field.name] = initialValue;
+    });
+    return initial;
+  }, [config, tipoServicoFiltro]);
 
   const [values, setValues] = useState<FormValues>({});
   const [files, setFiles] = useState<File[]>([]);
@@ -178,13 +206,9 @@ export default function FormularioPage() {
 
   useEffect(() => {
     if (config) {
-      const initial: FormValues = {};
-      config.fields.forEach((f) => {
-        initial[f.name] = "";
-      });
-      setValues(initial);
+      setValues(getInitialValues());
     }
-  }, [config]);
+  }, [config, getInitialValues]);
 
   useEffect(() => {
     return () => {
@@ -352,9 +376,7 @@ export default function FormularioPage() {
       );
       completeFormProgress();
       setFiles([]);
-      setValues((prev) =>
-        Object.fromEntries(Object.keys(prev).map((key) => [key, ""])),
-      );
+      setValues(getInitialValues());
     } catch (err) {
       console.error("Erro ao enviar formulário:", err);
       resetFormProgress();
