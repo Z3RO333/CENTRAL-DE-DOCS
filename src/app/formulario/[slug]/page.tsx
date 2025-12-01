@@ -1,15 +1,17 @@
-"use client";
+﻿"use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { FilePlus2 } from "lucide-react";
+import { useAuth } from "@/components/AuthProvider";
 
 type FormField = {
   name: string;
   label: string;
   type: "text" | "textarea" | "number" | "date";
   placeholder?: string;
+  options?: string[];
 };
 
 type FormConfig = {
@@ -18,6 +20,7 @@ type FormConfig = {
   title: string;
   description: string;
   fields: FormField[];
+  defaultStatus?: string;
 };
 
 const FORM_CONFIGS: FormConfig[] = [
@@ -27,6 +30,7 @@ const FORM_CONFIGS: FormConfig[] = [
     title: "Retenção Trabalhista",
     description:
       "Informe os dados necessários para análise e controle de retenções trabalhistas.",
+    defaultStatus: "em_analise",
     fields: [
       {
         name: "empresa",
@@ -66,6 +70,13 @@ const FORM_CONFIGS: FormConfig[] = [
         label: "Tipo de laudo",
         type: "text",
         placeholder: "Ex.: Laudo Técnico, PPRA, LTCAT, etc.",
+        options: ["Corretiva", "Preventiva"],
+      },
+      {
+        name: "prestador",
+        label: "Prestador",
+        type: "text",
+        placeholder: "Nome do prestador responsável pelo documento",
       },
       {
         name: "responsavel",
@@ -92,12 +103,19 @@ const FORM_CONFIGS: FormConfig[] = [
     title: "Notas Fiscais",
     description:
       "Cadastre e armazene notas fiscais emitidas para controle e auditoria.",
+    defaultStatus: "em_analise",
     fields: [
       {
         name: "numero_nf",
         label: "Número da nota",
         type: "text",
         placeholder: "Número completo da nota fiscal",
+      },
+      {
+        name: "numero_pedido",
+        label: "Número do pedido",
+        type: "text",
+        placeholder: "Ex.: 12345",
       },
       {
         name: "cnpj_emitente",
@@ -123,9 +141,17 @@ const FORM_CONFIGS: FormConfig[] = [
 
 type FormValues = Record<string, string>;
 
+type UploadedFileSummary = {
+  path: string;
+  name: string;
+  type: string;
+  size: number;
+};
+
 export default function FormularioPage() {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
 
   const config = useMemo(
     () => FORM_CONFIGS.find((f) => f.slug === params.slug),
@@ -133,24 +159,22 @@ export default function FormularioPage() {
   );
 
   const [values, setValues] = useState<FormValues>({});
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [formProgress, setFormProgress] = useState(0);
+  const formProgressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    const ensureAuth = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+    if (authLoading) {
+      return;
+    }
 
-      if (!user) {
-        router.replace("/login");
-      }
-    };
-
-    void ensureAuth();
-  }, [router]);
+    if (!user) {
+      router.replace("/login");
+    }
+  }, [authLoading, user, router]);
 
   useEffect(() => {
     if (config) {
@@ -162,6 +186,14 @@ export default function FormularioPage() {
     }
   }, [config]);
 
+  useEffect(() => {
+    return () => {
+      if (formProgressTimer.current) {
+        clearInterval(formProgressTimer.current);
+      }
+    };
+  }, []);
+
   if (!config) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center text-sm text-slate-300">
@@ -170,8 +202,43 @@ export default function FormularioPage() {
     );
   }
 
+  if (authLoading || !user) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
+        Carregando formulário...
+      </div>
+    );
+  }
+
   const handleChange = (name: string, value: string) => {
     setValues((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const beginFormProgress = () => {
+    if (formProgressTimer.current) {
+      clearInterval(formProgressTimer.current);
+    }
+    setFormProgress(10);
+    formProgressTimer.current = setInterval(() => {
+      setFormProgress((prev) => (prev < 85 ? prev + 5 : prev));
+    }, 400);
+  };
+
+  const completeFormProgress = () => {
+    if (formProgressTimer.current) {
+      clearInterval(formProgressTimer.current);
+      formProgressTimer.current = null;
+    }
+    setFormProgress(100);
+    setTimeout(() => setFormProgress(0), 700);
+  };
+
+  const resetFormProgress = () => {
+    if (formProgressTimer.current) {
+      clearInterval(formProgressTimer.current);
+      formProgressTimer.current = null;
+    }
+    setFormProgress(0);
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -181,43 +248,68 @@ export default function FormularioPage() {
     setSuccess(null);
 
     try {
-      if (!file) {
-        setError("Selecione um arquivo para enviar (PDF, PNG ou JPEG).");
+      if (files.length === 0) {
+        setError("Selecione ao menos um arquivo para enviar.");
         return;
       }
 
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) {
+      if (!user) {
         setError("Sessão expirada. Faça login novamente.");
         router.push("/login");
         return;
       }
 
-      const fileExt = file.name.split(".").pop();
-      const filePath = `${user.id}/${config.tipo}/${Date.now()}.${fileExt}`;
+      beginFormProgress();
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("formularios")
-        .upload(filePath, file);
+      const uploadResults: UploadedFileSummary[] = [];
+      for (const [index, currentFile] of files.entries()) {
+        const ext = currentFile.name.split(".").pop() ?? "bin";
+        const uniqueSuffix = `${Date.now()}-${index}`;
+        const filePath = `${user.id}/${config.tipo}/${uniqueSuffix}.${ext}`;
 
-      if (uploadError || !uploadData) {
-        setError(
-          uploadError?.message ||
-            "Erro ao fazer upload do arquivo para o Storage.",
-        );
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("formularios")
+          .upload(filePath, currentFile);
+
+        if (uploadError || !uploadData) {
+          resetFormProgress();
+          setError(
+            uploadError?.message ||
+              "Erro ao fazer upload de um dos arquivos para o Storage.",
+          );
+          return;
+        }
+
+        uploadResults.push({
+          path: uploadData.path ?? filePath,
+          name: currentFile.name,
+          type: currentFile.type,
+          size: currentFile.size,
+        });
+      }
+
+      if (uploadResults.length === 0) {
+        resetFormProgress();
+        setError("Nenhum arquivo foi processado. Tente novamente.");
         return;
       }
+
+      const payloadDados: Record<string, unknown> = {
+        ...values,
+        anexos: uploadResults.map((fileInfo) => ({
+          nome: fileInfo.name,
+          path: fileInfo.path,
+          tipo: fileInfo.type,
+          tamanho: fileInfo.size,
+        })),
+      };
 
       const payload = {
         user_id: user.id,
         tipo: config.tipo,
-        dados: values,
-        arquivo_path: uploadData.path ?? filePath,
-        status: "pendente",
+        dados: payloadDados,
+        arquivo_path: uploadResults[0]?.path ?? "",
+        status: config.defaultStatus ?? "pendente",
       };
 
       const { error: insertError } = await supabase
@@ -225,15 +317,21 @@ export default function FormularioPage() {
         .insert(payload);
 
       if (insertError) {
+        resetFormProgress();
         setError(insertError.message);
         return;
       }
 
       setSuccess("Formulário enviado com sucesso!");
-      setFile(null);
+      completeFormProgress();
+      setFiles([]);
       setValues((prev) =>
         Object.fromEntries(Object.keys(prev).map((key) => [key, ""])),
       );
+    } catch (err) {
+      console.error("Erro ao enviar formulário:", err);
+      resetFormProgress();
+      setError("Não foi possível enviar o formulário. Tente novamente.");
     } finally {
       setSubmitting(false);
     }
@@ -247,7 +345,7 @@ export default function FormularioPage() {
           onClick={() => router.back()}
           className="mb-3 text-xs text-slate-500 hover:text-sky-600"
         >
-          ← Voltar
+          Voltar
         </button>
         <div className="flex items-center gap-2">
           <FilePlus2 className="h-5 w-5 text-slate-700" />
@@ -257,6 +355,28 @@ export default function FormularioPage() {
         </div>
         <p className="mt-1 text-sm text-slate-500">{config.description}</p>
       </div>
+
+      {formProgress > 0 && (
+        <div className="rounded-2xl border border-sky-100 bg-sky-50/80 p-4 text-xs text-slate-600 shadow-sm shadow-sky-100">
+          <div className="flex items-center justify-between">
+            <p className="font-semibold text-slate-600">
+              Enviando formulário
+            </p>
+            <span className="text-[11px] font-semibold text-sky-700">
+              {Math.min(formProgress, 100).toFixed(0)}%
+            </span>
+          </div>
+          <div className="mt-2 h-2 w-full rounded-full bg-white">
+            <div
+              className="h-2 rounded-full bg-gradient-to-r from-sky-400 via-emerald-400 to-sky-400 transition-all"
+              style={{ width: `${Math.min(formProgress, 100)}%` }}
+            />
+          </div>
+          <p className="mt-2 text-[11px] text-slate-500">
+            Estamos carregando o arquivo e registrando os dados no Supabase.
+          </p>
+        </div>
+      )}
 
       <form
         onSubmit={handleSubmit}
@@ -274,7 +394,9 @@ export default function FormularioPage() {
               {field.type === "textarea" ? (
                 <textarea
                   id={field.name}
-                  required={field.name !== "observacoes" && field.name !== "descricao"}
+                  required={
+                    field.name !== "observacoes" && field.name !== "descricao"
+                  }
                   value={values[field.name] ?? ""}
                   onChange={(e) => handleChange(field.name, e.target.value)}
                   placeholder={field.placeholder}
@@ -288,8 +410,16 @@ export default function FormularioPage() {
                   value={values[field.name] ?? ""}
                   onChange={(e) => handleChange(field.name, e.target.value)}
                   placeholder={field.placeholder}
+                  list={field.options ? `${field.name}-options` : undefined}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-sky-500/40 placeholder:text-slate-400 focus:border-sky-500 focus:ring"
                 />
+              )}
+              {field.options && (
+                <datalist id={`${field.name}-options`}>
+                  {field.options.map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+                </datalist>
               )}
             </div>
           ))}
@@ -300,21 +430,24 @@ export default function FormularioPage() {
             htmlFor="arquivo"
             className="block text-xs font-medium uppercase tracking-wide text-slate-600"
           >
-            Arquivo (PDF, PNG ou JPEG)
+            Arquivos (PDF, PNG ou JPEG)
           </label>
           <input
             id="arquivo"
             type="file"
             accept="application/pdf,image/png,image/jpeg"
             required
+            multiple
             onChange={(e) => {
-              const selectedFile = e.target.files?.[0] ?? null;
-              setFile(selectedFile);
+              const selectedFiles = e.target.files
+                ? Array.from(e.target.files)
+                : [];
+              setFiles(selectedFiles);
             }}
             className="block w-full cursor-pointer rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-sky-500 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:border-sky-500"
           />
           <p className="text-[11px] text-slate-500">
-            Tamanho máximo definido no Storage da sua instância Supabase.
+            Png, Jpeg ou PDF
           </p>
         </div>
 
@@ -331,13 +464,11 @@ export default function FormularioPage() {
 
         <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-200 pt-4">
           <p className="text-[11px] text-slate-500">
-            Ao enviar, o documento será salvo na tabela{" "}
-            <span className="font-semibold text-slate-700">formularios</span>{" "}
-            e no bucket{" "}
-            <span className="font-semibold text-slate-700">
-              formularios
-            </span>{" "}
-            do Supabase Storage.
+            
+            
+            
+            
+      
           </p>
           <button
             type="submit"
@@ -351,3 +482,5 @@ export default function FormularioPage() {
     </div>
   );
 }
+
+

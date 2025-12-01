@@ -1,39 +1,25 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
-import {
-  BriefcaseBusiness,
-  FileBadge,
-  ReceiptText,
-} from "lucide-react";
+import { useAuth } from "@/components/AuthProvider";
+import { BriefcaseBusiness, FileBadge, ReceiptText } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const { user, isLoading, error: authError } = useAuth();
 
   useEffect(() => {
-    const verifyUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+    if (!isLoading && !user) {
+      router.replace("/login");
+    }
+  }, [isLoading, user, router]);
 
-      if (!user) {
-        router.replace("/login");
-      } else {
-        setLoading(false);
-      }
-    };
-
-    void verifyUser();
-  }, [router]);
-
-  if (loading) {
+  if (isLoading || !user) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
-        Carregando formulários...
+        {authError ?? "Carregando formulários..."}
       </div>
     );
   }
@@ -41,7 +27,8 @@ export default function DashboardPage() {
   const cards = [
     {
       title: "Retenção Trabalhista",
-      description: "Envio de documentos relacionados à retenção de tributos trabalhistas.",
+      description:
+        "Envio de documentos relacionados à retenção de tributos trabalhistas.",
       href: "/formulario/retencao-trabalhista",
       icon: BriefcaseBusiness,
       accent: "from-sky-100 via-sky-50 to-transparent",
@@ -66,10 +53,10 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="flex flex-1 flex-col gap-6 py-4">
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
             Formulários
           </h1>
           <p className="mt-1 text-sm text-slate-500">
@@ -84,29 +71,29 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (
           <Link
             key={card.href}
             href={card.href}
-            className="group relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm shadow-slate-200 transition hover:-translate-y-1 hover:shadow-md"
+            className="group relative overflow-hidden rounded-3xl bg-white p-6 shadow-md shadow-slate-200 transition hover:-translate-y-1 hover:shadow-lg"
           >
             <div
               className={`pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br ${card.accent} opacity-80 blur-2xl`}
             />
             <div className="relative flex h-full flex-col gap-3">
               <div className="flex items-center gap-2">
-                <card.icon className="h-5 w-5 text-slate-700" />
-                <h2 className="text-sm font-semibold text-slate-900">
+                <card.icon className="h-6 w-6 text-slate-700" />
+                <h2 className="text-base font-semibold text-slate-900">
                   {card.title}
                 </h2>
               </div>
-              <p className="flex-1 text-xs text-slate-500">
+              <p className="flex-1 text-sm text-slate-500">
                 {card.description}
               </p>
-              <span className="mt-1 inline-flex items-center text-xs font-medium text-emerald-700">
+              <span className="mt-1 inline-flex items-center text-sm font-semibold text-emerald-700">
                 Abrir formulário
-                <span className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-[10px] text-emerald-700">
+                <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-700">
                   &gt;
                 </span>
               </span>
