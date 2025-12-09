@@ -54,6 +54,7 @@ export default function PermissoesPage() {
     modules: modulesAccess,
     loading: accessLoading,
     error: accessError,
+    refresh: refreshModules,
   } = useDocumentsAccess();
   const canManagePermissions = modulesAccess.documentos;
   const {
@@ -239,6 +240,7 @@ export default function PermissoesPage() {
             success: `Acesso a ${label} concedido.`,
           });
         }
+        await refreshModules();
       } catch (err) {
         setFeedback({
           error:

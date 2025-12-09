@@ -43,42 +43,22 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
 
     setLoading(true);
     try {
-      const filters: string[] = [`user_id.eq.${user.id}`];
-      if (normalizedEmail) {
-        filters.push(`email.eq.${normalizedEmail}`);
-      }
+      const selectWithModule = async (column: "user_id" | "email", value: string) => {
+        return supabase
+          .from("documentos_acesso")
+          .select("id,modulo")
+          .eq(column, value);
+      };
 
-      const { data, error: queryError } = await supabase
-        .from("documentos_acesso")
-        .select("id,modulo")
-        .or(filters.join(","));
-
-      if (queryError) {
-        if (queryError.message?.toLowerCase().includes("modulo")) {
-          const {
-            data: fallbackData,
-            error: fallbackError,
-          } = await supabase
-            .from("documentos_acesso")
-            .select("id")
-            .or(filters.join(","));
-
-          if (fallbackError) {
-            throw fallbackError;
-          }
-
-          const hasAny = Boolean(fallbackData && fallbackData.length > 0);
-          setModules({
-            documentos: hasAny,
-            dashboards: false,
-            perfil: false,
-          });
-          setHasAccess(hasAny);
-          setError(null);
-          return;
-        }
-        throw queryError;
-      }
+      const selectWithoutModule = async (
+        column: "user_id" | "email",
+        value: string,
+      ) => {
+        return supabase
+          .from("documentos_acesso")
+          .select("id")
+          .eq(column, value);
+      };
 
       const baseModules: ModulesAccess = {
         documentos: false,
@@ -86,12 +66,45 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         perfil: false,
       };
 
-      data?.forEach((item) => {
-        const modulo = (item.modulo ?? "documentos") as ModuleKey;
-        if (modulo in baseModules) {
-          baseModules[modulo] = true;
+      const applyRecords = (records: { modulo?: string | null }[] | null) => {
+        records?.forEach((item) => {
+          const modulo = (item.modulo ?? "documentos") as ModuleKey;
+          if (modulo in baseModules) {
+            baseModules[modulo] = true;
+          }
+        });
+      };
+
+      let dataResult: { modulo?: string | null }[] | null = null;
+
+      let { data, error } = await selectWithModule("user_id", user.id);
+      if (error && error.message?.toLowerCase().includes("modulo")) {
+        const fallback = await selectWithoutModule("user_id", user.id);
+        data = fallback.data;
+        error = fallback.error;
+      }
+      if (error) {
+        throw error;
+      }
+
+      dataResult = data;
+      applyRecords(dataResult);
+
+      if ((!dataResult || dataResult.length === 0) && normalizedEmail) {
+        let {
+          data: emailData,
+          error: emailError,
+        } = await selectWithModule("email", normalizedEmail);
+        if (emailError && emailError.message?.toLowerCase().includes("modulo")) {
+          const fallback = await selectWithoutModule("email", normalizedEmail);
+          emailData = fallback.data;
+          emailError = fallback.error;
         }
-      });
+        if (emailError) {
+          throw emailError;
+        }
+        applyRecords(emailData ?? null);
+      }
 
       setModules(baseModules);
       setHasAccess(
