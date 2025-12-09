@@ -43,7 +43,10 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
 
     setLoading(true);
     try {
-      const selectWithModule = async (column: "user_id" | "email", value: string) => {
+      const selectWithModule = async (
+        column: "user_id" | "email",
+        value: string,
+      ) => {
         return supabase
           .from("documentos_acesso")
           .select("id,modulo")
@@ -80,7 +83,11 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
       let { data, error } = await selectWithModule("user_id", user.id);
       if (error && error.message?.toLowerCase().includes("modulo")) {
         const fallback = await selectWithoutModule("user_id", user.id);
-        data = fallback.data;
+        data =
+          fallback.data?.map((item) => ({
+            ...item,
+            modulo: null,
+          })) ?? null;
         error = fallback.error;
       }
       if (error) {
@@ -95,9 +102,16 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
           data: emailData,
           error: emailError,
         } = await selectWithModule("email", normalizedEmail);
-        if (emailError && emailError.message?.toLowerCase().includes("modulo")) {
+        if (
+          emailError &&
+          emailError.message?.toLowerCase().includes("modulo")
+        ) {
           const fallback = await selectWithoutModule("email", normalizedEmail);
-          emailData = fallback.data;
+          emailData =
+            fallback.data?.map((item) => ({
+              ...item,
+              modulo: null,
+            })) ?? null;
           emailError = fallback.error;
         }
         if (emailError) {
