@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { FilePlus2 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
+import { usePrestadores } from "@/hooks/usePrestadores";
 
 type FormField = {
   name: string;
@@ -165,6 +166,14 @@ export default function FormularioPage() {
     () => FORM_CONFIGS.find((f) => f.slug === params.slug),
     [params.slug],
   );
+  const enablePrestadorDropdown = config?.slug === "registro-laudos";
+  const {
+    prestadores: prestadoresDisponiveis,
+    loading: prestadoresLoading,
+  } = usePrestadores({
+    assignedOnly: true,
+    enabled: Boolean(enablePrestadorDropdown),
+  });
   const tipoServicoFiltro = searchParams.get("tipoServico") ?? "";
 
   const getInitialValues = useCallback((): FormValues => {
@@ -440,7 +449,29 @@ export default function FormularioPage() {
               >
                 {field.label}
               </label>
-              {field.type === "textarea" ? (
+              {enablePrestadorDropdown && field.name === "prestador" ? (
+                <select
+                  id={field.name}
+                  required
+                  value={values[field.name] ?? ""}
+                  onChange={(e) => handleChange(field.name, e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-sky-500/40 placeholder:text-slate-400 focus:border-sky-500 focus:ring"
+                  disabled={prestadoresLoading || prestadoresDisponiveis.length === 0}
+                >
+                  <option value="">
+                    {prestadoresLoading
+                      ? "Carregando prestadores..."
+                      : prestadoresDisponiveis.length === 0
+                        ? "Nenhum prestador disponível"
+                        : "Selecione um prestador"}
+                  </option>
+                  {prestadoresDisponiveis.map((prestador) => (
+                    <option key={prestador.id} value={prestador.nome}>
+                      {prestador.nome} • {prestador.tipo_servico}
+                    </option>
+                  ))}
+                </select>
+              ) : field.type === "textarea" ? (
                 <textarea
                   id={field.name}
                   required={
@@ -469,6 +500,15 @@ export default function FormularioPage() {
                     <option key={option} value={option} />
                   ))}
                 </datalist>
+              )}
+              {enablePrestadorDropdown && field.name === "prestador" && (
+                <p className="text-[11px] text-slate-500">
+                  {prestadoresLoading
+                    ? "Buscando prestadores vinculados ao seu usuário..."
+                    : prestadoresDisponiveis.length === 0
+                      ? "Nenhum prestador foi associado à sua conta. Peça ao administrador para adicionar seu e-mail ao grupo correto."
+                      : "Escolha um prestador cadastrado pelo administrador para vincular o envio."}
+                </p>
               )}
             </div>
           ))}

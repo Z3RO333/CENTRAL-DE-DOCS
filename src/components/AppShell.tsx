@@ -8,6 +8,7 @@ import {
   LogOut,
   UserRound,
   BarChart3,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabaseClient";
@@ -121,6 +122,19 @@ export default function AppShell({
               >
                 <UserRound className="h-4 w-4" />
                 Perfil
+              </Link>
+            )}
+            {canAccessDocuments && (
+              <Link
+                href="/dashboard/permissoes"
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                  pathname?.startsWith("/dashboard/permissoes")
+                    ? "bg-slate-900 text-slate-50 shadow-sm shadow-slate-400/40"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                <ShieldCheck className="h-4 w-4" />
+                Permissões
               </Link>
             )}
             {isAuthenticated && (

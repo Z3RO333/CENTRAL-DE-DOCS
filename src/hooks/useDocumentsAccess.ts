@@ -16,6 +16,7 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
   const [hasAccess, setHasAccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const normalizedEmail = user?.email?.toLowerCase().trim() ?? null;
 
   const fetchAccess = useCallback(async () => {
     if (!user) {
@@ -27,17 +28,31 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
 
     setLoading(true);
     try {
-      const { data, error: queryError } = await supabase
+      const baseQuery = supabase
         .from("documentos_acesso")
         .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+        .limit(1);
+
+      let dataResult = null;
+      let queryError = null;
+
+      const { data, error } = await baseQuery.eq("user_id", user.id).maybeSingle();
+      dataResult = data;
+      queryError = error;
+
+      if (!dataResult && !queryError && normalizedEmail) {
+        const { data: emailData, error: emailError } = await baseQuery
+          .eq("email", normalizedEmail)
+          .maybeSingle();
+        dataResult = emailData;
+        queryError = emailError;
+      }
 
       if (queryError) {
         throw queryError;
       }
 
-      setHasAccess(Boolean(data));
+      setHasAccess(Boolean(dataResult));
       setError(null);
     } catch (err) {
       console.error("Erro ao verificar permissões de documentos:", err);
@@ -50,7 +65,7 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, normalizedEmail]);
 
   useEffect(() => {
     if (!authLoading) {
