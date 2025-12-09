@@ -147,39 +147,33 @@ export function useDocumentPermissions(
         throw new Error("Esse usuário já possui essa permissão.");
       }
 
-      const payload: Record<string, string> = {
-        email: normalizedEmail,
-        modulo: module,
+      const token = await getAccessToken();
+      const response = await fetch("/api/admin/permissions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: "grant",
+          email: normalizedEmail,
+          module,
+          userId,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        permission?: DocumentPermission;
+        error?: string;
       };
 
-      if (userId) {
-        payload.user_id = userId;
+      if (!response.ok || !payload.permission) {
+        throw new Error(payload.error ?? "Falha ao conceder permissão.");
       }
 
-      const { data, error: insertError } = await supabase
-        .from("documentos_acesso")
-        .insert(payload)
-        .select("id,user_id,email,modulo,created_at")
-        .single();
-
-      if (insertError) {
-        throw insertError;
-      }
-
-      if (data) {
-        setPermissions((prev) => [
-          {
-            id: data.id as string,
-            user_id: data.user_id as string | null,
-            email: data.email as string | null,
-            module: (data.modulo as PermissionModule | null) ?? "documentos",
-            created_at: data.created_at as string,
-          },
-          ...prev,
-        ]);
-      }
+      setPermissions((prev) => [payload.permission!, ...prev]);
     },
-    [enabled, normalizedPermissions],
+    [enabled, normalizedPermissions, getAccessToken],
   );
 
   const revokePermission = useCallback(
@@ -190,18 +184,28 @@ export function useDocumentPermissions(
       if (!permissionId) {
         return;
       }
-      const { error: deleteError } = await supabase
-        .from("documentos_acesso")
-        .delete()
-        .eq("id", permissionId);
 
-      if (deleteError) {
-        throw deleteError;
+      const token = await getAccessToken();
+      const response = await fetch("/api/admin/permissions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: "revoke",
+          permissionId,
+        }),
+      });
+
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Falha ao remover permissão.");
       }
 
       setPermissions((prev) => prev.filter((item) => item.id !== permissionId));
     },
-    [enabled],
+    [enabled, getAccessToken],
   );
 
   return {
@@ -213,3 +217,15 @@ export function useDocumentPermissions(
     revokePermission,
   };
 }
+  const getAccessToken = useCallback(async () => {
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+    if (sessionError) {
+      throw sessionError;
+    }
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      throw new Error("Sessão expirou. Faça login novamente.");
+    }
+    return token;
+  }, []);
