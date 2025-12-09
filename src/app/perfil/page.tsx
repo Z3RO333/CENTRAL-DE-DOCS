@@ -23,10 +23,9 @@ type StatusBanner = {
 export default function PerfilPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
-  const {
-    hasAccess: hasDocumentsAccess,
-    loading: accessLoading,
-  } = useDocumentsAccess();
+  const { modules: modulesAccess, loading: accessLoading } =
+    useDocumentsAccess();
+  const canAccessPerfil = modulesAccess.perfil;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
@@ -47,10 +46,10 @@ export default function PerfilPage() {
       return;
     }
 
-    if (!hasDocumentsAccess) {
+    if (!canAccessPerfil) {
       router.replace("/dashboard");
     }
-  }, [authLoading, accessLoading, user, hasDocumentsAccess, router]);
+  }, [authLoading, accessLoading, user, canAccessPerfil, router]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !storageKey) {
@@ -421,7 +420,7 @@ export default function PerfilPage() {
               <p className="mt-2 text-[11px] text-slate-500">
                 Dominio liberado para assinar:{" "}
                 <span className="font-semibold text-emerald-600">
-                {hasDocumentsAccess ? "@bemol.com.br" : "não autorizado"}
+                {canAccessPerfil ? "@bemol.com.br" : "não autorizado"}
                 </span>
               </p>
             </div>

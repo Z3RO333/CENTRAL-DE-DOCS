@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ShieldCheck,
@@ -12,7 +12,11 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
-import { useDocumentPermissions } from "@/hooks/useDocumentPermissions";
+import {
+  type PermissionModule,
+  type DocumentPermission,
+  useDocumentPermissions,
+} from "@/hooks/useDocumentPermissions";
 import { supabase } from "@/lib/supabaseClient";
 
 const formatDateTime = (value: string) => {
@@ -21,6 +25,18 @@ const formatDateTime = (value: string) => {
     return "--";
   }
   return date.toLocaleString("pt-BR");
+};
+
+const MODULE_BUTTONS: { key: PermissionModule; label: string }[] = [
+  { key: "documentos", label: "Documentos" },
+  { key: "dashboards", label: "Dashboards" },
+  { key: "perfil", label: "Perfil" },
+];
+
+const MODULE_LABELS: Record<PermissionModule, string> = {
+  documentos: "Documentos",
+  dashboards: "Dashboards",
+  perfil: "Perfil",
 };
 
 type AppUser = {
@@ -35,10 +51,11 @@ export default function PermissoesPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
   const {
-    hasAccess: hasDocumentsAccess,
+    modules: modulesAccess,
     loading: accessLoading,
     error: accessError,
   } = useDocumentsAccess();
+  const canManagePermissions = modulesAccess.documentos;
   const {
     permissions,
     loading: permissionsLoading,
@@ -47,7 +64,7 @@ export default function PermissoesPage() {
     revokePermission,
     refresh,
   } = useDocumentPermissions({
-    enabled: hasDocumentsAccess,
+    enabled: canManagePermissions,
   });
 
   const [formState, setFormState] = useState({
@@ -65,6 +82,7 @@ export default function PermissoesPage() {
   const [appUsers, setAppUsers] = useState<AppUser[]>([]);
   const [appUsersLoading, setAppUsersLoading] = useState(true);
   const [appUsersError, setAppUsersError] = useState<string | null>(null);
+  const [togglingTarget, setTogglingTarget] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -73,10 +91,10 @@ export default function PermissoesPage() {
   }, [authLoading, user, router]);
 
   useEffect(() => {
-    if (!authLoading && !accessLoading && user && !hasDocumentsAccess) {
+    if (!authLoading && !accessLoading && user && !canManagePermissions) {
       router.replace("/dashboard");
     }
-  }, [authLoading, accessLoading, user, hasDocumentsAccess, router]);
+  }, [authLoading, accessLoading, user, canManagePermissions, router]);
 
   useEffect(() => {
     if (selectedPermissionId) {
@@ -90,7 +108,7 @@ export default function PermissoesPage() {
   }, [permissions, selectedPermissionId]);
 
   useEffect(() => {
-    if (!hasDocumentsAccess || authLoading || accessLoading) {
+    if (!canManagePermissions || authLoading || accessLoading) {
       return;
     }
 
@@ -149,7 +167,7 @@ export default function PermissoesPage() {
     return () => {
       active = false;
     };
-  }, [hasDocumentsAccess, authLoading, accessLoading]);
+  }, [canManagePermissions, authLoading, accessLoading]);
 
   const filteredPermissions = useMemo(() => {
     if (!searchTerm.trim()) {
@@ -168,6 +186,75 @@ export default function PermissoesPage() {
   const selectedPermission =
     permissions.find((item) => item.id === selectedPermissionId) ?? null;
 
+  const normalizeEmail = useCallback(
+    (value: string | null) => value?.toLowerCase().trim() ?? null,
+    [],
+  );
+
+  const getPermissionForUserAndModule = useCallback(
+    (appUser: AppUser, module: PermissionModule) => {
+      const normalizedEmail = normalizeEmail(appUser.email);
+      return (
+        permissions.find(
+          (permission) =>
+            permission.module === module &&
+            ((permission.user_id && permission.user_id === appUser.id) ||
+              (normalizedEmail && permission.email === normalizedEmail)),
+        ) ?? null
+      );
+    },
+    [normalizeEmail, permissions],
+  );
+
+  const handleToggleModule = useCallback(
+    async (
+      appUser: AppUser,
+      module: PermissionModule,
+      existing: DocumentPermission | null,
+    ) => {
+      if (!appUser.email) {
+        setFeedback({
+          error: "Usuário sem e-mail cadastrado. Cadastre um e-mail primeiro.",
+          success: null,
+        });
+        return;
+      }
+      const targetKey = `${appUser.id}:${module}`;
+      setTogglingTarget(targetKey);
+      try {
+        const label = MODULE_LABELS[module] ?? module;
+        if (existing) {
+          await revokePermission(existing.id);
+          setFeedback({
+            error: null,
+            success: `Acesso a ${label} revogado.`,
+          });
+        } else {
+          await grantPermission({
+            email: appUser.email,
+            userId: appUser.id,
+            module,
+          });
+          setFeedback({
+            error: null,
+            success: `Acesso a ${label} concedido.`,
+          });
+        }
+      } catch (err) {
+        setFeedback({
+          error:
+            err instanceof Error
+              ? err.message
+              : "Não foi possível atualizar a permissão.",
+          success: null,
+        });
+      } finally {
+        setTogglingTarget(null);
+      }
+    },
+    [grantPermission, revokePermission],
+  );
+
   const handleGrant = async (event: React.FormEvent) => {
     event.preventDefault();
     setFeedback({ error: null, success: null });
@@ -185,6 +272,7 @@ export default function PermissoesPage() {
       await grantPermission({
         email: formState.email.trim(),
         userId: formState.userId.trim() || undefined,
+        module: "documentos",
       });
       setFeedback({
         error: null,
@@ -230,7 +318,7 @@ export default function PermissoesPage() {
     authLoading ||
     accessLoading ||
     !user ||
-    (!hasDocumentsAccess && !accessLoading)
+    (!canManagePermissions && !accessLoading)
   ) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
@@ -403,11 +491,11 @@ export default function PermissoesPage() {
             </p>
           ) : (
             <div className="space-y-2">
-              {filteredPermissions.map((permission) => (
-                <button
-                  key={permission.id}
-                  type="button"
-                  onClick={() => setSelectedPermissionId(permission.id)}
+            {filteredPermissions.map((permission) => (
+              <button
+                key={permission.id}
+                type="button"
+                onClick={() => setSelectedPermissionId(permission.id)}
                   className={`w-full rounded-2xl border px-4 py-3 text-left text-sm transition ${
                     permission.id === selectedPermissionId
                       ? "border-sky-300 bg-sky-50 text-sky-900"
@@ -426,6 +514,12 @@ export default function PermissoesPage() {
                     ) : (
                       <span className="text-amber-600">não informado</span>
                     )}
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Tela liberada:{" "}
+                    <span className="font-semibold text-slate-700">
+                      {MODULE_LABELS[permission.module] ?? permission.module}
+                    </span>
                   </p>
                   <p className="text-[11px] text-slate-500">
                     Registrado em {formatDateTime(permission.created_at)}
@@ -461,6 +555,15 @@ export default function PermissoesPage() {
             </div>
             <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Tela liberada
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-700">
+                {MODULE_LABELS[selectedPermission.module] ??
+                  selectedPermission.module}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Criado em
               </p>
               <p className="mt-1 text-sm font-semibold text-slate-700">
@@ -492,7 +595,8 @@ export default function PermissoesPage() {
               Usuários cadastrados no aplicativo
             </p>
             <p className="text-[11px] text-slate-500">
-              Lista fornecida diretamente pelo Supabase Auth.
+              Lista fornecida diretamente pelo Supabase Auth. Use os botões para
+              liberar cada tela.
             </p>
           </div>
           <div className="text-xs text-slate-500">
@@ -520,6 +624,7 @@ export default function PermissoesPage() {
                   <th className="px-4 py-3 text-left">Criado em</th>
                   <th className="px-4 py-3 text-left">Último acesso</th>
                   <th className="px-4 py-3 text-left">Telefone</th>
+                  <th className="px-4 py-3 text-left">Acesso às telas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs text-slate-600">
@@ -540,6 +645,46 @@ export default function PermissoesPage() {
                       {appUser.phone ?? (
                         <span className="text-slate-400">—</span>
                       )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-2">
+                        {MODULE_BUTTONS.map((module) => {
+                          const existing = getPermissionForUserAndModule(
+                            appUser,
+                            module.key,
+                          );
+                          const active = Boolean(existing);
+                          const isProcessing =
+                            togglingTarget === `${appUser.id}:${module.key}`;
+                          return (
+                            <button
+                              key={module.key}
+                              type="button"
+                              disabled={!appUser.email || isProcessing}
+                              onClick={() =>
+                                handleToggleModule(
+                                  appUser,
+                                  module.key,
+                                  existing,
+                                )
+                              }
+                              className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                                active
+                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                  : "border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+                              } ${
+                                !appUser.email
+                                  ? "opacity-60"
+                                  : "disabled:opacity-60"
+                              }`}
+                            >
+                              {isProcessing
+                                ? "Atualizando..."
+                                : module.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </td>
                   </tr>
                 ))}

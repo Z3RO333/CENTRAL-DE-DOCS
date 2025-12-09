@@ -28,13 +28,14 @@ type DashboardCard = {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading, error: authError } = useAuth();
-  const { hasAccess: hasDocumentsAccess } = useDocumentsAccess();
+  const { modules: modulesAccess } = useDocumentsAccess();
+  const canManagePrestadores = modulesAccess.documentos;
   const {
     prestadores,
     loading: prestadoresLoading,
     error: prestadoresError,
     createPrestador,
-  } = usePrestadores({ enabled: hasDocumentsAccess });
+  } = usePrestadores({ enabled: canManagePrestadores });
   const [prestadorForm, setPrestadorForm] = useState({
     nome: "",
     tipoServico: "",
@@ -132,7 +133,7 @@ export default function DashboardPage() {
     }
     if (!prestadorForm.tipoServico.trim()) {
       setPrestadorFeedback({
-        error: "Informe o tipo de servi‡o.",
+        error: "Informe o tipo de serviço.",
         success: null,
       });
       return;
@@ -152,7 +153,7 @@ export default function DashboardPage() {
     if (usuariosList.length === 0) {
       setPrestadorFeedback({
         error:
-          "Informe pelo menos um e-mail de usu rio autorizado, separados por v¡rgula.",
+          "Informe pelo menos um e-mail de usuário autorizado, separados por vírgula.",
         success: null,
       });
       return;
@@ -186,7 +187,7 @@ export default function DashboardPage() {
         error:
           err instanceof Error
             ? err.message
-            : "NÆo foi poss¡vel cadastrar o prestador.",
+            : "Não foi possível cadastrar o prestador.",
         success: null,
       });
     } finally {
@@ -244,7 +245,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {hasDocumentsAccess && (
+      {canManagePrestadores && (
         <section className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm shadow-slate-200">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
@@ -253,11 +254,11 @@ export default function DashboardPage() {
                 Cadastro de prestadores
               </p>
               <p className="text-[11px] text-slate-500">
-                Administre quais prestadores e usu rios podem enviar laudos.
+                Administre quais prestadores e usuários podem enviar laudos.
               </p>
             </div>
             <span className="text-[11px] font-semibold text-slate-500">
-              Vis¡vel apenas para administradores
+              Visível apenas para administradores
             </span>
           </div>
 
@@ -301,7 +302,7 @@ export default function DashboardPage() {
                   />
                 </label>
                 <label className="text-xs font-semibold text-slate-600">
-                  Tipo de servi‡o
+                  Tipo de serviço
                   <input
                     type="text"
                     value={prestadorForm.tipoServico}
@@ -312,7 +313,7 @@ export default function DashboardPage() {
                       )
                     }
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                    placeholder="Ex.: Laudos t‚cnicos"
+                    placeholder="Ex.: Laudos técnicos"
                     required
                   />
                 </label>
@@ -330,18 +331,18 @@ export default function DashboardPage() {
                   />
                 </label>
                 <label className="text-xs font-semibold text-slate-600">
-                  Usu rios autorizados
+                  Usuários autorizados
                   <textarea
                     value={prestadorForm.usuarios}
                     onChange={(event) =>
                       handlePrestadorFieldChange("usuarios", event.target.value)
                     }
                     className="mt-1 min-h-[90px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                    placeholder="Informe os e-mails separados por v¡rgula"
+                    placeholder="Informe os e-mails separados por vírgula"
                   />
                   <span className="text-[11px] text-slate-500">
-                    Digite os e-mails de quem poder  usar esse prestador no
-                    formul rio.
+                    Digite os e-mails de quem poderá usar esse prestador no
+                    formulário.
                   </span>
                 </label>
               </div>
@@ -390,7 +391,7 @@ export default function DashboardPage() {
                     <div className="mt-4 space-y-2 rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-xs text-slate-600">
                       <p>
                         <span className="font-semibold text-slate-700">
-                          Tipo de servi‡o:
+                          Tipo de serviço:
                         </span>{" "}
                         {selectedPrestador.tipo_servico}
                       </p>
@@ -402,7 +403,7 @@ export default function DashboardPage() {
                       </p>
                       <div>
                         <span className="font-semibold text-slate-700">
-                          Usu rios vinculados:
+                          Usuários vinculados:
                         </span>
                         <ul className="mt-1 list-disc pl-4 text-[11px]">
                           {selectedPrestador.usuarios.map((usuario) => (

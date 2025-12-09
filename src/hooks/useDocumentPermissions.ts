@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
+export type PermissionModule = "documentos" | "dashboards" | "perfil";
+
 export type DocumentPermission = {
   id: string;
   user_id: string | null;
   email: string | null;
+  module: PermissionModule;
   created_at: string;
 };
 
@@ -22,6 +25,7 @@ type UseDocumentPermissionsResult = {
   grantPermission: (input: {
     email: string;
     userId?: string;
+    module: PermissionModule;
   }) => Promise<void>;
   revokePermission: (permissionId: string) => Promise<void>;
 };
@@ -55,10 +59,35 @@ export function useDocumentPermissions(
     try {
       const { data, error: queryError } = await supabase
         .from("documentos_acesso")
-        .select("id,user_id,email,created_at")
+        .select("id,user_id,email,modulo,created_at")
         .order("created_at", { ascending: false });
 
       if (queryError) {
+        if (queryError.message?.toLowerCase().includes("modulo")) {
+          const {
+            data: fallbackData,
+            error: fallbackError,
+          } = await supabase
+            .from("documentos_acesso")
+            .select("id,user_id,email,created_at")
+            .order("created_at", { ascending: false });
+
+          if (fallbackError) {
+            throw fallbackError;
+          }
+
+          setPermissions(
+            fallbackData?.map((item) => ({
+              id: item.id as string,
+              user_id: item.user_id as string | null,
+              email: item.email as string | null,
+              module: "documentos",
+              created_at: item.created_at as string,
+            })) ?? [],
+          );
+          setError(null);
+          return;
+        }
         throw queryError;
       }
 
@@ -67,6 +96,7 @@ export function useDocumentPermissions(
           id: item.id as string,
           user_id: item.user_id as string | null,
           email: item.email as string | null,
+          module: (item.modulo as PermissionModule | null) ?? "documentos",
           created_at: item.created_at as string,
         })) ?? [],
       );
@@ -89,7 +119,15 @@ export function useDocumentPermissions(
   }, [fetchPermissions]);
 
   const grantPermission = useCallback(
-    async ({ email, userId }: { email: string; userId?: string }) => {
+    async ({
+      email,
+      userId,
+      module,
+    }: {
+      email: string;
+      userId?: string;
+      module: PermissionModule;
+    }) => {
       if (!enabled) {
         throw new Error("Gerenciamento de permissões está desabilitado.");
       }
@@ -101,15 +139,17 @@ export function useDocumentPermissions(
 
       const exists = normalizedPermissions.find(
         (permission) =>
-          permission.email === normalizedEmail ||
-          (userId && permission.user_id === userId),
+          (permission.email === normalizedEmail ||
+            (userId && permission.user_id === userId)) &&
+          permission.module === module,
       );
       if (exists) {
-        throw new Error("Esse usuário já possui permissão.");
+        throw new Error("Esse usuário já possui essa permissão.");
       }
 
       const payload: Record<string, string> = {
         email: normalizedEmail,
+        modulo: module,
       };
 
       if (userId) {
@@ -119,7 +159,7 @@ export function useDocumentPermissions(
       const { data, error: insertError } = await supabase
         .from("documentos_acesso")
         .insert(payload)
-        .select("id,user_id,email,created_at")
+        .select("id,user_id,email,modulo,created_at")
         .single();
 
       if (insertError) {
@@ -132,6 +172,7 @@ export function useDocumentPermissions(
             id: data.id as string,
             user_id: data.user_id as string | null,
             email: data.email as string | null,
+            module: (data.modulo as PermissionModule | null) ?? "documentos",
             created_at: data.created_at as string,
           },
           ...prev,

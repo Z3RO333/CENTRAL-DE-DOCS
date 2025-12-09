@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
+import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 
 type Registro = {
   id: string;
@@ -75,6 +76,9 @@ const getUltimosMeses = (qtd = 6, anoRef?: number, mesRef?: number) => {
 export default function DashboardAnalisesPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
+  const { modules: modulesAccess, loading: accessLoading } =
+    useDocumentsAccess();
+  const canAccessDashboards = modulesAccess.dashboards;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [registros, setRegistros] = useState<Registro[]>([]);
@@ -89,12 +93,21 @@ export default function DashboardAnalisesPage() {
     anoFilter === "todos" ? "todos os anos" : anoFilter;
 
   useEffect(() => {
-    if (authLoading) {
+    if (authLoading || accessLoading) {
       return;
     }
 
     if (!user) {
       router.replace("/login");
+      return;
+    }
+
+    if (!canAccessDashboards) {
+      setError(
+        "Você não possui permissão para acessar os dashboards analíticos.",
+      );
+      setLoading(false);
+      router.replace("/dashboard");
       return;
     }
 
@@ -158,7 +171,13 @@ export default function DashboardAnalisesPage() {
     return () => {
       active = false;
     };
-  }, [authLoading, user, router]);
+  }, [
+    authLoading,
+    accessLoading,
+    canAccessDashboards,
+    user,
+    router,
+  ]);
 
   const anosDisponiveis = useMemo(() => {
     return Array.from(
@@ -264,7 +283,7 @@ export default function DashboardAnalisesPage() {
     setMesFilter("12");
   };
 
-  if (authLoading || loading) {
+  if (authLoading || accessLoading || loading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
         Carregando análises...

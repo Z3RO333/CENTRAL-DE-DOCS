@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 
 type SafeUser = {
@@ -20,12 +21,29 @@ export async function GET(request: Request) {
     }
 
     const accessToken = authHeader.slice("Bearer ".length).trim();
-    const supabaseAdmin = createSupabaseAdminClient();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json(
+        {
+          error:
+            "Configuração incompleta. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+        },
+        { status: 500 },
+      );
+    }
+
+    const supabaseSessionClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
 
     const {
       data: userData,
       error: sessionError,
-    } = await supabaseAdmin.auth.getUser(accessToken);
+    } = await supabaseSessionClient.auth.getUser(accessToken);
 
     if (sessionError || !userData?.user) {
       return NextResponse.json({ error: "Invalid session." }, { status: 401 });
@@ -116,3 +134,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+    const supabaseAdmin = createSupabaseAdminClient();

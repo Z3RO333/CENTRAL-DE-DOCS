@@ -205,10 +205,11 @@ export default function DocumentosPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
   const {
-    hasAccess: hasDocumentsAccess,
+    modules: modulesAccess,
     loading: accessLoading,
     error: accessError,
   } = useDocumentsAccess();
+  const canAccessDocumentos = modulesAccess.documentos;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [registros, setRegistros] = useState<FormularioRecord[]>([]);
@@ -233,7 +234,7 @@ export default function DocumentosPage() {
       return;
     }
 
-    if (!hasDocumentsAccess) {
+    if (!canAccessDocumentos) {
       router.replace("/dashboard");
       return;
     }
@@ -298,7 +299,7 @@ export default function DocumentosPage() {
     return () => {
       active = false;
     };
-  }, [authLoading, accessLoading, user, hasDocumentsAccess, router]);
+  }, [authLoading, accessLoading, user, canAccessDocumentos, router]);
 
   const getPathParaVisualizacao = (registro: FormularioRecord) =>
     resolveSignedPdfPath(registro.arquivo_assinado_path) ??

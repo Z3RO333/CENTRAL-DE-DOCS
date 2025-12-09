@@ -23,14 +23,17 @@ export default function AppShell({
   const router = useRouter();
   const { user, isLoading, error: authError, refresh } = useAuth();
   const {
-    hasAccess: documentsAccessGranted,
+    modules: modulesAccess,
     loading: documentsAccessLoading,
   } = useDocumentsAccess();
   const showNav = pathname !== "/login";
 
   const isAuthenticated = !!user;
   const canAccessDocuments =
-    documentsAccessGranted && !documentsAccessLoading;
+    modulesAccess.documentos && !documentsAccessLoading;
+  const canAccessDashboards =
+    modulesAccess.dashboards && !documentsAccessLoading;
+  const canAccessPerfil = modulesAccess.perfil && !documentsAccessLoading;
   const resolvedWithoutUser = !isLoading && !isAuthenticated;
 
   const handleLogout = async () => {
@@ -98,7 +101,7 @@ export default function AppShell({
                 Documentos
               </Link>
             )}
-            {canAccessDocuments && (
+            {canAccessDashboards && (
               <Link
                 href="/dashboard/analises"
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
@@ -111,7 +114,7 @@ export default function AppShell({
                 Dashboards
               </Link>
             )}
-            {canAccessDocuments && (
+            {canAccessPerfil && (
               <Link
                 href="/perfil"
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
