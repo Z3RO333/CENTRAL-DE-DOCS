@@ -232,7 +232,6 @@ export default function PermissoesPage() {
         } else {
           await grantPermission({
             email: appUser.email,
-            userId: appUser.id,
             module,
           });
           setFeedback({
