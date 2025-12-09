@@ -13,6 +13,7 @@ import {
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { useDocumentPermissions } from "@/hooks/useDocumentPermissions";
+import { supabase } from "@/lib/supabaseClient";
 
 const formatDateTime = (value: string) => {
   const date = new Date(value);
@@ -20,6 +21,14 @@ const formatDateTime = (value: string) => {
     return "--";
   }
   return date.toLocaleString("pt-BR");
+};
+
+type AppUser = {
+  id: string;
+  email: string | null;
+  created_at: string;
+  last_sign_in_at: string | null;
+  phone: string | null;
 };
 
 export default function PermissoesPage() {
@@ -53,6 +62,9 @@ export default function PermissoesPage() {
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPermissionId, setSelectedPermissionId] = useState<string>("");
+  const [appUsers, setAppUsers] = useState<AppUser[]>([]);
+  const [appUsersLoading, setAppUsersLoading] = useState(true);
+  const [appUsersError, setAppUsersError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -76,6 +88,68 @@ export default function PermissoesPage() {
       }
     }
   }, [permissions, selectedPermissionId]);
+
+  useEffect(() => {
+    if (!hasDocumentsAccess || authLoading || accessLoading) {
+      return;
+    }
+
+    let active = true;
+    const loadUsers = async () => {
+      setAppUsersLoading(true);
+      setAppUsersError(null);
+      try {
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
+
+        if (sessionError) {
+          throw sessionError;
+        }
+
+        const token = sessionData.session?.access_token;
+        if (!token) {
+          throw new Error("Não foi possível confirmar a sessão atual.");
+        }
+
+        const response = await fetch("/api/admin/users", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json()) as { error?: string };
+          throw new Error(
+            payload.error ?? "Falha ao carregar a lista de usuários.",
+          );
+        }
+
+        const payload = (await response.json()) as { users: AppUser[] };
+        if (active) {
+          setAppUsers(payload.users);
+        }
+      } catch (err) {
+        if (active) {
+          setAppUsers([]);
+          setAppUsersError(
+            err instanceof Error
+              ? err.message
+              : "Erro desconhecido ao carregar usuários.",
+          );
+        }
+      } finally {
+        if (active) {
+          setAppUsersLoading(false);
+        }
+      }
+    };
+
+    void loadUsers();
+
+    return () => {
+      active = false;
+    };
+  }, [hasDocumentsAccess, authLoading, accessLoading]);
 
   const filteredPermissions = useMemo(() => {
     if (!searchTerm.trim()) {
@@ -201,10 +275,14 @@ export default function PermissoesPage() {
       {(feedback.error ||
         feedback.success ||
         permissionsError ||
-        accessError) && (
+        accessError ||
+        appUsersError) && (
         <div
           className={`rounded-2xl border px-4 py-3 text-xs ${
-            feedback.error || permissionsError || accessError
+            feedback.error ||
+            permissionsError ||
+            accessError ||
+            appUsersError
               ? "border-red-200 bg-red-50 text-red-700"
               : "border-emerald-200 bg-emerald-50 text-emerald-800"
           }`}
@@ -212,6 +290,7 @@ export default function PermissoesPage() {
           {feedback.error ||
             permissionsError ||
             accessError ||
+            appUsersError ||
             feedback.success}
         </div>
       )}
@@ -405,6 +484,70 @@ export default function PermissoesPage() {
           </div>
         </section>
       )}
+
+      <section className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm shadow-slate-200">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Usuários cadastrados no aplicativo
+            </p>
+            <p className="text-[11px] text-slate-500">
+              Lista fornecida diretamente pelo Supabase Auth.
+            </p>
+          </div>
+          <div className="text-xs text-slate-500">
+            Total:{" "}
+            <span className="font-semibold text-slate-700">
+              {appUsers.length}
+            </span>
+          </div>
+        </div>
+        {appUsersLoading ? (
+          <p className="mt-4 text-sm text-slate-500">
+            Carregando usuários cadastrados...
+          </p>
+        ) : appUsers.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-500">
+            Nenhum usuário foi encontrado. Crie uma conta pelo login para que
+            apareça aqui.
+          </p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-100 text-sm">
+              <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 text-left">E-mail</th>
+                  <th className="px-4 py-3 text-left">Criado em</th>
+                  <th className="px-4 py-3 text-left">Último acesso</th>
+                  <th className="px-4 py-3 text-left">Telefone</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs text-slate-600">
+                {appUsers.map((appUser) => (
+                  <tr key={appUser.id}>
+                    <td className="px-4 py-3 font-semibold text-slate-900">
+                      {appUser.email ?? "sem e-mail"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {formatDateTime(appUser.created_at)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {appUser.last_sign_in_at
+                        ? formatDateTime(appUser.last_sign_in_at)
+                        : "Nunca"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {appUser.phone ?? (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
