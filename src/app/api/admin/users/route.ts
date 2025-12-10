@@ -59,6 +59,7 @@ export async function GET(request: Request) {
         .from("documentos_acesso")
         .select("id")
         .eq("user_id", requesterId)
+        .eq("modulo", "documentos")
         .maybeSingle();
 
     if (permissionByIdError) {
@@ -72,6 +73,7 @@ export async function GET(request: Request) {
           .from("documentos_acesso")
           .select("id")
           .eq("email", requesterEmail)
+          .eq("modulo", "documentos")
           .maybeSingle();
 
       if (permissionByEmailError) {
