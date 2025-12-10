@@ -10,6 +10,8 @@ type SafeUser = {
   phone: string | null;
 };
 
+const supabaseAdmin = createSupabaseAdminClient();
+
 export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get("authorization");
@@ -134,4 +136,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-    const supabaseAdmin = createSupabaseAdminClient();
