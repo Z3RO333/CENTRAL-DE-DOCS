@@ -9,6 +9,7 @@ import {
   UserRound,
   BarChart3,
   ShieldCheck,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabaseClient";
@@ -99,6 +100,19 @@ export default function AppShell({
               >
                 <FileText className="h-4 w-4" />
                 Documentos
+              </Link>
+            )}
+            {canAccessDocuments && (
+              <Link
+                href="/prestadores"
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                  pathname?.startsWith("/prestadores")
+                    ? "bg-slate-900 text-slate-50 shadow-sm shadow-slate-400/40"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                <Building2 className="h-4 w-4" />
+                Prestadores
               </Link>
             )}
             {canAccessDashboards && (
