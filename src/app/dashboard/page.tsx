@@ -83,22 +83,12 @@ export default function DashboardPage() {
             Escolha um tipo de formulario para iniciar o envio de documentos.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/documentos"
-            className="inline-flex items-center rounded-full border border-sky-500/70 bg-sky-50 px-4 py-1.5 text-xs font-medium text-sky-700 shadow-sm shadow-sky-200/80 transition hover:bg-sky-100"
-          >
-            Ver documentos enviados
-          </Link>
-          {canManagePrestadores && (
-            <Link
-              href="/prestadores"
-              className="inline-flex items-center rounded-full border border-emerald-500/50 bg-emerald-50 px-4 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm shadow-emerald-200 transition hover:bg-emerald-100"
-            >
-              Gerenciar prestadores
-            </Link>
-          )}
-        </div>
+        <Link
+          href="/documentos"
+          className="inline-flex items-center rounded-full border border-sky-500/70 bg-sky-50 px-4 py-1.5 text-xs font-medium text-sky-700 shadow-sm shadow-sky-200/80 transition hover:bg-sky-100"
+        >
+          Ver documentos enviados
+        </Link>
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
