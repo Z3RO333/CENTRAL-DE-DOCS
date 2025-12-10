@@ -122,13 +122,34 @@ export async function POST(request: Request) {
         );
       }
 
-      const payload: Record<string, string> = {
+      let resolvedUserId = body.userId?.trim() || null;
+      if (!resolvedUserId) {
+        const { data: existingUser, error: lookupError } =
+          await supabaseAdmin.auth.admin.getUserByEmail(normalizedEmail);
+        if (lookupError) {
+          return NextResponse.json(
+            { error: lookupError.message },
+            { status: 400 },
+          );
+        }
+        resolvedUserId = existingUser?.user?.id ?? null;
+      }
+
+      if (!resolvedUserId) {
+        return NextResponse.json(
+          {
+            error:
+              "UsuÇ­rio nÇœo encontrado no Supabase. Informe o ID ou solicite que o usuÇ­rio faÇõa login pelo menos uma vez.",
+          },
+          { status: 400 },
+        );
+      }
+
+      const payload = {
         email: normalizedEmail,
         modulo: body.module,
+        user_id: resolvedUserId,
       };
-      if (body.userId) {
-        payload.user_id = body.userId;
-      }
 
       const { data, error: insertError } = await supabaseAdmin
         .from("documentos_acesso")
