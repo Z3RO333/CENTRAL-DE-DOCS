@@ -124,15 +124,31 @@ export async function POST(request: Request) {
 
       let resolvedUserId = body.userId?.trim() || null;
       if (!resolvedUserId) {
-        const { data: existingUser, error: lookupError } =
-          await supabaseAdmin.auth.admin.getUserByEmail(normalizedEmail);
-        if (lookupError) {
-          return NextResponse.json(
-            { error: lookupError.message },
-            { status: 400 },
-          );
+        const perPage = 200;
+        let page = 1;
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { data, error: listError } =
+            await supabaseAdmin.auth.admin.listUsers({
+              page,
+              perPage,
+            });
+          if (listError) {
+            return NextResponse.json({ error: listError.message }, { status: 400 });
+          }
+          const match =
+            data?.users?.find(
+              (user) => user.email?.toLowerCase().trim() === normalizedEmail,
+            ) ?? null;
+          if (match) {
+            resolvedUserId = match.id;
+            break;
+          }
+          if (!data?.users || data.users.length < perPage) {
+            break;
+          }
+          page += 1;
         }
-        resolvedUserId = existingUser?.user?.id ?? null;
       }
 
       if (!resolvedUserId) {
