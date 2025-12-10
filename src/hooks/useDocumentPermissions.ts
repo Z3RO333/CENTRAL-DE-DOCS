@@ -37,6 +37,18 @@ export function useDocumentPermissions(
   const [permissions, setPermissions] = useState<DocumentPermission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const getAccessToken = useCallback(async () => {
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+    if (sessionError) {
+      throw sessionError;
+    }
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      throw new Error("Sessao expirou. Faca login novamente.");
+    }
+    return token;
+  }, []);
 
   const normalizedPermissions = useMemo(
     () =>
@@ -217,15 +229,4 @@ export function useDocumentPermissions(
     revokePermission,
   };
 }
-  const getAccessToken = useCallback(async () => {
-    const { data: sessionData, error: sessionError } =
-      await supabase.auth.getSession();
-    if (sessionError) {
-      throw sessionError;
-    }
-    const token = sessionData.session?.access_token;
-    if (!token) {
-      throw new Error("Sessão expirou. Faça login novamente.");
-    }
-    return token;
-  }, []);
+
