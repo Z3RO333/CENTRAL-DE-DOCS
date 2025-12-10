@@ -48,6 +48,9 @@ export default function DashboardPage() {
   }>({ error: null, success: null });
   const [creatingPrestador, setCreatingPrestador] = useState(false);
   const [selectedPrestadorId, setSelectedPrestadorId] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<
+    "formularios" | "prestadores"
+  >("formularios");
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -214,38 +217,67 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        {baseCards.map((card) => (
-          <Link
-            key={card.href}
-            href={card.href}
-            className="group relative overflow-hidden rounded-3xl bg-white p-6 shadow-md shadow-slate-200 transition hover:-translate-y-1 hover:shadow-lg"
-          >
-            <div
-              className={`pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br ${card.accent} opacity-80 blur-2xl`}
-            />
-            <div className="relative flex h-full flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <card.icon className="h-6 w-6 text-slate-700" />
-                <h2 className="text-base font-semibold text-slate-900">
-                  {card.title}
-                </h2>
-              </div>
-              <p className="flex-1 text-sm text-slate-500">
-                {card.description}
-              </p>
-              <span className="mt-1 inline-flex items-center text-sm font-semibold text-emerald-700">
-                Abrir formulario
-                <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-700">
-                  &gt;
-                </span>
-              </span>
-            </div>
-          </Link>
-        ))}
-      </div>
-
       {canManagePrestadores && (
+        <div className="flex w-full max-w-md gap-2 rounded-full border border-slate-200 bg-white/80 p-1 text-xs font-semibold text-slate-500 shadow-sm shadow-slate-200">
+          <button
+            type="button"
+            onClick={() => setActiveTab("formularios")}
+            className={`flex-1 rounded-full px-4 py-1.5 transition ${
+              activeTab === "formularios"
+                ? "bg-sky-600 text-white shadow-sm shadow-sky-200"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Formularios
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("prestadores")}
+            className={`flex-1 rounded-full px-4 py-1.5 transition ${
+              activeTab === "prestadores"
+                ? "bg-sky-600 text-white shadow-sm shadow-sky-200"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Cadastro de prestadores
+          </button>
+        </div>
+      )}
+
+      {(!canManagePrestadores || activeTab === "formularios") && (
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {baseCards.map((card) => (
+            <Link
+              key={card.href}
+              href={card.href}
+              className="group relative overflow-hidden rounded-3xl bg-white p-6 shadow-md shadow-slate-200 transition hover:-translate-y-1 hover:shadow-lg"
+            >
+              <div
+                className={`pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br ${card.accent} opacity-80 blur-2xl`}
+              />
+              <div className="relative flex h-full flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <card.icon className="h-6 w-6 text-slate-700" />
+                  <h2 className="text-base font-semibold text-slate-900">
+                    {card.title}
+                  </h2>
+                </div>
+                <p className="flex-1 text-sm text-slate-500">
+                  {card.description}
+                </p>
+                <span className="mt-1 inline-flex items-center text-sm font-semibold text-emerald-700">
+                  Abrir formulario
+                  <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-700">
+                    &gt;
+                  </span>
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {canManagePrestadores && activeTab === "prestadores" && (
         <section className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm shadow-slate-200">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
