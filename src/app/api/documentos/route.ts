@@ -109,6 +109,30 @@ async function hasDocumentosAccess(
   return Boolean(emailData);
 }
 
+async function getAuthorizedPrestadorIds(
+  email: string | null,
+  supabaseAdmin = createSupabaseAdminClient(),
+) {
+  if (!email) {
+    return [];
+  }
+  const { data, error } = await supabaseAdmin
+    .from("prestadores")
+    .select("id,usuarios")
+    .contains("usuarios", [email]);
+  if (error) {
+    throw error;
+  }
+  return (
+    data?.map((item) => ({
+      id: item.id as string,
+      usuarios: (item.usuarios as string[] | null) ?? [],
+    })) ?? []
+  )
+    .filter((item) => item.usuarios.some((usuario) => usuario === email))
+    .map((item) => item.id);
+}
+
 function mapRows(rows: FormularioRow[]): DocumentRecord[] {
   return rows.map((item) => ({
     id: item.id,
@@ -132,21 +156,38 @@ export async function GET(request: Request) {
     const user = await getSessionUser(request);
     const email = user.email?.toLowerCase().trim() ?? null;
     const supabaseAdmin = createSupabaseAdminClient();
+    const allowedPrestadores = await getAuthorizedPrestadorIds(
+      email,
+      supabaseAdmin,
+    );
 
     const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
-    if (!canAccess) {
-      throw new HttpError(
-        403,
-        "Você não possui permissão para consultar documentos.",
-      );
-    }
-
     const { searchParams } = new URL(request.url);
     const filterUserId = searchParams.get("userId");
     const filterPrestadores = searchParams
       .getAll("prestadorId")
       .map((value) => value.trim())
       .filter(Boolean);
+    let prestadoresPermitidos = filterPrestadores;
+    let userFilter = filterUserId;
+
+    if (!canAccess) {
+      if (prestadoresPermitidos.length > 0) {
+        prestadoresPermitidos = prestadoresPermitidos.filter((id) =>
+          allowedPrestadores.includes(id),
+        );
+        if (prestadoresPermitidos.length === 0) {
+          throw new HttpError(
+            403,
+            "Você não possui permissão para consultar documentos.",
+          );
+        }
+      } else if (allowedPrestadores.length > 0) {
+        prestadoresPermitidos = allowedPrestadores;
+      } else {
+        userFilter = user.id;
+      }
+    }
 
     let query = supabaseAdmin
       .from("formularios")
@@ -155,14 +196,14 @@ export async function GET(request: Request) {
       )
       .order("created_at", { ascending: false });
 
-    if (filterUserId) {
-      query = query.eq("user_id", filterUserId);
+    if (userFilter) {
+      query = query.eq("user_id", userFilter);
     }
 
-    if (filterPrestadores.length === 1) {
-      query = query.eq("prestador_id", filterPrestadores[0]);
-    } else if (filterPrestadores.length > 1) {
-      query = query.in("prestador_id", filterPrestadores);
+    if (prestadoresPermitidos.length === 1) {
+      query = query.eq("prestador_id", prestadoresPermitidos[0]);
+    } else if (prestadoresPermitidos.length > 1) {
+      query = query.in("prestador_id", prestadoresPermitidos);
     }
 
     const { data, error } = await query;
