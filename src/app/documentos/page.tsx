@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BriefcaseBusiness,
@@ -210,6 +210,7 @@ export default function DocumentosPage() {
     error: accessError,
   } = useDocumentsAccess();
   const canAccessDocumentos = modulesAccess.documentos;
+  const canViewAllDocuments = modulesAccess.dashboards;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [registros, setRegistros] = useState<FormularioRecord[]>([]);
@@ -223,6 +224,19 @@ export default function DocumentosPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [startingBatch, setStartingBatch] = useState(false);
   const [viewMode, setViewMode] = useState<"tabela" | "cards">("tabela");
+
+  const getAccessToken = useCallback(async () => {
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+    if (sessionError) {
+      throw sessionError;
+    }
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      throw new Error("Sessão expirada. Faça login novamente.");
+    }
+    return token;
+  }, []);
 
   useEffect(() => {
     if (authLoading || accessLoading) {
@@ -246,34 +260,56 @@ export default function DocumentosPage() {
       setError(null);
 
       try {
-        const { data, error: listError } = await supabase
-          .from("formularios")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
+        let parsed: FormularioRecord[] = [];
 
-        if (listError) {
-          throw listError;
+        if (canViewAllDocuments) {
+          const token = await getAccessToken();
+          const response = await fetch("/api/documentos", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          const payload = (await response.json()) as {
+            registros?: FormularioRecord[];
+            error?: string;
+          };
+
+          if (!response.ok || !payload.registros) {
+            throw new Error(
+              payload.error ?? "Não foi possível carregar os documentos.",
+            );
+          }
+          parsed = payload.registros;
+        } else {
+          const { data, error: listError } = await supabase
+            .from("formularios")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false });
+
+          if (listError) {
+            throw listError;
+          }
+
+          parsed =
+            data?.map((row) => {
+              const dadosParsed =
+                typeof row.dados === "string"
+                  ? (JSON.parse(row.dados) as Record<string, unknown>)
+                  : (row.dados as Record<string, unknown> | null);
+
+              return {
+                id: row.id as string,
+                tipo: row.tipo as string,
+                status: row.status as string,
+                arquivo_path: row.arquivo_path as string,
+                arquivo_assinado_path: row.arquivo_assinado_path as string | null,
+                created_at: row.created_at as string,
+                dados: dadosParsed,
+                assinado_por: row.assinado_por as string | null,
+              };
+            }) ?? [];
         }
-
-        const parsed: FormularioRecord[] =
-          data?.map((row) => {
-            const dadosParsed =
-              typeof row.dados === "string"
-                ? (JSON.parse(row.dados) as Record<string, unknown>)
-                : (row.dados as Record<string, unknown> | null);
-
-            return {
-              id: row.id as string,
-              tipo: row.tipo as string,
-              status: row.status as string,
-              arquivo_path: row.arquivo_path as string,
-              arquivo_assinado_path: row.arquivo_assinado_path as string | null,
-              created_at: row.created_at as string,
-              dados: dadosParsed,
-              assinado_por: row.assinado_por as string | null,
-            };
-          }) ?? [];
 
         if (active) {
           setRegistros(parsed);
@@ -299,7 +335,15 @@ export default function DocumentosPage() {
     return () => {
       active = false;
     };
-  }, [authLoading, accessLoading, user, canAccessDocumentos, router]);
+  }, [
+    authLoading,
+    accessLoading,
+    user,
+    canAccessDocumentos,
+    router,
+    canViewAllDocuments,
+    getAccessToken,
+  ]);
 
   const getPathParaVisualizacao = (registro: FormularioRecord) =>
     resolveSignedPdfPath(registro.arquivo_assinado_path) ??
@@ -1242,4 +1286,3 @@ export default function DocumentosPage() {
     </div>
   );
 }
-
