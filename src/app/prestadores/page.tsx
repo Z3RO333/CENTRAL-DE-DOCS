@@ -61,12 +61,12 @@ export default function PrestadoresPage() {
   if (!canManagePrestadores) {
     return (
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center gap-4 px-4 py-10 text-center text-sm text-slate-500">
-        <p>Voce nao possui autorizacao para gerenciar prestadores.</p>
+        <p>Você não possui autorização para gerenciar prestadores.</p>
         <Link
           href="/dashboard"
           className="rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-sky-200 transition hover:bg-sky-500"
         >
-          Voltar para formularios
+          Voltar para formulários
         </Link>
       </div>
     );
@@ -96,7 +96,7 @@ export default function PrestadoresPage() {
     }
     if (!prestadorForm.tipoServico.trim()) {
       setPrestadorFeedback({
-        error: "Informe o tipo de servico.",
+        error: "Informe o tipo de serviço.",
         success: null,
       });
       return;
@@ -116,7 +116,7 @@ export default function PrestadoresPage() {
     if (usuariosList.length === 0) {
       setPrestadorFeedback({
         error:
-          "Informe pelo menos um e-mail de usuario autorizado, separados por virgula.",
+          "Informe pelo menos um e-mail de usuário autorizado, separados por vírgula.",
         success: null,
       });
       return;
@@ -150,7 +150,7 @@ export default function PrestadoresPage() {
         error:
           err instanceof Error
             ? err.message
-            : "Nao foi possivel cadastrar o prestador.",
+            : "Não foi possível cadastrar o prestador.",
         success: null,
       });
     } finally {
@@ -167,14 +167,14 @@ export default function PrestadoresPage() {
             Cadastro de prestadores
           </p>
           <p className="text-sm text-slate-500">
-            Administre quais prestadores e usuarios podem enviar laudos.
+            Administre quais prestadores e usuários podem enviar laudos.
           </p>
         </div>
         <Link
           href="/dashboard"
           className="inline-flex items-center rounded-full border border-slate-200 px-4 py-1.5 text-xs font-medium text-slate-600 transition hover:border-sky-400 hover:text-sky-600"
         >
-          Voltar para formularios
+          Voltar para formulários
         </Link>
       </div>
 
@@ -213,12 +213,12 @@ export default function PrestadoresPage() {
                   handlePrestadorFieldChange("nome", event.target.value)
                 }
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                placeholder="Ex.: Laboratorio XPTO"
+                placeholder="Ex.: Laboratório XPTO"
                 required
               />
             </label>
             <label className="text-xs font-semibold text-slate-600">
-              Tipo de servico
+              Tipo de serviço
               <input
                 type="text"
                 value={prestadorForm.tipoServico}
@@ -226,7 +226,7 @@ export default function PrestadoresPage() {
                   handlePrestadorFieldChange("tipoServico", event.target.value)
                 }
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                placeholder="Ex.: Laudos tecnicos"
+                placeholder="Ex.: Laudos técnicos"
                 required
               />
             </label>
@@ -244,18 +244,18 @@ export default function PrestadoresPage() {
               />
             </label>
             <label className="text-xs font-semibold text-slate-600">
-              Usuarios autorizados
+              Usuários autorizados
               <textarea
                 value={prestadorForm.usuarios}
                 onChange={(event) =>
                   handlePrestadorFieldChange("usuarios", event.target.value)
                 }
                 className="mt-1 min-h-[90px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                placeholder="Informe os e-mails separados por virgula"
+                placeholder="Informe os e-mails separados por vírgula"
               />
               <span className="text-[11px] text-slate-500">
-                Digite os e-mails de quem podera usar esse prestador no
-                formulario.
+                Digite os e-mails de quem poderá usar esse prestador no
+                formulário.
               </span>
             </label>
           </div>
@@ -304,7 +304,7 @@ export default function PrestadoresPage() {
                 <div className="mt-4 space-y-2 rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-xs text-slate-600">
                   <p>
                     <span className="font-semibold text-slate-700">
-                      Tipo de servico:
+                      Tipo de serviço:
                     </span>{" "}
                     {selectedPrestador.tipo_servico}
                   </p>
@@ -314,7 +314,7 @@ export default function PrestadoresPage() {
                   </p>
                   <div>
                     <span className="font-semibold text-slate-700">
-                      Usuarios vinculados:
+                      Usuários vinculados:
                     </span>
                     <ul className="mt-1 list-disc pl-4 text-[11px]">
                       {selectedPrestador.usuarios.map((usuario) => (
