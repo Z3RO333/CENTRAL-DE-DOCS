@@ -69,6 +69,13 @@ const TIPO_ASSINAVEL = "registro_laudos";
 const STORAGE_BUCKET = "formularios";
 const SIGNED_URL_EXPIRES_IN = 60 * 30;
 
+const normalizeRegistroStatus = (registro: FormularioRecord) => {
+  if (registro.tipo !== TIPO_ASSINAVEL && registro.status === "pendente") {
+    return { ...registro, status: "em_analise" };
+  }
+  return registro;
+};
+
 async function getSignedFileUrl(
   path: string,
   expiresIn = SIGNED_URL_EXPIRES_IN,
@@ -279,7 +286,7 @@ export default function DocumentosPage() {
               payload.error ?? "Não foi possível carregar os documentos.",
             );
           }
-          parsed = payload.registros;
+          parsed = payload.registros ?? [];
         } else {
           const { data, error: listError } = await supabase
             .from("formularios")
@@ -312,7 +319,7 @@ export default function DocumentosPage() {
         }
 
         if (active) {
-          setRegistros(parsed);
+          setRegistros(parsed.map((registro) => normalizeRegistroStatus(registro)));
         }
       } catch (err) {
         if (active) {

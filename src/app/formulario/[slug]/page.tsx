@@ -147,6 +147,8 @@ const FORM_CONFIGS: FormConfig[] = [
   },
 ];
 
+const FORM_TIPO_ASSINAVEL = "registro_laudos";
+
 type FormValues = Record<string, string>;
 
 type UploadedFileSummary = {
@@ -369,7 +371,9 @@ export default function FormularioPage() {
       }
 
       const valoresAtuais = { ...values };
-      const statusPadrao = config.defaultStatus ?? "pendente";
+      const statusPadrao =
+        config.defaultStatus ??
+        (config.tipo === FORM_TIPO_ASSINAVEL ? "pendente" : "em_analise");
       await salvarDocumentosSeparados(
         uploadResults,
         valoresAtuais,
@@ -571,6 +575,5 @@ export default function FormularioPage() {
     </div>
   );
 }
-
 
 
