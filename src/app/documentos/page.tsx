@@ -15,6 +15,7 @@ import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
+import { usePrestadores } from "@/hooks/usePrestadores";
 
 type FormularioRecord = {
   id: string;
@@ -25,6 +26,7 @@ type FormularioRecord = {
   created_at: string;
   dados: Record<string, unknown> | null;
   assinado_por?: string | null;
+  prestador_id?: string | null;
 };
 
 const tipoLabel: Record<string, string> = {
@@ -218,6 +220,13 @@ export default function DocumentosPage() {
   } = useDocumentsAccess();
   const canAccessDocumentos = modulesAccess.documentos;
   const canViewAllDocuments = modulesAccess.dashboards;
+  const {
+    prestadores: prestadoresDoUsuario,
+    loading: prestadoresUsuarioLoading,
+  } = usePrestadores({
+    assignedOnly: true,
+    enabled: canAccessDocumentos && !canViewAllDocuments,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [registros, setRegistros] = useState<FormularioRecord[]>([]);
@@ -260,6 +269,10 @@ export default function DocumentosPage() {
       return;
     }
 
+    if (!canViewAllDocuments && prestadoresUsuarioLoading) {
+      return;
+    }
+
     let active = true;
 
     const load = async () => {
@@ -267,59 +280,41 @@ export default function DocumentosPage() {
       setError(null);
 
       try {
-        let parsed: FormularioRecord[] = [];
-
-        if (canViewAllDocuments) {
-          const token = await getAccessToken();
-          const response = await fetch("/api/documentos", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          const payload = (await response.json()) as {
-            registros?: FormularioRecord[];
-            error?: string;
-          };
-
-          if (!response.ok || !payload.registros) {
-            throw new Error(
-              payload.error ?? "Não foi possível carregar os documentos.",
-            );
+        const token = await getAccessToken();
+        const params = new URLSearchParams();
+        if (!canViewAllDocuments) {
+          if (prestadoresDoUsuario.length > 0) {
+            prestadoresDoUsuario.forEach((prestador) => {
+              params.append("prestadorId", prestador.id);
+            });
+          } else {
+            params.set("userId", user.id);
           }
-          parsed = payload.registros ?? [];
-        } else {
-          const { data, error: listError } = await supabase
-            .from("formularios")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false });
-
-          if (listError) {
-            throw listError;
-          }
-
-          parsed =
-            data?.map((row) => {
-              const dadosParsed =
-                typeof row.dados === "string"
-                  ? (JSON.parse(row.dados) as Record<string, unknown>)
-                  : (row.dados as Record<string, unknown> | null);
-
-              return {
-                id: row.id as string,
-                tipo: row.tipo as string,
-                status: row.status as string,
-                arquivo_path: row.arquivo_path as string,
-                arquivo_assinado_path: row.arquivo_assinado_path as string | null,
-                created_at: row.created_at as string,
-                dados: dadosParsed,
-                assinado_por: row.assinado_por as string | null,
-              };
-            }) ?? [];
         }
 
+        const url =
+          params.size > 0 ? `/api/documentos?${params.toString()}` : "/api/documentos";
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const payload = (await response.json()) as {
+          registros?: FormularioRecord[];
+          error?: string;
+        };
+
+        if (!response.ok || !payload.registros) {
+          throw new Error(
+            payload.error ?? "Não foi possível carregar os documentos.",
+          );
+        }
+        const parsed = payload.registros ?? [];
+
         if (active) {
-          setRegistros(parsed.map((registro) => normalizeRegistroStatus(registro)));
+          setRegistros(
+            parsed.map((registro) => normalizeRegistroStatus(registro)),
+          );
         }
       } catch (err) {
         if (active) {
@@ -350,6 +345,8 @@ export default function DocumentosPage() {
     router,
     canViewAllDocuments,
     getAccessToken,
+    prestadoresUsuarioLoading,
+    prestadoresDoUsuario,
   ]);
 
   const getPathParaVisualizacao = (registro: FormularioRecord) =>

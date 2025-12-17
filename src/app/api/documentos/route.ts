@@ -12,6 +12,7 @@ type FormularioRow = {
   dados: Record<string, unknown> | string | null;
   assinado_por?: string | null;
   user_id: string;
+  prestador_id?: string | null;
 };
 
 type DocumentRecord = {
@@ -24,6 +25,7 @@ type DocumentRecord = {
   dados: Record<string, unknown> | null;
   assinado_por: string | null;
   user_id: string;
+  prestador_id: string | null;
 };
 
 class HttpError extends Error {
@@ -121,6 +123,7 @@ function mapRows(rows: FormularioRow[]): DocumentRecord[] {
         : (item.dados as Record<string, unknown> | null),
     assinado_por: item.assinado_por ?? null,
     user_id: item.user_id,
+    prestador_id: item.prestador_id ?? null,
   }));
 }
 
@@ -140,16 +143,26 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const filterUserId = searchParams.get("userId");
+    const filterPrestadores = searchParams
+      .getAll("prestadorId")
+      .map((value) => value.trim())
+      .filter(Boolean);
 
     let query = supabaseAdmin
       .from("formularios")
       .select(
-        "id,tipo,status,arquivo_path,arquivo_assinado_path,created_at,dados,assinado_por,user_id",
+        "id,tipo,status,arquivo_path,arquivo_assinado_path,created_at,dados,assinado_por,user_id,prestador_id",
       )
       .order("created_at", { ascending: false });
 
     if (filterUserId) {
       query = query.eq("user_id", filterUserId);
+    }
+
+    if (filterPrestadores.length === 1) {
+      query = query.eq("prestador_id", filterPrestadores[0]);
+    } else if (filterPrestadores.length > 1) {
+      query = query.in("prestador_id", filterPrestadores);
     }
 
     const { data, error } = await query;

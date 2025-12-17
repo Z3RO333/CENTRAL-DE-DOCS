@@ -149,6 +149,21 @@ const FORM_CONFIGS: FormConfig[] = [
 
 const FORM_TIPO_ASSINAVEL = "registro_laudos";
 
+const tipoLabel: Record<string, string> = {
+  retencao_trabalhista: "Retenção Trabalhista",
+  registro_laudos: "Registro e Laudos",
+  notas_fiscais: "Notas Fiscais",
+};
+
+type DocumentoHistorico = {
+  id: string;
+  tipo: string;
+  status: string;
+  created_at: string;
+  prestador_id?: string | null;
+  dados: Record<string, unknown> | null;
+};
+
 type FormValues = Record<string, string>;
 
 type UploadedFileSummary = {
@@ -174,7 +189,7 @@ export default function FormularioPage() {
     loading: prestadoresLoading,
   } = usePrestadores({
     assignedOnly: true,
-    enabled: Boolean(enablePrestadorDropdown),
+    enabled: true,
   });
   const tipoServicoFiltro = searchParams.get("tipoServico") ?? "";
 
@@ -204,6 +219,10 @@ export default function FormularioPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [formProgress, setFormProgress] = useState(0);
   const formProgressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [selectedPrestadorId, setSelectedPrestadorId] = useState<string>("");
+  const [historico, setHistorico] = useState<DocumentoHistorico[]>([]);
+  const [historicoLoading, setHistoricoLoading] = useState(true);
+  const [historicoErro, setHistoricoErro] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) {
@@ -218,8 +237,67 @@ export default function FormularioPage() {
   useEffect(() => {
     if (config) {
       setValues(getInitialValues());
+      setSelectedPrestadorId("");
     }
   }, [config, getInitialValues]);
+
+  const carregarHistorico = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+    setHistoricoLoading(true);
+    setHistoricoErro(null);
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        throw sessionError;
+      }
+      const token = data.session?.access_token;
+      if (!token) {
+        throw new Error("Sessão expirada. Faça login novamente.");
+      }
+      const params = new URLSearchParams();
+      if (prestadoresDisponiveis.length > 0) {
+        prestadoresDisponiveis.forEach((prestador) => {
+          params.append("prestadorId", prestador.id);
+        });
+      } else {
+        params.set("userId", user.id);
+      }
+      const url =
+        params.size > 0 ? `/api/documentos?${params.toString()}` : "/api/documentos";
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = (await response.json()) as {
+        registros?: DocumentoHistorico[];
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(
+          payload.error ?? "Não foi possível carregar o histórico de envios.",
+        );
+      }
+      setHistorico(payload.registros ?? []);
+    } catch (err) {
+      console.error("Erro ao carregar histórico:", err);
+      setHistoricoErro(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível carregar o histórico.",
+      );
+    } finally {
+      setHistoricoLoading(false);
+    }
+  }, [prestadoresDisponiveis, user]);
+
+  useEffect(() => {
+    if (user && !prestadoresLoading) {
+      void carregarHistorico();
+    }
+  }, [user, prestadoresLoading, carregarHistorico]);
 
   useEffect(() => {
     return () => {
@@ -255,6 +333,18 @@ export default function FormularioPage() {
     });
   };
 
+  const handlePrestadorSelection = (prestadorId: string) => {
+    setSelectedPrestadorId(prestadorId);
+    if (!prestadorId) {
+      handleChange("prestador", "");
+      return;
+    }
+    const prestador = prestadoresDisponiveis.find(
+      (item) => item.id === prestadorId,
+    );
+    handleChange("prestador", prestador?.nome ?? "");
+  };
+
   const beginFormProgress = () => {
     if (formProgressTimer.current) {
       clearInterval(formProgressTimer.current);
@@ -274,6 +364,30 @@ export default function FormularioPage() {
     setTimeout(() => setFormProgress(0), 700);
   };
 
+  const statusLabelMap: Record<string, string> = {
+    pendente: "Pendente",
+    em_analise: "Em análise",
+    assinado: "Assinado",
+  };
+
+  const historicoRecentes = useMemo(
+    () => historico.slice(0, 5),
+    [historico],
+  );
+
+  const formatStatus = (status: string) =>
+    statusLabelMap[status] ?? status.replace(/_/g, " ");
+
+  const formatTipo = (tipo: string) => tipoLabel[tipo] ?? tipo;
+
+  const formatData = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "--";
+    }
+    return date.toLocaleString("pt-BR");
+  };
+
   const resetFormProgress = () => {
     if (formProgressTimer.current) {
       clearInterval(formProgressTimer.current);
@@ -288,6 +402,7 @@ export default function FormularioPage() {
     usuarioId: string,
     tipoFormulario: string,
     statusPadrao: string,
+    prestadorId?: string | null,
   ) => {
     for (const arquivo of arquivos) {
       const payloadDados: Record<string, unknown> = {
@@ -308,6 +423,7 @@ export default function FormularioPage() {
         dados: payloadDados,
         arquivo_path: arquivo.path,
         status: statusPadrao,
+        prestador_id: prestadorId ?? null,
       };
 
       const { error } = await supabase.from("formularios").insert(payload);
@@ -374,12 +490,17 @@ export default function FormularioPage() {
       const statusPadrao =
         config.defaultStatus ??
         (config.tipo === FORM_TIPO_ASSINAVEL ? "pendente" : "em_analise");
+      const prestadorIdParaSalvar =
+        enablePrestadorDropdown && selectedPrestadorId
+          ? selectedPrestadorId
+          : null;
       await salvarDocumentosSeparados(
         uploadResults,
         valoresAtuais,
         user.id,
         config.tipo,
         statusPadrao,
+        prestadorIdParaSalvar,
       );
 
       setSuccess(
@@ -390,6 +511,7 @@ export default function FormularioPage() {
       completeFormProgress();
       setFiles([]);
       setValues(getInitialValues());
+      setSelectedPrestadorId("");
     } catch (err) {
       console.error("Erro ao enviar formulário:", err);
       resetFormProgress();
@@ -457,8 +579,8 @@ export default function FormularioPage() {
                 <select
                   id={field.name}
                   required
-                  value={values[field.name] ?? ""}
-                  onChange={(e) => handleChange(field.name, e.target.value)}
+                  value={selectedPrestadorId}
+                  onChange={(e) => handlePrestadorSelection(e.target.value)}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-sky-500/40 placeholder:text-slate-400 focus:border-sky-500 focus:ring"
                   disabled={prestadoresLoading || prestadoresDisponiveis.length === 0}
                 >
@@ -466,12 +588,12 @@ export default function FormularioPage() {
                     {prestadoresLoading
                       ? "Carregando prestadores..."
                       : prestadoresDisponiveis.length === 0
-                        ? "Nenhum prestador disponível"
+                        ? "Nenhum prestador disponivel"
                         : "Selecione um prestador"}
                   </option>
                   {prestadoresDisponiveis.map((prestador) => (
-                    <option key={prestador.id} value={prestador.nome}>
-                      {prestador.nome} • {prestador.tipo_servico}
+                    <option key={prestador.id} value={prestador.id}>
+                      {prestador.nome} - {prestador.tipo_servico}
                     </option>
                   ))}
                 </select>
@@ -518,11 +640,11 @@ export default function FormularioPage() {
           ))}
         </div>
 
-        <div className="mt-2 space-y-2 text-sm">
-          <label
-            htmlFor="arquivo"
-            className="block text-xs font-medium uppercase tracking-wide text-slate-600"
-          >
+      <div className="mt-2 space-y-2 text-sm">
+        <label
+          htmlFor="arquivo"
+          className="block text-xs font-medium uppercase tracking-wide text-slate-600"
+        >
             Arquivos (PDF, PNG ou JPEG)
           </label>
           <input
@@ -572,8 +694,72 @@ export default function FormularioPage() {
           </button>
         </div>
       </form>
+
+      <section className="rounded-2xl border border-slate-200 bg-white/80 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Histórico de envios
+            </p>
+            <span className="text-[11px] text-slate-500">
+              Consulte rapidamente os formulários enviados pelo seu grupo.
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-400">
+            Mostrando {historicoRecentes.length} de {historico.length} registros
+          </span>
+        </div>
+
+        {historicoLoading ? (
+          <p className="mt-4 text-xs text-slate-500">
+            Carregando histórico de envios...
+          </p>
+        ) : historicoErro ? (
+          <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {historicoErro}
+          </p>
+        ) : historicoRecentes.length === 0 ? (
+          <p className="mt-4 text-xs text-slate-500">
+            Ainda não há envios registrados para o seu acesso.
+          </p>
+        ) : (
+          <ul className="mt-4 space-y-3 text-xs text-slate-600">
+            {historicoRecentes.map((registro) => (
+              <li
+                key={registro.id}
+                className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {formatTipo(registro.tipo)}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Enviado em {formatData(registro.created_at)}
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                      registro.status === "assinado"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : registro.status === "em_analise"
+                          ? "bg-amber-50 text-amber-700"
+                          : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {formatStatus(registro.status)}
+                  </span>
+                </div>
+                {registro.dados && registro.dados.numero_pedido && (
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Pedido: {registro.dados.numero_pedido as string}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
-
-
