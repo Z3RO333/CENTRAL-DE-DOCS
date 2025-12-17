@@ -1,20 +1,15 @@
-import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 
-const PRESTADORES_BUCKET =
-  process.env.NEXT_PUBLIC_PRESTADORES_BUCKET ?? "prestadores-config";
-const PRESTADORES_FILE_KEY = "prestadores.json";
-
-type StoredPrestador = {
+type PrestadorRow = {
   id: string;
   nome: string;
   cnpj: string;
   tipo_servico: string;
-  usuarios: string[];
+  usuarios: string[] | null;
   created_at: string;
-  created_by: string;
+  created_by: string | null;
 };
 
 class HttpError extends Error {
@@ -57,100 +52,12 @@ async function getSessionUser(request: Request) {
   return data.user;
 }
 
-async function ensureBucket(client: SupabaseClient) {
-  const { data } = await client.storage.getBucket(PRESTADORES_BUCKET);
-  if (data) {
-    return;
-  }
-
-  const { error } = await client.storage.createBucket(PRESTADORES_BUCKET, {
-    public: false,
-  });
-
-  if (error && !error.message?.toLowerCase().includes("exists")) {
-    throw error;
-  }
-}
-
-async function readPrestadores(client: SupabaseClient) {
-  await ensureBucket(client);
-  const { data, error } = await client.storage
-    .from(PRESTADORES_BUCKET)
-    .download(PRESTADORES_FILE_KEY);
-
-  if (error) {
-    const statusCode =
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (error as any).statusCode ?? (error as { statusCode?: number }).statusCode;
-    if (statusCode === 404 || statusCode === "404" || error.message?.includes("Not Found")) {
-      return [] as StoredPrestador[];
-    }
-    throw error;
-  }
-
-  if (!data) {
-    return [];
-  }
-
-  const arrayBuffer = await data.arrayBuffer();
-  if (arrayBuffer.byteLength === 0) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(
-      Buffer.from(arrayBuffer).toString("utf-8"),
-    ) as StoredPrestador[];
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed.map((item) => ({
-      id: item.id,
-      nome: item.nome,
-      cnpj: item.cnpj,
-      tipo_servico: item.tipo_servico,
-      usuarios: Array.isArray(item.usuarios)
-        ? item.usuarios
-            .map((email) =>
-              typeof email === "string" ? email.toLowerCase().trim() : "",
-            )
-            .filter(Boolean)
-        : [],
-      created_at: item.created_at,
-      created_by: item.created_by,
-    }));
-  } catch {
-    return [];
-  }
-}
-
-async function writePrestadores(
-  client: SupabaseClient,
-  prestadores: StoredPrestador[],
-) {
-  await ensureBucket(client);
-  const payload = Buffer.from(
-    JSON.stringify(prestadores, null, 2),
-    "utf-8",
-  );
-  const { error } = await client.storage
-    .from(PRESTADORES_BUCKET)
-    .upload(PRESTADORES_FILE_KEY, payload, {
-      contentType: "application/json",
-      upsert: true,
-    });
-
-  if (error) {
-    throw error;
-  }
-}
-
 async function hasDocumentosAccess(
-  client: SupabaseClient,
   userId: string,
   email: string | null,
+  supabaseAdmin = createSupabaseAdminClient(),
 ) {
-  const { data, error } = await client
+  const { data, error } = await supabaseAdmin
     .from("documentos_acesso")
     .select("id")
     .eq("user_id", userId)
@@ -172,7 +79,7 @@ async function hasDocumentosAccess(
   const {
     data: emailData,
     error: emailError,
-  } = await client
+  } = await supabaseAdmin
     .from("documentos_acesso")
     .select("id")
     .eq("email", email)
@@ -200,9 +107,9 @@ export async function GET(request: Request) {
   try {
     const user = await getSessionUser(request);
     const email = user.email?.toLowerCase().trim() ?? null;
-    const adminClient = createSupabaseAdminClient();
+    const supabaseAdmin = createSupabaseAdminClient();
 
-    const canAccess = await hasDocumentosAccess(adminClient, user.id, email);
+    const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
     if (!canAccess) {
       throw new HttpError(
         403,
@@ -213,13 +120,35 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const assignedOnly = searchParams.get("assignedOnly") === "true";
 
-    const prestadores = await readPrestadores(adminClient);
-    const filtered =
-      assignedOnly && email
-        ? prestadores.filter((item) => item.usuarios.includes(email))
-        : prestadores;
+    if (assignedOnly && !email) {
+      return NextResponse.json({ prestadores: [] });
+    }
 
-    return NextResponse.json({ prestadores: filtered });
+    let query = supabaseAdmin
+      .from("prestadores")
+      .select("id,nome,cnpj,tipo_servico,usuarios,created_at")
+      .order("created_at", { ascending: false });
+
+    if (assignedOnly && email) {
+      query = query.contains("usuarios", [email]);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw error;
+    }
+
+    const prestadores =
+      data?.map((item) => ({
+        id: item.id as string,
+        nome: item.nome as string,
+        cnpj: item.cnpj as string,
+        tipo_servico: item.tipo_servico as string,
+        usuarios: (item.usuarios as string[] | null) ?? [],
+        created_at: item.created_at as string,
+      })) ?? [];
+
+    return NextResponse.json({ prestadores });
   } catch (err) {
     console.error("Erro ao buscar prestadores:", err);
     if (err instanceof HttpError) {
@@ -237,9 +166,9 @@ export async function POST(request: Request) {
   try {
     const user = await getSessionUser(request);
     const email = user.email?.toLowerCase().trim() ?? null;
-    const adminClient = createSupabaseAdminClient();
+    const supabaseAdmin = createSupabaseAdminClient();
 
-    const canAccess = await hasDocumentosAccess(adminClient, user.id, email);
+    const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
     if (!canAccess) {
       throw new HttpError(
         403,
@@ -275,20 +204,30 @@ export async function POST(request: Request) {
       );
     }
 
-    const existing = await readPrestadores(adminClient);
-    const novoPrestador: StoredPrestador = {
-      id: randomUUID(),
-      nome,
-      cnpj,
-      tipo_servico: tipoServico,
-      usuarios,
-      created_at: new Date().toISOString(),
-      created_by: user.id,
-    };
+    const { data, error } = await supabaseAdmin
+      .from("prestadores")
+      .insert({
+        nome,
+        cnpj,
+        tipo_servico: tipoServico,
+        usuarios,
+        created_by: user.id,
+      })
+      .select("id,nome,cnpj,tipo_servico,usuarios,created_at")
+      .single();
 
-    await writePrestadores(adminClient, [novoPrestador, ...existing]);
+    if (error) {
+      throw error;
+    }
 
-    return NextResponse.json({ prestador: novoPrestador });
+    const prestador: PrestadorRow = data as PrestadorRow;
+
+    return NextResponse.json({
+      prestador: {
+        ...prestador,
+        usuarios: prestador.usuarios ?? [],
+      },
+    });
   } catch (err) {
     console.error("Erro ao criar prestador:", err);
     if (err instanceof HttpError) {
