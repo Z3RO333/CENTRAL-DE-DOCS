@@ -750,11 +750,12 @@ export default function FormularioPage() {
                     {formatStatus(registro.status)}
                   </span>
                 </div>
-                {registro.dados && registro.dados.numero_pedido && (
+                {registro.dados &&
+                  typeof registro.dados.numero_pedido === "string" && (
                   <p className="mt-1 text-[11px] text-slate-500">
                     Pedido: {registro.dados.numero_pedido as string}
                   </p>
-                )}
+                  )}
               </li>
             ))}
           </ul>
