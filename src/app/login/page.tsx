@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loadingSession && user) {
@@ -25,6 +26,7 @@ export default function LoginPage() {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    setFeedback(null);
 
     try {
       if (isLoginMode) {
@@ -47,6 +49,11 @@ export default function LoginPage() {
           setError(signUpError.message);
           return;
         }
+        setFeedback(
+          "Cadastro realizado! Confirme o seu e-mail para liberar o acesso e, em seguida, faça o login.",
+        );
+        setIsLoginMode(true);
+        return;
       }
 
       router.push("/dashboard");
@@ -151,6 +158,11 @@ export default function LoginPage() {
                     {error}
                   </p>
                 )}
+                {feedback && !error && (
+                  <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                    {feedback}
+                  </p>
+                )}
 
                 <button
                   type="submit"
@@ -177,8 +189,8 @@ export default function LoginPage() {
               </button>
 
               <p className="mt-6 text-center text-[11px] text-slate-500">
-                Autenticação gerenciada via Supabase Auth. Use um e-mail válido para confirmar o cadastro, se
-                exigido nas configurações do projeto.
+                Autenticacao gerenciada via Supabase Auth. Utilize um e-mail valido e confirme o cadastro pelo link enviado.
+                Somente apos a confirmacao o acesso sera liberado.
               </p>
             </div>
         </div>
@@ -186,4 +198,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
