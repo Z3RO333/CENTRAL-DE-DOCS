@@ -6,12 +6,12 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { BriefcaseBusiness, FileBadge, ReceiptText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { supabase } from "@/lib/supabaseClient";
 
 type DashboardCard = {
   slug: string;
+  tipo: string;
   title: string;
   description: string;
   href: string;
@@ -23,8 +23,6 @@ type DashboardCard = {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading, error: authError } = useAuth();
-  const { modules: modulesAccess } = useDocumentsAccess();
-  const canManagePrestadores = modulesAccess.documentos;
   const {
     prestadores: prestadoresDoUsuario,
     loading: prestadoresLoading,
@@ -62,6 +60,7 @@ export default function DashboardPage() {
     () => [
       {
         slug: "retencao-trabalhista",
+        tipo: "retencao_trabalhista",
         title: "Retencao Trabalhista",
         description:
           "Envio de documentos relacionados a retencao de tributos trabalhistas.",
@@ -72,6 +71,7 @@ export default function DashboardPage() {
       },
       {
         slug: "registro-laudos",
+        tipo: "registro_laudos",
         title: "Registro e Laudos",
         description: "Formularios para registros tecnicos e laudos emitidos.",
         href: "/formulario/registro-laudos",
@@ -81,6 +81,7 @@ export default function DashboardPage() {
       },
       {
         slug: "notas-fiscais",
+        tipo: "notas_fiscais",
         title: "Notas Fiscais",
         description: "Upload e controle de notas fiscais emitidas.",
         href: "/formulario/notas-fiscais",
@@ -183,6 +184,39 @@ export default function DashboardPage() {
     [historico],
   );
 
+  const resumoPorTipo = useMemo(() => {
+    return historico.reduce<
+      Record<
+        string,
+        {
+          total: number;
+          ultimo: {
+            status: string;
+            created_at: string;
+            dados: Record<string, unknown> | null;
+          } | null;
+        }
+      >
+    >((acc, item) => {
+      if (!acc[item.tipo]) {
+        acc[item.tipo] = { total: 0, ultimo: null };
+      }
+      acc[item.tipo].total += 1;
+      if (
+        !acc[item.tipo].ultimo ||
+        new Date(item.created_at) >
+          new Date(acc[item.tipo].ultimo?.created_at ?? 0)
+      ) {
+        acc[item.tipo].ultimo = {
+          status: item.status,
+          created_at: item.created_at,
+          dados: item.dados,
+        };
+      }
+      return acc;
+    }, {});
+  }, [historico]);
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -203,34 +237,68 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        {baseCards.map((card) => (
-          <Link
-            key={card.href}
-            href={card.href}
-            className="group relative overflow-hidden rounded-3xl bg-white p-6 shadow-md shadow-slate-200 transition hover:-translate-y-1 hover:shadow-lg"
-          >
-            <div
-              className={`pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br ${card.accent} opacity-80 blur-2xl`}
-            />
-            <div className="relative flex h-full flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <card.icon className="h-6 w-6 text-slate-700" />
-                <h2 className="text-base font-semibold text-slate-900">
-                  {card.title}
-                </h2>
-              </div>
-              <p className="flex-1 text-sm text-slate-500">
-                {card.description}
-              </p>
-              <span className="mt-1 inline-flex items-center text-sm font-semibold text-emerald-700">
-                Abrir formulario
-                <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-700">
-                  &gt;
+        {baseCards.map((card) => {
+          const resumo = resumoPorTipo[card.tipo];
+          const ultimoStatus = resumo?.ultimo?.status ?? null;
+          const ultimoNumeroPedido =
+            resumo?.ultimo?.dados &&
+            typeof resumo.ultimo.dados.numero_pedido === "string"
+              ? resumo.ultimo.dados.numero_pedido
+              : null;
+
+          return (
+            <Link
+              key={card.href}
+              href={card.href}
+              className="group relative overflow-hidden rounded-3xl bg-white p-6 shadow-md shadow-slate-200 transition hover:-translate-y-1 hover:shadow-lg"
+            >
+              <div
+                className={`pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br ${card.accent} opacity-80 blur-2xl`}
+              />
+              <div className="relative flex h-full flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <card.icon className="h-6 w-6 text-slate-700" />
+                  <h2 className="text-base font-semibold text-slate-900">
+                    {card.title}
+                  </h2>
+                </div>
+                <p className="text-sm text-slate-500">{card.description}</p>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                  <span className="rounded-full bg-slate-100 px-2 py-1">
+                    {resumo?.total ? `${resumo.total} envio(s)` : "Nenhum envio"}
+                  </span>
+                  {resumo?.ultimo && (
+                    <span className="rounded-full bg-slate-100 px-2 py-1">
+                      Ultimo envio: {formatData(resumo.ultimo.created_at)}
+                    </span>
+                  )}
+                </div>
+                {ultimoStatus && (
+                  <div className="text-[11px] text-slate-500">
+                    Status recente:{" "}
+                    <span className="font-semibold text-slate-700">
+                      {formatStatus(ultimoStatus)}
+                    </span>
+                  </div>
+                )}
+                {ultimoNumeroPedido && (
+                  <div className="text-[11px] text-slate-500">
+                    Pedido recente:{" "}
+                    <span className="font-semibold text-slate-700">
+                      {ultimoNumeroPedido}
+                    </span>
+                  </div>
+                )}
+                <span className="mt-1 inline-flex items-center text-sm font-semibold text-emerald-700">
+                  Abrir formulario
+                  <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-700">
+                    &gt;
+                  </span>
                 </span>
-              </span>
-            </div>
-          </Link>
-        ))}
+              </div>
+            </Link>
+          );
+        })}
       </div>
 
       <section className="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm shadow-slate-100/80">
