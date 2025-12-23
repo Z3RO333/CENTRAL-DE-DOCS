@@ -31,14 +31,14 @@ type DocumentoApiRecord = {
 };
 
 const tipoLabel: Record<string, string> = {
-  retencao_trabalhista: "RetenÃ§Ã£o Trabalhista",
+  retencao_trabalhista: "Retencao Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
 };
 
 const STATUS_LABELS: Record<string, string> = {
   pendente: "Pendente",
-  em_analise: "Em anÃ¡lise",
+  em_analise: "Em analise",
   assinado: "Assinado",
 };
 
@@ -54,7 +54,7 @@ const MESES = [
   { value: "todos", label: "Todos os meses" },
   { value: "01", label: "Janeiro" },
   { value: "02", label: "Fevereiro" },
-  { value: "03", label: "MarÃ§o" },
+  { value: "03", label: "Marco" },
   { value: "04", label: "Abril" },
   { value: "05", label: "Maio" },
   { value: "06", label: "Junho" },
@@ -129,7 +129,7 @@ export default function DashboardAnalisesPage() {
 
     if (!canAccessDashboards) {
       setError(
-        "VocÃª nÃ£o possui permissÃ£o para acessar os dashboards analÃ­ticos.",
+        "Voce nao possui permissao para acessar os dashboards analiticos.",
       );
       setLoading(false);
       router.replace("/dashboard");
@@ -139,7 +139,7 @@ export default function DashboardAnalisesPage() {
     const email = user.email?.toLowerCase() ?? "";
     if (!email.endsWith("@bemol.com.br")) {
       setError(
-        "VocÃª nÃ£o tem acesso a esta Ã¡rea. Procure por richardoliveira@bemol.com para solicitar acesso.",
+        "Voce nao tem acesso a esta area. Procure por richardoliveira@bemol.com para solicitar acesso.",
       );
       setLoading(false);
       return;
@@ -182,12 +182,12 @@ export default function DashboardAnalisesPage() {
 
         setRegistros(parsed);
       } catch (err) {
-        console.error("Erro ao carregar dados analÃ­ticos:", err);
+        console.error("Erro ao carregar dados analiticos:", err);
         if (active) {
           setError(
             err instanceof Error
               ? err.message
-              : "NÃ£o foi possÃ­vel carregar os dados analÃ­ticos.",
+              : "Nao foi possivel carregar os dados analiticos.",
           );
           setRegistros([]);
         }
@@ -375,7 +375,7 @@ export default function DashboardAnalisesPage() {
   if (authLoading || accessLoading || loading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
-        Carregando anÃ¡lises...
+        Carregando analises...
       </div>
     );
   }
@@ -420,7 +420,7 @@ export default function DashboardAnalisesPage() {
       accent: "bg-amber-100 text-amber-700",
     },
     {
-      label: "Em anÃ¡lise",
+      label: "Em analise",
       value: emAnalise,
       icon: BarChart3,
       accent: "bg-sky-100 text-sky-700",
@@ -439,10 +439,10 @@ export default function DashboardAnalisesPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-slate-900">
-            Painel analÃ­tico
+            Painel analitico
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Resumo visual dos documentos enviados para apoiar decisÃµes rÃ¡pidas.
+            Resumo visual dos documentos enviados para apoiar decisoes rapidas.
           </p>
         </div>
         <button
@@ -485,7 +485,7 @@ export default function DashboardAnalisesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Volume mensal (Ãºltimos 6 meses)
+                Volume mensal (ultimos 6 meses)
               </p>
               <p className="text-[11px] text-slate-500">
                 Considera a data de envio de cada documento.
@@ -520,10 +520,10 @@ export default function DashboardAnalisesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                DistribuiÃ§Ã£o por status
+                Distribuicao por status
               </p>
               <p className="text-[11px] text-slate-500">
-                Percentual em relaÃ§Ã£o ao total listado.
+                Percentual em relacao ao total listado.
               </p>
             </div>
             <PieChart className="h-5 w-5 text-slate-400" />
@@ -567,7 +567,7 @@ export default function DashboardAnalisesPage() {
               Filtros
             </p>
             <p className="text-[11px] text-slate-500">
-              Os cartÃµes e grÃ¡ficos consideram o perÃ­odo e as seleÃ§Ãµes abaixo.
+              Os cartoes e graficos consideram o periodo e as selecoes abaixo.
             </p>
           </div>
           <button
@@ -643,7 +643,7 @@ export default function DashboardAnalisesPage() {
             </select>
           </label>
           <label className="text-xs font-semibold text-slate-600">
-            MÃªs
+            Mes
             <select
               value={mesFilter}
               onChange={(event) => setMesFilter(event.target.value)}
@@ -660,7 +660,7 @@ export default function DashboardAnalisesPage() {
         <p className="mt-3 text-[11px] text-slate-500">
           Exibindo dados de {mesSelecionadoLabel.toLowerCase()} em{" "}
           {anoSelecionadoLabel}. Ajuste o intervalo para comparar outros
-          perÃ­odos.
+          periodos.
         </p>
       </div>
 
@@ -709,7 +709,7 @@ export default function DashboardAnalisesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                ServiÇõÇœos mais feitos
+                Servicos mais feitos
               </p>
               <p className="text-[11px] text-slate-500">
                 Baseado no tipo de laudo informado.
@@ -720,7 +720,7 @@ export default function DashboardAnalisesPage() {
           <div className="mt-4 divide-y divide-slate-100 text-sm text-slate-600">
             {servicosOrdenados.length === 0 ? (
               <p className="py-6 text-center text-xs text-slate-400">
-                Nenhum serviÇõÇœo encontrado nos envios filtrados.
+                Nenhum servico encontrado nos envios filtrados.
               </p>
             ) : (
               servicosOrdenados.map(([servico, total]) => (
