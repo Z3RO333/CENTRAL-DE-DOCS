@@ -31,14 +31,14 @@ type DocumentoApiRecord = {
 };
 
 const tipoLabel: Record<string, string> = {
-  retencao_trabalhista: "Retencao Trabalhista",
+  retencao_trabalhista: "Retenção Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
 };
 
 const STATUS_LABELS: Record<string, string> = {
   pendente: "Pendente",
-  em_analise: "Em analise",
+  em_analise: "Em análise",
   assinado: "Assinado",
 };
 
@@ -54,7 +54,7 @@ const MESES = [
   { value: "todos", label: "Todos os meses" },
   { value: "01", label: "Janeiro" },
   { value: "02", label: "Fevereiro" },
-  { value: "03", label: "Marco" },
+  { value: "03", label: "Março" },
   { value: "04", label: "Abril" },
   { value: "05", label: "Maio" },
   { value: "06", label: "Junho" },
@@ -112,7 +112,7 @@ export default function DashboardAnalisesPage() {
     }
     const token = sessionData.session?.access_token;
     if (!token) {
-      throw new Error("Sessao expirada. Faca login novamente.");
+      throw new Error("Sessão expirada. Faça login novamente.");
     }
     return token;
   }, []);
@@ -129,7 +129,7 @@ export default function DashboardAnalisesPage() {
 
     if (!canAccessDashboards) {
       setError(
-        "Voce nao possui permissao para acessar os dashboards analiticos.",
+        "Você não possui permissão para acessar os dashboards analíticos.",
       );
       setLoading(false);
       router.replace("/dashboard");
@@ -139,7 +139,7 @@ export default function DashboardAnalisesPage() {
     const email = user.email?.toLowerCase() ?? "";
     if (!email.endsWith("@bemol.com.br")) {
       setError(
-        "Voce nao tem acesso a esta area. Procure por richardoliveira@bemol.com para solicitar acesso.",
+        "Você não tem acesso a esta área. Procure por richardoliveira@bemol.com para solicitar acesso.",
       );
       setLoading(false);
       return;
@@ -163,7 +163,7 @@ export default function DashboardAnalisesPage() {
         };
         if (!response.ok) {
           throw new Error(
-            payload.error ?? "Nao foi possivel carregar os dados analiticos.",
+            payload.error ?? "Não foi possível carregar os dados analíticos.",
           );
         }
 
@@ -182,12 +182,12 @@ export default function DashboardAnalisesPage() {
 
         setRegistros(parsed);
       } catch (err) {
-        console.error("Erro ao carregar dados analiticos:", err);
+        console.error("Erro ao carregar dados analíticos:", err);
         if (active) {
           setError(
             err instanceof Error
               ? err.message
-              : "Nao foi possivel carregar os dados analiticos.",
+              : "Não foi possível carregar os dados analíticos.",
           );
           setRegistros([]);
         }
@@ -375,7 +375,7 @@ export default function DashboardAnalisesPage() {
   if (authLoading || accessLoading || loading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
-        Carregando analises...
+        Carregando análises...
       </div>
     );
   }
@@ -420,7 +420,7 @@ export default function DashboardAnalisesPage() {
       accent: "bg-amber-100 text-amber-700",
     },
     {
-      label: "Em analise",
+      label: "Em análise",
       value: emAnalise,
       icon: BarChart3,
       accent: "bg-sky-100 text-sky-700",
@@ -439,10 +439,10 @@ export default function DashboardAnalisesPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-slate-900">
-            Painel analitico
+            Painel analítico
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Resumo visual dos documentos enviados para apoiar decisoes rapidas.
+            Resumo visual dos documentos enviados para apoiar decisões rápidas.
           </p>
         </div>
         <button
@@ -485,7 +485,7 @@ export default function DashboardAnalisesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Volume mensal (ultimos 6 meses)
+                Volume mensal (últimos 6 meses)
               </p>
               <p className="text-[11px] text-slate-500">
                 Considera a data de envio de cada documento.
@@ -520,10 +520,10 @@ export default function DashboardAnalisesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Distribuicao por status
+                Distribuição por status
               </p>
               <p className="text-[11px] text-slate-500">
-                Percentual em relacao ao total listado.
+                Percentual em relação ao total listado.
               </p>
             </div>
             <PieChart className="h-5 w-5 text-slate-400" />
@@ -567,7 +567,7 @@ export default function DashboardAnalisesPage() {
               Filtros
             </p>
             <p className="text-[11px] text-slate-500">
-              Os cartoes e graficos consideram o periodo e as selecoes abaixo.
+              Os cartões e gráficos consideram o período e as seleções abaixo.
             </p>
           </div>
           <button
@@ -603,7 +603,7 @@ export default function DashboardAnalisesPage() {
                 onChange={(event) => setServicoFilter(event.target.value)}
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
               >
-                <option value="todos">Todos os servicos</option>
+                <option value="todos">Todos os serviços</option>
                 {servicosDisponiveis.map((servico) => (
                   <option key={servico} value={servico}>
                     {servico}
@@ -643,7 +643,7 @@ export default function DashboardAnalisesPage() {
             </select>
           </label>
           <label className="text-xs font-semibold text-slate-600">
-            Mes
+            Mês
             <select
               value={mesFilter}
               onChange={(event) => setMesFilter(event.target.value)}
@@ -660,7 +660,7 @@ export default function DashboardAnalisesPage() {
         <p className="mt-3 text-[11px] text-slate-500">
           Exibindo dados de {mesSelecionadoLabel.toLowerCase()} em{" "}
           {anoSelecionadoLabel}. Ajuste o intervalo para comparar outros
-          periodos.
+          períodos.
         </p>
       </div>
 
@@ -680,7 +680,7 @@ export default function DashboardAnalisesPage() {
           <div className="mt-4 divide-y divide-slate-100 text-sm text-slate-600">
             {tiposOrdenados.length === 0 ? (
               <p className="py-6 text-center text-xs text-slate-400">
-                Nenhum documento disponヴvel para anケlise.
+                Nenhum documento disponível para análise.
               </p>
             ) : (
               tiposOrdenados.map(([tipo, total]) => (
@@ -709,7 +709,7 @@ export default function DashboardAnalisesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Servicos mais feitos
+                Serviços mais feitos
               </p>
               <p className="text-[11px] text-slate-500">
                 Baseado no tipo de laudo informado.
@@ -720,7 +720,7 @@ export default function DashboardAnalisesPage() {
           <div className="mt-4 divide-y divide-slate-100 text-sm text-slate-600">
             {servicosOrdenados.length === 0 ? (
               <p className="py-6 text-center text-xs text-slate-400">
-                Nenhum servico encontrado nos envios filtrados.
+                Nenhum serviço encontrado nos envios filtrados.
               </p>
             ) : (
               servicosOrdenados.map(([servico, total]) => (
