@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity,
@@ -15,6 +15,13 @@ import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 
 type Registro = {
+  id: string;
+  tipo: string;
+  status: string;
+  created_at: string;
+};
+
+type DocumentoApiRecord = {
   id: string;
   tipo: string;
   status: string;
@@ -85,12 +92,26 @@ export default function DashboardAnalisesPage() {
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const anoAtual = new Date().getFullYear().toString();
+  const mesAtual = String(new Date().getMonth() + 1).padStart(2, "0");
   const [anoFilter, setAnoFilter] = useState<string>(anoAtual);
-  const [mesFilter, setMesFilter] = useState<string>("12");
+  const [mesFilter, setMesFilter] = useState<string>(mesAtual);
   const mesSelecionadoLabel =
     MESES.find((mes) => mes.value === mesFilter)?.label ?? "Todos os meses";
   const anoSelecionadoLabel =
     anoFilter === "todos" ? "todos os anos" : anoFilter;
+
+  const getAccessToken = useCallback(async () => {
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+    if (sessionError) {
+      throw sessionError;
+    }
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      throw new Error("Sessao expirada. Faca login novamente.");
+    }
+    return token;
+  }, []);
 
   useEffect(() => {
     if (authLoading || accessLoading) {
@@ -126,14 +147,20 @@ export default function DashboardAnalisesPage() {
       setLoading(true);
       setError(null);
       try {
-        const { data, error: queryError } = await supabase
-          .from("formularios")
-          .select("id,tipo,status,created_at")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
-
-        if (queryError) {
-          throw queryError;
+        const token = await getAccessToken();
+        const response = await fetch("/api/documentos", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const payload = (await response.json()) as {
+          registros?: DocumentoApiRecord[];
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(
+            payload.error ?? "Nao foi possivel carregar os dados analiticos.",
+          );
         }
 
         if (!active) {
@@ -141,7 +168,7 @@ export default function DashboardAnalisesPage() {
         }
 
         const parsed =
-          data?.map((item) => ({
+          payload.registros?.map((item) => ({
             id: item.id as string,
             tipo: item.tipo as string,
             status: item.status as string,
@@ -175,6 +202,7 @@ export default function DashboardAnalisesPage() {
     authLoading,
     accessLoading,
     canAccessDashboards,
+    getAccessToken,
     user,
     router,
   ]);
@@ -280,7 +308,7 @@ export default function DashboardAnalisesPage() {
     setTipoFilter("todos");
     setStatusFilter("todos");
     setAnoFilter(anoAtual);
-    setMesFilter("12");
+    setMesFilter(mesAtual);
   };
 
   if (authLoading || accessLoading || loading) {
