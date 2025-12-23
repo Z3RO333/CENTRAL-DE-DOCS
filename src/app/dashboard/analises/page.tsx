@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -19,6 +19,7 @@ type Registro = {
   tipo: string;
   status: string;
   created_at: string;
+  dados: Record<string, unknown> | null;
 };
 
 type DocumentoApiRecord = {
@@ -26,17 +27,18 @@ type DocumentoApiRecord = {
   tipo: string;
   status: string;
   created_at: string;
+  dados?: Record<string, unknown> | null;
 };
 
 const tipoLabel: Record<string, string> = {
-  retencao_trabalhista: "Retenção Trabalhista",
+  retencao_trabalhista: "RetenÃ§Ã£o Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
 };
 
 const STATUS_LABELS: Record<string, string> = {
   pendente: "Pendente",
-  em_analise: "Em análise",
+  em_analise: "Em anÃ¡lise",
   assinado: "Assinado",
 };
 
@@ -52,7 +54,7 @@ const MESES = [
   { value: "todos", label: "Todos os meses" },
   { value: "01", label: "Janeiro" },
   { value: "02", label: "Fevereiro" },
-  { value: "03", label: "Março" },
+  { value: "03", label: "MarÃ§o" },
   { value: "04", label: "Abril" },
   { value: "05", label: "Maio" },
   { value: "06", label: "Junho" },
@@ -91,10 +93,12 @@ export default function DashboardAnalisesPage() {
   const [registros, setRegistros] = useState<Registro[]>([]);
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
+  const [servicoFilter, setServicoFilter] = useState<string>("todos");
   const anoAtual = new Date().getFullYear().toString();
   const mesAtual = String(new Date().getMonth() + 1).padStart(2, "0");
   const [anoFilter, setAnoFilter] = useState<string>(anoAtual);
   const [mesFilter, setMesFilter] = useState<string>(mesAtual);
+  const showServicoFilter = tipoFilter === "registro_laudos";
   const mesSelecionadoLabel =
     MESES.find((mes) => mes.value === mesFilter)?.label ?? "Todos os meses";
   const anoSelecionadoLabel =
@@ -125,7 +129,7 @@ export default function DashboardAnalisesPage() {
 
     if (!canAccessDashboards) {
       setError(
-        "Você não possui permissão para acessar os dashboards analíticos.",
+        "VocÃª nÃ£o possui permissÃ£o para acessar os dashboards analÃ­ticos.",
       );
       setLoading(false);
       router.replace("/dashboard");
@@ -135,7 +139,7 @@ export default function DashboardAnalisesPage() {
     const email = user.email?.toLowerCase() ?? "";
     if (!email.endsWith("@bemol.com.br")) {
       setError(
-        "Você não tem acesso a esta área. Procure por richardoliveira@bemol.com para solicitar acesso.",
+        "VocÃª nÃ£o tem acesso a esta Ã¡rea. Procure por richardoliveira@bemol.com para solicitar acesso.",
       );
       setLoading(false);
       return;
@@ -173,16 +177,17 @@ export default function DashboardAnalisesPage() {
             tipo: item.tipo as string,
             status: item.status as string,
             created_at: item.created_at as string,
+            dados: (item.dados as Record<string, unknown> | null) ?? null,
           })) ?? [];
 
         setRegistros(parsed);
       } catch (err) {
-        console.error("Erro ao carregar dados analíticos:", err);
+        console.error("Erro ao carregar dados analÃ­ticos:", err);
         if (active) {
           setError(
             err instanceof Error
               ? err.message
-              : "Não foi possível carregar os dados analíticos.",
+              : "NÃ£o foi possÃ­vel carregar os dados analÃ­ticos.",
           );
           setRegistros([]);
         }
@@ -206,6 +211,12 @@ export default function DashboardAnalisesPage() {
     user,
     router,
   ]);
+
+  useEffect(() => {
+    if (tipoFilter !== "registro_laudos" && servicoFilter !== "todos") {
+      setServicoFilter("todos");
+    }
+  }, [tipoFilter, servicoFilter]);
 
   const anosDisponiveis = useMemo(() => {
     return Array.from(
@@ -232,6 +243,15 @@ export default function DashboardAnalisesPage() {
         if (statusFilter !== "todos" && registro.status !== statusFilter) {
           return false;
         }
+        if (showServicoFilter && servicoFilter !== "todos") {
+          const valorServico =
+            typeof registro.dados?.tipo_laudo === "string"
+              ? registro.dados.tipo_laudo.trim()
+              : "";
+          if (valorServico !== servicoFilter) {
+            return false;
+          }
+        }
 
         if (anoFilter !== "todos" || mesFilter !== "todos") {
           const data = new Date(registro.created_at);
@@ -253,7 +273,15 @@ export default function DashboardAnalisesPage() {
 
         return true;
       }),
-    [registros, tipoFilter, statusFilter, anoFilter, mesFilter],
+    [
+      registros,
+      tipoFilter,
+      statusFilter,
+      anoFilter,
+      mesFilter,
+      showServicoFilter,
+      servicoFilter,
+    ],
   );
 
   const totalPorStatus = useMemo(() => {
@@ -274,6 +302,38 @@ export default function DashboardAnalisesPage() {
       },
       {},
     );
+  }, [registrosFiltrados]);
+
+  const servicosDisponiveis = useMemo(() => {
+    if (!showServicoFilter) {
+      return [];
+    }
+    const values = registros
+      .filter((registro) => registro.tipo === "registro_laudos")
+      .map((registro) =>
+        typeof registro.dados?.tipo_laudo === "string"
+          ? registro.dados.tipo_laudo.trim()
+          : "",
+      )
+      .filter((valor) => Boolean(valor));
+    return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+  }, [registros, showServicoFilter]);
+
+  const totalPorServico = useMemo(() => {
+    return registrosFiltrados.reduce<Record<string, number>>((acc, registro) => {
+      if (registro.tipo !== "registro_laudos") {
+        return acc;
+      }
+      const servico =
+        typeof registro.dados?.tipo_laudo === "string"
+          ? registro.dados.tipo_laudo.trim()
+          : "";
+      if (!servico) {
+        return acc;
+      }
+      acc[servico] = (acc[servico] ?? 0) + 1;
+      return acc;
+    }, {});
   }, [registrosFiltrados]);
 
   const serieMensal = useMemo(() => {
@@ -307,6 +367,7 @@ export default function DashboardAnalisesPage() {
   const handleResetFilters = () => {
     setTipoFilter("todos");
     setStatusFilter("todos");
+    setServicoFilter("todos");
     setAnoFilter(anoAtual);
     setMesFilter(mesAtual);
   };
@@ -314,7 +375,7 @@ export default function DashboardAnalisesPage() {
   if (authLoading || accessLoading || loading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
-        Carregando análises...
+        Carregando anÃ¡lises...
       </div>
     );
   }
@@ -359,7 +420,7 @@ export default function DashboardAnalisesPage() {
       accent: "bg-amber-100 text-amber-700",
     },
     {
-      label: "Em análise",
+      label: "Em anÃ¡lise",
       value: emAnalise,
       icon: BarChart3,
       accent: "bg-sky-100 text-sky-700",
@@ -369,16 +430,19 @@ export default function DashboardAnalisesPage() {
   const tiposOrdenados = Object.entries(totalPorTipo).sort(
     (a, b) => b[1] - a[1],
   );
+  const servicosOrdenados = Object.entries(totalPorServico).sort(
+    (a, b) => b[1] - a[1],
+  );
 
   return (
     <div className="flex flex-1 flex-col gap-6 py-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-slate-900">
-            Painel analítico
+            Painel analÃ­tico
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Resumo visual dos documentos enviados para apoiar decisões rápidas.
+            Resumo visual dos documentos enviados para apoiar decisÃµes rÃ¡pidas.
           </p>
         </div>
         <button
@@ -421,7 +485,7 @@ export default function DashboardAnalisesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Volume mensal (últimos 6 meses)
+                Volume mensal (Ãºltimos 6 meses)
               </p>
               <p className="text-[11px] text-slate-500">
                 Considera a data de envio de cada documento.
@@ -456,10 +520,10 @@ export default function DashboardAnalisesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Distribuição por status
+                DistribuiÃ§Ã£o por status
               </p>
               <p className="text-[11px] text-slate-500">
-                Percentual em relação ao total listado.
+                Percentual em relaÃ§Ã£o ao total listado.
               </p>
             </div>
             <PieChart className="h-5 w-5 text-slate-400" />
@@ -503,7 +567,7 @@ export default function DashboardAnalisesPage() {
               Filtros
             </p>
             <p className="text-[11px] text-slate-500">
-              Os cartões e gráficos consideram o período e as seleções abaixo.
+              Os cartÃµes e grÃ¡ficos consideram o perÃ­odo e as seleÃ§Ãµes abaixo.
             </p>
           </div>
           <button
@@ -531,6 +595,23 @@ export default function DashboardAnalisesPage() {
               ))}
             </select>
           </label>
+          {showServicoFilter && (
+            <label className="text-xs font-semibold text-slate-600">
+              Tipo de laudo
+              <select
+                value={servicoFilter}
+                onChange={(event) => setServicoFilter(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+              >
+                <option value="todos">Todos os servicos</option>
+                {servicosDisponiveis.map((servico) => (
+                  <option key={servico} value={servico}>
+                    {servico}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="text-xs font-semibold text-slate-600">
             Status
             <select
@@ -562,7 +643,7 @@ export default function DashboardAnalisesPage() {
             </select>
           </label>
           <label className="text-xs font-semibold text-slate-600">
-            Mês
+            MÃªs
             <select
               value={mesFilter}
               onChange={(event) => setMesFilter(event.target.value)}
@@ -579,48 +660,88 @@ export default function DashboardAnalisesPage() {
         <p className="mt-3 text-[11px] text-slate-500">
           Exibindo dados de {mesSelecionadoLabel.toLowerCase()} em{" "}
           {anoSelecionadoLabel}. Ajuste o intervalo para comparar outros
-          períodos.
+          perÃ­odos.
         </p>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Tipos mais enviados
-            </p>
-            <p className="text-[11px] text-slate-500">
-              Ordenado do maior para o menor volume.
-            </p>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Tipos mais enviados
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Ordenado do maior para o menor volume.
+              </p>
+            </div>
+            <TrendingUp className="h-5 w-5 text-slate-400" />
           </div>
-          <TrendingUp className="h-5 w-5 text-slate-400" />
-        </div>
-        <div className="mt-4 divide-y divide-slate-100 text-sm text-slate-600">
-          {tiposOrdenados.length === 0 ? (
-            <p className="py-6 text-center text-xs text-slate-400">
-              Nenhum documento disponível para análise.
-            </p>
-          ) : (
-            tiposOrdenados.map(([tipo, total]) => (
-              <div
-                key={tipo}
-                className="flex items-center justify-between py-3"
-              >
-                <div>
-                  <p className="font-semibold text-slate-900">
-                    {tipoLabel[tipo] ?? tipo}
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    {((total / Math.max(totalDocumentos, 1)) * 100).toFixed(1)}%
-                    do total
-                  </p>
+          <div className="mt-4 divide-y divide-slate-100 text-sm text-slate-600">
+            {tiposOrdenados.length === 0 ? (
+              <p className="py-6 text-center text-xs text-slate-400">
+                Nenhum documento disponヴvel para anケlise.
+              </p>
+            ) : (
+              tiposOrdenados.map(([tipo, total]) => (
+                <div
+                  key={tipo}
+                  className="flex items-center justify-between py-3"
+                >
+                  <div>
+                    <p className="font-semibold text-slate-900">
+                      {tipoLabel[tipo] ?? tipo}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {((total / Math.max(totalDocumentos, 1)) * 100).toFixed(1)}%
+                      do total
+                    </p>
+                  </div>
+                  <span className="text-sm font-semibold text-slate-700">
+                    {total}
+                  </span>
                 </div>
-                <span className="text-sm font-semibold text-slate-700">
-                  {total}
-                </span>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                ServiÇõÇœos mais feitos
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Baseado no tipo de laudo informado.
+              </p>
+            </div>
+            <TrendingUp className="h-5 w-5 text-slate-400" />
+          </div>
+          <div className="mt-4 divide-y divide-slate-100 text-sm text-slate-600">
+            {servicosOrdenados.length === 0 ? (
+              <p className="py-6 text-center text-xs text-slate-400">
+                Nenhum serviÇõÇœo encontrado nos envios filtrados.
+              </p>
+            ) : (
+              servicosOrdenados.map(([servico, total]) => (
+                <div
+                  key={servico}
+                  className="flex items-center justify-between py-3"
+                >
+                  <div>
+                    <p className="font-semibold text-slate-900">{servico}</p>
+                    <p className="text-[11px] text-slate-500">
+                      {((total / Math.max(totalDocumentos, 1)) * 100).toFixed(1)}%
+                      do total
+                    </p>
+                  </div>
+                  <span className="text-sm font-semibold text-slate-700">
+                    {total}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>
