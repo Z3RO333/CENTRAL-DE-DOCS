@@ -30,7 +30,7 @@ type FormularioRecord = {
 };
 
 const tipoLabel: Record<string, string> = {
-  retencao_trabalhista: "Retencao Trabalhista",
+  retencao_trabalhista: "Retenção Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
 };
@@ -47,14 +47,14 @@ const FORM_FILTER_CARDS: FilterCardConfig[] = [
   {
     value: "retencao_trabalhista",
     label: tipoLabel.retencao_trabalhista,
-    description: "Documentos ligados a retencao de tributos trabalhistas.",
+    description: "Documentos ligados à retenção de tributos trabalhistas.",
     icon: BriefcaseBusiness,
     accent: "from-sky-100 via-sky-50 to-transparent",
   },
   {
     value: "registro_laudos",
     label: tipoLabel.registro_laudos,
-    description: "Registros tecnicos e laudos enviados para validacao.",
+    description: "Registros técnicos e laudos enviados para validação.",
     icon: FileBadge,
     accent: "from-emerald-100 via-emerald-50 to-transparent",
   },
@@ -96,7 +96,7 @@ async function getSignedFileUrl(
 const statusLabelMap: Record<string, string> = {
   pendente: "Pendente",
   assinado: "Assinado",
-  em_analise: "Em analise",
+  em_analise: "Em análise",
 };
 
 const humanizeTexto = (value: string) =>
@@ -321,7 +321,7 @@ export default function DocumentosPage() {
           setError(
             err instanceof Error
               ? err.message
-              : "Não foi possivel carregar os documentos.",
+              : "Não foi possível carregar os documentos.",
           );
           setRegistros([]);
         }
@@ -991,7 +991,7 @@ export default function DocumentosPage() {
                       type="button"
                       onClick={() => toggleSelecionar(id)}
                       className="text-[10px] font-semibold text-slate-500 transition hover:text-slate-800"
-                      title="Remover da selecao"
+                      title="Remover da seleção"
                     >
                       x
                     </button>
@@ -1013,7 +1013,7 @@ export default function DocumentosPage() {
               className="rounded-full border border-slate-200 px-4 py-1.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {assinaturasPendentes.length === 0
-                ? "Nenhum selecionavel"
+                ? "Nenhum selecionável"
                 : "Selecionar todos"}
             </button>
             <button

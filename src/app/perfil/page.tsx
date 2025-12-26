@@ -207,7 +207,7 @@ export default function PerfilPage() {
     setStatus({
       type: "success",
       message:
-        "Assinatura salva. Use o botao abaixo para baixar e anexar aos documentos.",
+        "Assinatura salva. Use o botão abaixo para baixar e anexar aos documentos.",
     });
   };
 
@@ -338,7 +338,7 @@ export default function PerfilPage() {
           </div>
           <p className="text-[11px] text-slate-500">
             Use o mouse ou o dedo (em telas touch) para desenhar a assinatura que
-            sera usada ao enviar documentos assinados.
+            será usada ao enviar documentos assinados.
           </p>
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3">
             <canvas
@@ -372,7 +372,7 @@ export default function PerfilPage() {
             </label>
             {uploadName && (
               <p className="mt-2 text-[10px] text-slate-500">
-                Ultimo arquivo importado:{" "}
+                Último arquivo importado:{" "}
                 <span className="font-semibold text-slate-700">
                   {uploadName}
                 </span>
@@ -418,7 +418,7 @@ export default function PerfilPage() {
               </p>
               <p className="text-slate-500">{user.email}</p>
               <p className="mt-2 text-[11px] text-slate-500">
-                Dominio liberado para assinar:{" "}
+                Domínio liberado para assinar:{" "}
                 <span className="font-semibold text-emerald-600">
                 {canAccessPerfil ? "@bemol.com.br" : "não autorizado"}
                 </span>
@@ -439,14 +439,14 @@ export default function PerfilPage() {
                 />
                 <p className="mt-2 text-[11px] text-slate-500">
                   Essa imagem fica salva somente no seu navegador para agilizar o
-                  envio de documentos. Utilize o botao de download para anexa-la
+                  envio de documentos. Utilize o botão de download para anexá-la
                   no fluxo de assinatura dos documentos.
                 </p>
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-[11px] text-slate-500">
                 Nenhuma assinatura salva ainda. Depois de desenhar e salvar, ela
-                aparecera aqui para download rapido.
+                aparecerá aqui para download rápido.
               </div>
             )}
           </div>

@@ -53,7 +53,7 @@ export default function DashboardPage() {
   if (isLoading || !user) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
-        {authError ?? "Carregando formularios..."}
+        {authError ?? "Carregando formulários..."}
       </div>
     );
   }
@@ -63,9 +63,9 @@ export default function DashboardPage() {
       {
         slug: "retencao-trabalhista",
         tipo: "retencao_trabalhista",
-        title: "Retencao Trabalhista",
+        title: "Retenção Trabalhista",
         description:
-          "Envio de documentos relacionados a retencao de tributos trabalhistas.",
+          "Envio de documentos relacionados à retenção de tributos trabalhistas.",
         href: "/formulario/retencao-trabalhista",
         icon: BriefcaseBusiness,
         accent: "from-sky-100 via-sky-50 to-transparent",
@@ -75,7 +75,7 @@ export default function DashboardPage() {
         slug: "registro-laudos",
         tipo: "registro_laudos",
         title: "Registro e Laudos",
-        description: "Formularios para registros tecnicos e laudos emitidos.",
+        description: "Formulários para registros técnicos e laudos emitidos.",
         href: "/formulario/registro-laudos",
         icon: FileBadge,
         accent: "from-sky-100 via-sky-50 to-transparent",
@@ -104,7 +104,7 @@ export default function DashboardPage() {
 
   const statusLabelMap: Record<string, string> = {
     pendente: "Pendente",
-    em_analise: "Em analise",
+    em_analise: "Em análise",
     assinado: "Assinado",
   };
 
@@ -112,7 +112,7 @@ export default function DashboardPage() {
     statusLabelMap[status] ?? status.replace(/_/g, " ");
 
   const tipoLabel: Record<string, string> = {
-    retencao_trabalhista: "Retencao Trabalhista",
+    retencao_trabalhista: "Retenção Trabalhista",
     registro_laudos: "Registro e Laudos",
     notas_fiscais: "Notas Fiscais",
   };
@@ -141,7 +141,7 @@ export default function DashboardPage() {
       .createSignedUrl(path, SIGNED_URL_EXPIRES_IN);
 
     if (error || !data?.signedUrl) {
-      throw error ?? new Error("Nao foi possivel gerar o link do arquivo.");
+      throw error ?? new Error("Não foi possível gerar o link do arquivo.");
     }
     return data.signedUrl;
   };
@@ -156,7 +156,7 @@ export default function DashboardPage() {
       registro.arquivo_path;
 
     if (!path) {
-      setHistoricoErro("Arquivo indisponivel no momento.");
+      setHistoricoErro("Arquivo indisponível no momento.");
       return;
     }
 
@@ -171,7 +171,7 @@ export default function DashboardPage() {
       document.body.removeChild(anchor);
     } catch (err) {
       console.error("Erro ao abrir documento:", err);
-      setHistoricoErro("Nao foi possivel abrir o documento. Tente novamente.");
+      setHistoricoErro("Não foi possível abrir o documento. Tente novamente.");
     }
   };
 
@@ -188,7 +188,7 @@ export default function DashboardPage() {
       }
       const token = data.session?.access_token;
       if (!token) {
-        throw new Error("Sessao expirada. Faca login novamente.");
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
       const params = new URLSearchParams();
       if (prestadoresDoUsuario.length > 0) {
@@ -219,14 +219,14 @@ export default function DashboardPage() {
       };
       if (!response.ok) {
         throw new Error(
-          payload.error ?? "Nao foi possivel carregar o historico.",
+          payload.error ?? "Não foi possível carregar o histórico.",
         );
       }
       setHistorico(payload.registros ?? []);
     } catch (err) {
-      console.error("Erro ao carregar historico:", err);
+      console.error("Erro ao carregar histórico:", err);
       setHistoricoErro(
-        err instanceof Error ? err.message : "Nao foi possivel carregar o historico.",
+        err instanceof Error ? err.message : "Não foi possível carregar o histórico.",
       );
     } finally {
       setHistoricoLoading(false);
@@ -282,10 +282,10 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-            Formularios
+            Formulários
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Escolha um tipo de formulario para iniciar o envio de documentos.
+            Escolha um tipo de formulário para iniciar o envio de documentos.
           </p>
         </div>
         <Link
@@ -329,7 +329,7 @@ export default function DashboardPage() {
                   </span>
                   {resumo?.ultimo && (
                     <span className="rounded-full bg-slate-100 px-2 py-1">
-                      Ultimo envio: {formatData(resumo.ultimo.created_at)}
+                      Último envio: {formatData(resumo.ultimo.created_at)}
                     </span>
                   )}
                 </div>
@@ -350,7 +350,7 @@ export default function DashboardPage() {
                   </div>
                 )}
                 <span className="mt-1 inline-flex items-center text-sm font-semibold text-emerald-700">
-                  Abrir formulario
+                  Abrir formulário
                   <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-700">
                     &gt;
                   </span>
@@ -365,10 +365,10 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Historico de envios
+              Histórico de envios
             </p>
             <span className="text-[11px] text-slate-500">
-              Consulte rapidamente os formularios enviados pelo seu grupo.
+              Consulte rapidamente os formulários enviados pelo seu grupo.
             </span>
           </div>
           <span className="text-[11px] text-slate-400">
@@ -378,7 +378,7 @@ export default function DashboardPage() {
 
         {historicoLoading ? (
           <p className="mt-4 text-xs text-slate-500">
-            Carregando historico de envios...
+            Carregando histórico de envios...
           </p>
         ) : historicoErro ? (
           <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -386,7 +386,7 @@ export default function DashboardPage() {
           </p>
         ) : historicoRecentes.length === 0 ? (
           <p className="mt-4 text-xs text-slate-500">
-            Ainda nao ha envios registrados para o seu acesso.
+            Ainda não há envios registrados para o seu acesso.
           </p>
         ) : (
           <ul className="mt-4 space-y-3 text-xs text-slate-600">

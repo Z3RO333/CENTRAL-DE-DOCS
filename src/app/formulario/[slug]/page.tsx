@@ -411,7 +411,7 @@ export default function FormularioPage() {
       .createSignedUrl(path, SIGNED_URL_EXPIRES_IN);
 
     if (error || !data?.signedUrl) {
-      throw error ?? new Error("Nao foi possivel gerar o link do arquivo.");
+      throw error ?? new Error("Não foi possível gerar o link do arquivo.");
     }
     return data.signedUrl;
   };
@@ -423,7 +423,7 @@ export default function FormularioPage() {
       registro.arquivo_path;
 
     if (!path) {
-      setError("Arquivo indisponivel no momento.");
+      setError("Arquivo indisponível no momento.");
       return;
     }
 
@@ -438,7 +438,7 @@ export default function FormularioPage() {
       document.body.removeChild(anchor);
     } catch (err) {
       console.error("Erro ao abrir documento:", err);
-      setError("Nao foi possivel abrir o documento. Tente novamente.");
+      setError("Não foi possível abrir o documento. Tente novamente.");
     }
   };
 
@@ -642,7 +642,7 @@ export default function FormularioPage() {
                     {prestadoresLoading
                       ? "Carregando prestadores..."
                       : prestadoresDisponiveis.length === 0
-                        ? "Nenhum prestador disponivel"
+                        ? "Nenhum prestador disponível"
                         : "Selecione um prestador"}
                   </option>
                   {prestadoresDisponiveis.map((prestador) => (
@@ -838,3 +838,4 @@ export default function FormularioPage() {
     </div>
   );
 }
+

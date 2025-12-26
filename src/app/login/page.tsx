@@ -189,8 +189,8 @@ export default function LoginPage() {
               </button>
 
               <p className="mt-6 text-center text-[11px] text-slate-500">
-                Autenticacao gerenciada via Supabase Auth. Utilize um e-mail valido e confirme o cadastro pelo link enviado.
-                Somente apos a confirmacao o acesso sera liberado.
+                Autenticação gerenciada via Supabase Auth. Utilize um e-mail válido e confirme o cadastro pelo link enviado.
+                Somente após a confirmação o acesso será liberado.
               </p>
             </div>
         </div>
