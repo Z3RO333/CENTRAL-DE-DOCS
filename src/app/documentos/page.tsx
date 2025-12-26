@@ -241,6 +241,7 @@ export default function DocumentosPage() {
   const [startingBatch, setStartingBatch] = useState(false);
   const [viewMode, setViewMode] = useState<"tabela" | "cards">("tabela");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingBatch, setDeletingBatch] = useState(false);
 
   const getAccessToken = useCallback(async () => {
     const { data: sessionData, error: sessionError } =
@@ -451,6 +452,53 @@ export default function DocumentosPage() {
     }
   };
 
+  const removerSelecionados = async () => {
+    if (selectedIds.length === 0) {
+      return;
+    }
+    if (
+      !window.confirm(
+        "Tem certeza que deseja remover os documentos selecionados? Esta ação não pode ser desfeita.",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setDeletingBatch(true);
+      setError(null);
+      const token = await getAccessToken();
+      const query = selectedIds
+        .map((id) => `id=${encodeURIComponent(id)}`)
+        .join("&");
+      const response = await fetch(`/api/documentos?${query}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(
+          payload.error ?? "Não foi possível remover os documentos.",
+        );
+      }
+      setRegistros((prev) =>
+        prev.filter((item) => !selectedIds.includes(item.id)),
+      );
+      setSelectedIds([]);
+    } catch (err) {
+      console.error("Erro ao remover documentos:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível remover os documentos.",
+      );
+    } finally {
+      setDeletingBatch(false);
+    }
+  };
+
   const anosDisponiveis = useMemo(
     () =>
       Array.from(
@@ -564,17 +612,13 @@ export default function DocumentosPage() {
   );
 
   useEffect(() => {
-    setSelectedIds((prev) =>
-      prev.filter((id) => assinaturasPendentes.includes(id)),
-    );
-  }, [assinaturasPendentes]);
+    const idsDisponiveis = new Set(registrosFiltrados.map((item) => item.id));
+    setSelectedIds((prev) => prev.filter((id) => idsDisponiveis.has(id)));
+  }, [registrosFiltrados]);
 
   const toggleSelecionar = (id: string) => {
     const registro = registrosFiltrados.find((item) => item.id === id);
     if (!registro) {
-      return;
-    }
-    if (registro.status === "assinado" || registro.tipo !== TIPO_ASSINAVEL) {
       return;
     }
     setSelectedIds((prev) =>
@@ -583,28 +627,30 @@ export default function DocumentosPage() {
   };
 
   const selecionarTodos = () => {
-    if (assinaturasPendentes.length === 0) {
+    const todosIds = registrosFiltrados.map((item) => item.id);
+    if (todosIds.length === 0) {
       return;
     }
-    const allSelected = assinaturasPendentes.every((id) =>
-      selectedIds.includes(id),
-    );
-    setSelectedIds(allSelected ? [] : assinaturasPendentes);
+    const allSelected = todosIds.every((id) => selectedIds.includes(id));
+    setSelectedIds(allSelected ? [] : todosIds);
   };
 
   const iniciarAssinaturaEmLote = () => {
-    if (selectedIds.length === 0) {
+    const assinaturasSelecionadas = selectedIds.filter((id) =>
+      assinaturasPendentes.includes(id),
+    );
+    if (assinaturasSelecionadas.length === 0) {
       setError("Selecione ao menos um documento pendente para assinar.");
       return;
     }
     setStartingBatch(true);
-    const queue = selectedIds.join(",");
-    if (selectedIds.length === 1) {
-      router.push(`/documentos/${selectedIds[0]}`);
+    const queue = assinaturasSelecionadas.join(",");
+    if (assinaturasSelecionadas.length === 1) {
+      router.push(`/documentos/${assinaturasSelecionadas[0]}`);
       return;
     }
     router.push(
-      `/documentos/${selectedIds[0]}?lote=${encodeURIComponent(queue)}`,
+      `/documentos/${assinaturasSelecionadas[0]}?lote=${encodeURIComponent(queue)}`,
     );
   };
 
@@ -670,6 +716,9 @@ export default function DocumentosPage() {
 
   const showErrorMessage = error ?? authError ?? accessError;
   const hasSelection = selectedIds.length > 0;
+  const assinaturasSelecionadasCount = selectedIds.filter((id) =>
+    assinaturasPendentes.includes(id),
+  ).length;
   const totalResultados = registrosFiltrados.length;
 
   if (authLoading || accessLoading || loading) {
@@ -1052,11 +1101,11 @@ export default function DocumentosPage() {
             <button
               type="button"
               onClick={selecionarTodos}
-              disabled={assinaturasPendentes.length === 0}
+              disabled={registrosFiltrados.length === 0}
               className="rounded-full border border-slate-200 px-4 py-1.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {assinaturasPendentes.length === 0
-                ? "Nenhum selecionável"
+              {registrosFiltrados.length === 0
+                ? "Nenhum registro"
                 : "Selecionar todos"}
             </button>
             <button
@@ -1069,13 +1118,21 @@ export default function DocumentosPage() {
             </button>
             <button
               type="button"
+              onClick={removerSelecionados}
+              disabled={!hasSelection || deletingBatch}
+              className="rounded-full border border-red-200 px-4 py-1.5 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {deletingBatch ? "Removendo..." : "Remover selecionados"}
+            </button>
+            <button
+              type="button"
               onClick={iniciarAssinaturaEmLote}
-              disabled={!hasSelection || startingBatch}
+              disabled={assinaturasSelecionadasCount === 0 || startingBatch}
               className="rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white shadow-sm shadow-emerald-200 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {startingBatch
                 ? "Abrindo..."
-                : hasSelection && selectedIds.length > 1
+                : assinaturasSelecionadasCount > 1
                   ? "Assinar em lote"
                   : "Assinar selecionados"}
             </button>
@@ -1112,12 +1169,12 @@ export default function DocumentosPage() {
                       type="checkbox"
                       onChange={selecionarTodos}
                       checked={
-                        assinaturasPendentes.length > 0 &&
-                        assinaturasPendentes.every((id) =>
-                          selectedIds.includes(id),
+                        registrosFiltrados.length > 0 &&
+                        registrosFiltrados.every((item) =>
+                          selectedIds.includes(item.id),
                         )
                       }
-                      disabled={assinaturasPendentes.length === 0}
+                      disabled={registrosFiltrados.length === 0}
                       className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
                       aria-label="Selecionar todos"
                     />
@@ -1151,7 +1208,6 @@ export default function DocumentosPage() {
                         <input
                           type="checkbox"
                           checked={isMarcado}
-                          disabled={!isSelecionavel}
                           onChange={() => toggleSelecionar(registro.id)}
                           className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
                           aria-label="Selecionar documento para assinatura"
@@ -1266,7 +1322,6 @@ export default function DocumentosPage() {
                     <input
                       type="checkbox"
                       checked={isMarcado}
-                      disabled={!isSelecionavel}
                       onChange={() => toggleSelecionar(registro.id)}
                       className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
                     />
@@ -1349,3 +1404,12 @@ export default function DocumentosPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+

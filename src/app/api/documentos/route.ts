@@ -239,29 +239,39 @@ export async function DELETE(request: Request) {
     );
 
     const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-    if (!id) {
+    const ids = searchParams.getAll("id").map((value) => value.trim());
+    const idsFromList = (searchParams.get("ids") ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const idsToRemove = Array.from(
+      new Set([...ids, ...idsFromList].filter(Boolean)),
+    );
+
+    if (idsToRemove.length === 0) {
       throw new HttpError(400, "Informe o id do documento.");
     }
 
-    const { data: registro, error: recordError } = await supabaseAdmin
+    const { data: registros, error: recordError } = await supabaseAdmin
       .from("formularios")
       .select("id,user_id,prestador_id,arquivo_path,arquivo_assinado_path")
-      .eq("id", id)
-      .maybeSingle();
+      .in("id", idsToRemove);
     if (recordError) {
       throw recordError;
     }
-    if (!registro) {
+    if (!registros || registros.length !== idsToRemove.length) {
       throw new HttpError(404, "Documento não encontrado.");
     }
 
     if (!canAccess) {
-      const prestadorId = registro.prestador_id as string | null;
-      const hasPrestadorAccess =
-        prestadorId && allowedPrestadores.includes(prestadorId);
-      const isOwner = registro.user_id === user.id;
-      if (!hasPrestadorAccess && !isOwner) {
+      const isAuthorized = registros.every((registro) => {
+        const prestadorId = registro.prestador_id as string | null;
+        const hasPrestadorAccess =
+          prestadorId && allowedPrestadores.includes(prestadorId);
+        const isOwner = registro.user_id === user.id;
+        return hasPrestadorAccess || isOwner;
+      });
+      if (!isAuthorized) {
         throw new HttpError(
           403,
           "Você não possui permissão para remover este documento.",
@@ -272,12 +282,16 @@ export async function DELETE(request: Request) {
     const { error: deleteError } = await supabaseAdmin
       .from("formularios")
       .delete()
-      .eq("id", id);
+      .in("id", idsToRemove);
     if (deleteError) {
       throw deleteError;
     }
 
-    const arquivos = [registro.arquivo_path, registro.arquivo_assinado_path]
+    const arquivos = registros
+      .flatMap((registro) => [
+        registro.arquivo_path,
+        registro.arquivo_assinado_path,
+      ])
       .filter(Boolean) as string[];
     if (arquivos.length > 0) {
       const { error: storageError } = await supabaseAdmin.storage
