@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
-import { BriefcaseBusiness, FileBadge, ReceiptText } from "lucide-react";
+import { BriefcaseBusiness, Eye, FileBadge, ReceiptText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { supabase } from "@/lib/supabaseClient";
@@ -35,6 +35,8 @@ export default function DashboardPage() {
       id: string;
       tipo: string;
       status: string;
+      arquivo_path?: string | null;
+      arquivo_assinado_path?: string | null;
       created_at: string;
       dados: Record<string, unknown> | null;
     }[]
@@ -117,6 +119,62 @@ export default function DashboardPage() {
 
   const formatTipo = (tipo: string) => tipoLabel[tipo] ?? tipo;
 
+  const STORAGE_BUCKET = "formularios";
+  const SIGNED_URL_EXPIRES_IN = 60 * 30;
+
+  const resolveSignedPdfPath = (path?: string | null) => {
+    if (!path) {
+      return null;
+    }
+    if (path.endsWith("-view.html")) {
+      return path.replace(/-view\.html$/, ".pdf");
+    }
+    if (path.endsWith(".html")) {
+      return path.replace(/\.html$/, ".pdf");
+    }
+    return path;
+  };
+
+  const getSignedFileUrl = async (path: string) => {
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(path, SIGNED_URL_EXPIRES_IN);
+
+    if (error || !data?.signedUrl) {
+      throw error ?? new Error("Nao foi possivel gerar o link do arquivo.");
+    }
+    return data.signedUrl;
+  };
+
+  const abrirDocumento = async (registro: {
+    arquivo_path?: string | null;
+    arquivo_assinado_path?: string | null;
+  }) => {
+    const path =
+      resolveSignedPdfPath(registro.arquivo_assinado_path) ??
+      registro.arquivo_assinado_path ??
+      registro.arquivo_path;
+
+    if (!path) {
+      setHistoricoErro("Arquivo indisponivel no momento.");
+      return;
+    }
+
+    try {
+      const signedUrl = await getSignedFileUrl(path);
+      const anchor = document.createElement("a");
+      anchor.href = signedUrl;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+    } catch (err) {
+      console.error("Erro ao abrir documento:", err);
+      setHistoricoErro("Nao foi possivel abrir o documento. Tente novamente.");
+    }
+  };
+
   const carregarHistorico = useCallback(async () => {
     if (!user) {
       return;
@@ -152,6 +210,8 @@ export default function DashboardPage() {
           id: string;
           tipo: string;
           status: string;
+          arquivo_path?: string | null;
+          arquivo_assinado_path?: string | null;
           created_at: string;
           dados: Record<string, unknown> | null;
         }[];
@@ -330,40 +390,60 @@ export default function DashboardPage() {
           </p>
         ) : (
           <ul className="mt-4 space-y-3 text-xs text-slate-600">
-            {historicoRecentes.map((registro) => (
-              <li
-                key={registro.id}
-                className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">
-                      {formatTipo(registro.tipo)}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      Enviado em {formatData(registro.created_at)}
-                    </p>
+            {historicoRecentes.map((registro) => {
+              const pathParaVisualizar =
+                resolveSignedPdfPath(registro.arquivo_assinado_path) ??
+                registro.arquivo_assinado_path ??
+                registro.arquivo_path;
+              const podeVisualizar = Boolean(pathParaVisualizar);
+
+              return (
+                <li
+                  key={registro.id}
+                  className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        {formatTipo(registro.tipo)}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Enviado em {formatData(registro.created_at)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void abrirDocumento(registro)}
+                        disabled={!podeVisualizar}
+                        className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        title="Visualizar documento"
+                        aria-label="Visualizar documento"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <span
+                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                          registro.status === "assinado"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : registro.status === "em_analise"
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {formatStatus(registro.status)}
+                      </span>
+                    </div>
                   </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                      registro.status === "assinado"
-                        ? "bg-emerald-50 text-emerald-700"
-                        : registro.status === "em_analise"
-                          ? "bg-amber-50 text-amber-700"
-                          : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {formatStatus(registro.status)}
-                  </span>
-                </div>
-                {registro.dados &&
-                  typeof registro.dados.numero_pedido === "string" && (
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Pedido: {registro.dados.numero_pedido}
-                    </p>
-                  )}
-              </li>
-            ))}
+                  {registro.dados &&
+                    typeof registro.dados.numero_pedido === "string" && (
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Pedido: {registro.dados.numero_pedido}
+                      </p>
+                    )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
