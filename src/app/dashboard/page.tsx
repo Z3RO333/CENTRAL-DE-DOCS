@@ -43,6 +43,8 @@ export default function DashboardPage() {
   >([]);
   const [historicoLoading, setHistoricoLoading] = useState(true);
   const [historicoErro, setHistoricoErro] = useState<string | null>(null);
+  const [historicoTipoFilter, setHistoricoTipoFilter] = useState("todos");
+  const [historicoStatusFilter, setHistoricoStatusFilter] = useState("todos");
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -240,9 +242,57 @@ export default function DashboardPage() {
   }, [user, prestadoresLoading, carregarHistorico]);
 
   const historicoRecentes = useMemo(
-    () => historico.slice(0, 6),
-    [historico],
+    () =>
+      historico.filter((item) => {
+        if (historicoTipoFilter !== "todos" && item.tipo !== historicoTipoFilter) {
+          return false;
+        }
+        if (
+          historicoStatusFilter !== "todos" &&
+          item.status !== historicoStatusFilter
+        ) {
+          return false;
+        }
+        return true;
+      }),
+    [historico, historicoTipoFilter, historicoStatusFilter],
   );
+
+  const historicoTipoOptions = useMemo(() => {
+    const extras = Array.from(new Set(historico.map((item) => item.tipo)))
+      .filter((tipo) => !(tipo in tipoLabel))
+      .sort();
+    return [
+      { value: "todos", label: "Todos os tipos" },
+      ...Object.entries(tipoLabel).map(([value, label]) => ({
+        value,
+        label,
+      })),
+      ...extras.map((tipo) => ({
+        value: tipo,
+        label: tipo.replace(/_/g, " "),
+      })),
+    ];
+  }, [historico]);
+
+  const historicoStatusOptions = useMemo(() => {
+    const base = ["pendente", "assinado", "em_analise"];
+    const unique = Array.from(new Set(historico.map((item) => item.status)));
+    const extras = unique.filter((status) => !base.includes(status)).sort();
+    const ordered = [
+      "todos",
+      ...base.filter((status) => unique.includes(status)),
+      ...extras,
+    ];
+    const seen = new Set<string>();
+    return ordered.filter((status) => {
+      if (seen.has(status)) {
+        return false;
+      }
+      seen.add(status);
+      return true;
+    });
+  }, [historico]);
 
   const resumoPorTipo = useMemo(() => {
     return historico.reduce<
@@ -374,6 +424,39 @@ export default function DashboardPage() {
           <span className="text-[11px] text-slate-400">
             Mostrando {historicoRecentes.length} de {historico.length} registros
           </span>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <label className="text-xs font-semibold text-slate-600">
+            Tipo
+            <select
+              value={historicoTipoFilter}
+              onChange={(event) => setHistoricoTipoFilter(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+            >
+              {historicoTipoOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Status
+            <select
+              value={historicoStatusFilter}
+              onChange={(event) => setHistoricoStatusFilter(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+            >
+              {historicoStatusOptions.map((statusOption) => (
+                <option key={statusOption} value={statusOption}>
+                  {statusOption === "todos"
+                    ? "Todos os status"
+                    : formatStatus(statusOption)}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         {historicoLoading ? (
