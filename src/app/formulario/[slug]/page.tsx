@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { FilePlus2 } from "lucide-react";
+import { Eye, FilePlus2 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { usePrestadores } from "@/hooks/usePrestadores";
 
@@ -148,6 +148,8 @@ const FORM_CONFIGS: FormConfig[] = [
 ];
 
 const FORM_TIPO_ASSINAVEL = "registro_laudos";
+const STORAGE_BUCKET = "formularios";
+const SIGNED_URL_EXPIRES_IN = 60 * 30;
 
 const tipoLabel: Record<string, string> = {
   retencao_trabalhista: "Retenção Trabalhista",
@@ -159,6 +161,8 @@ type DocumentoHistorico = {
   id: string;
   tipo: string;
   status: string;
+  arquivo_path?: string | null;
+  arquivo_assinado_path?: string | null;
   created_at: string;
   prestador_id?: string | null;
   dados: Record<string, unknown> | null;
@@ -386,6 +390,56 @@ export default function FormularioPage() {
       return "--";
     }
     return date.toLocaleString("pt-BR");
+  };
+
+  const resolveSignedPdfPath = (path?: string | null) => {
+    if (!path) {
+      return null;
+    }
+    if (path.endsWith("-view.html")) {
+      return path.replace(/-view\.html$/, ".pdf");
+    }
+    if (path.endsWith(".html")) {
+      return path.replace(/\.html$/, ".pdf");
+    }
+    return path;
+  };
+
+  const getSignedFileUrl = async (path: string) => {
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(path, SIGNED_URL_EXPIRES_IN);
+
+    if (error || !data?.signedUrl) {
+      throw error ?? new Error("Nao foi possivel gerar o link do arquivo.");
+    }
+    return data.signedUrl;
+  };
+
+  const abrirDocumento = async (registro: DocumentoHistorico) => {
+    const path =
+      resolveSignedPdfPath(registro.arquivo_assinado_path) ??
+      registro.arquivo_assinado_path ??
+      registro.arquivo_path;
+
+    if (!path) {
+      setError("Arquivo indisponivel no momento.");
+      return;
+    }
+
+    try {
+      const signedUrl = await getSignedFileUrl(path);
+      const anchor = document.createElement("a");
+      anchor.href = signedUrl;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+    } catch (err) {
+      console.error("Erro ao abrir documento:", err);
+      setError("Nao foi possivel abrir o documento. Tente novamente.");
+    }
   };
 
   const resetFormProgress = () => {
@@ -724,40 +778,60 @@ export default function FormularioPage() {
           </p>
         ) : (
           <ul className="mt-4 space-y-3 text-xs text-slate-600">
-            {historicoRecentes.map((registro) => (
-              <li
-                key={registro.id}
-                className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">
-                      {formatTipo(registro.tipo)}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      Enviado em {formatData(registro.created_at)}
-                    </p>
+            {historicoRecentes.map((registro) => {
+              const pathParaVisualizar =
+                resolveSignedPdfPath(registro.arquivo_assinado_path) ??
+                registro.arquivo_assinado_path ??
+                registro.arquivo_path;
+              const podeVisualizar = Boolean(pathParaVisualizar);
+
+              return (
+                <li
+                  key={registro.id}
+                  className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        {formatTipo(registro.tipo)}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Enviado em {formatData(registro.created_at)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void abrirDocumento(registro)}
+                        disabled={!podeVisualizar}
+                        className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        title="Visualizar documento"
+                        aria-label="Visualizar documento"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <span
+                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                          registro.status === "assinado"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : registro.status === "em_analise"
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {formatStatus(registro.status)}
+                      </span>
+                    </div>
                   </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                      registro.status === "assinado"
-                        ? "bg-emerald-50 text-emerald-700"
-                        : registro.status === "em_analise"
-                          ? "bg-amber-50 text-amber-700"
-                          : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {formatStatus(registro.status)}
-                  </span>
-                </div>
-                {registro.dados &&
-                  typeof registro.dados.numero_pedido === "string" && (
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    Pedido: {registro.dados.numero_pedido as string}
-                  </p>
-                  )}
-              </li>
-            ))}
+                  {registro.dados &&
+                    typeof registro.dados.numero_pedido === "string" && (
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Pedido: {registro.dados.numero_pedido as string}
+                    </p>
+                    )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
