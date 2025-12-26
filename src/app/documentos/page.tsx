@@ -240,6 +240,7 @@ export default function DocumentosPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [startingBatch, setStartingBatch] = useState(false);
   const [viewMode, setViewMode] = useState<"tabela" | "cards">("tabela");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const getAccessToken = useCallback(async () => {
     const { data: sessionData, error: sessionError } =
@@ -405,6 +406,48 @@ export default function DocumentosPage() {
     } catch (err) {
       console.error("Erro ao baixar documento:", err);
       setError("Não foi possível gerar o link de download.");
+    }
+  };
+
+  const removerDocumento = async (registro: FormularioRecord) => {
+    if (
+      !window.confirm(
+        "Tem certeza que deseja remover este documento? Esta ação não pode ser desfeita.",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setDeletingId(registro.id);
+      setError(null);
+      const token = await getAccessToken();
+      const response = await fetch(
+        `/api/documentos?id=${encodeURIComponent(registro.id)}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(
+          payload.error ?? "Não foi possível remover o documento.",
+        );
+      }
+      setRegistros((prev) => prev.filter((item) => item.id !== registro.id));
+      setSelectedIds((prev) => prev.filter((id) => id !== registro.id));
+    } catch (err) {
+      console.error("Erro ao remover documento:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível remover o documento.",
+      );
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -1165,6 +1208,14 @@ export default function DocumentosPage() {
                           >
                             Baixar
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => void removerDocumento(registro)}
+                            disabled={deletingId === registro.id}
+                            className="rounded-full border border-red-200 px-3 py-1 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {deletingId === registro.id ? "Removendo..." : "Remover"}
+                          </button>
                           {isSelecionavel && (
                             <button
                               type="button"
@@ -1271,6 +1322,14 @@ export default function DocumentosPage() {
                     className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                   >
                     Baixar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void removerDocumento(registro)}
+                    disabled={deletingId === registro.id}
+                    className="rounded-full border border-red-200 px-3 py-1 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {deletingId === registro.id ? "Removendo..." : "Remover"}
                   </button>
                   {isSelecionavel && (
                     <button

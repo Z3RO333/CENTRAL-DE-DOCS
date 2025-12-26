@@ -226,3 +226,78 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await getSessionUser(request);
+    const email = user.email?.toLowerCase().trim() ?? null;
+    const supabaseAdmin = createSupabaseAdminClient();
+    const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
+    const allowedPrestadores = await getAuthorizedPrestadorIds(
+      email,
+      supabaseAdmin,
+    );
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    if (!id) {
+      throw new HttpError(400, "Informe o id do documento.");
+    }
+
+    const { data: registro, error: recordError } = await supabaseAdmin
+      .from("formularios")
+      .select("id,user_id,prestador_id,arquivo_path,arquivo_assinado_path")
+      .eq("id", id)
+      .maybeSingle();
+    if (recordError) {
+      throw recordError;
+    }
+    if (!registro) {
+      throw new HttpError(404, "Documento não encontrado.");
+    }
+
+    if (!canAccess) {
+      const prestadorId = registro.prestador_id as string | null;
+      const hasPrestadorAccess =
+        prestadorId && allowedPrestadores.includes(prestadorId);
+      const isOwner = registro.user_id === user.id;
+      if (!hasPrestadorAccess && !isOwner) {
+        throw new HttpError(
+          403,
+          "Você não possui permissão para remover este documento.",
+        );
+      }
+    }
+
+    const { error: deleteError } = await supabaseAdmin
+      .from("formularios")
+      .delete()
+      .eq("id", id);
+    if (deleteError) {
+      throw deleteError;
+    }
+
+    const arquivos = [registro.arquivo_path, registro.arquivo_assinado_path]
+      .filter(Boolean) as string[];
+    if (arquivos.length > 0) {
+      const { error: storageError } = await supabaseAdmin.storage
+        .from("formularios")
+        .remove(arquivos);
+      if (storageError) {
+        console.error("Erro ao remover arquivos do storage:", storageError);
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Erro ao remover documento:", err);
+    if (err instanceof HttpError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Não foi possível remover o documento.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
