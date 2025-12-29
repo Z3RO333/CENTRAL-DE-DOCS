@@ -91,6 +91,15 @@ export default function PrestadoresPage() {
     const match = formularioOptions.find((option) => option.value === alvo);
     return match?.label ?? alvo;
   };
+  const prestadorAccent = (index: number) => {
+    const accents = [
+      "from-sky-100 via-white to-transparent",
+      "from-emerald-100 via-white to-transparent",
+      "from-amber-100 via-white to-transparent",
+      "from-rose-100 via-white to-transparent",
+    ];
+    return accents[index % accents.length];
+  };
 
   const carregarRegras = useCallback(async () => {
     if (!user) {
@@ -658,7 +667,7 @@ export default function PrestadoresPage() {
               </p>
             ) : (
               <div className="mt-4 grid gap-3 md:grid-cols-2">
-                {prestadores.map((prestador) => {
+                {prestadores.map((prestador, index) => {
                   const regrasDoPrestador =
                     regrasPorPrestador[prestador.id] ?? [];
                   const regraDestaque = regrasDoPrestador[0] ?? null;
@@ -671,12 +680,17 @@ export default function PrestadoresPage() {
                       key={prestador.id}
                       type="button"
                       onClick={() => setSelectedPrestadorId(prestador.id)}
-                      className={`text-left rounded-2xl border px-4 py-3 transition ${
+                      className={`relative overflow-hidden text-left rounded-2xl border px-4 py-3 transition ${
                         selectedPrestadorId === prestador.id
-                          ? "border-sky-300 bg-sky-50/60 shadow-sm shadow-sky-100"
-                          : "border-slate-100 bg-slate-50/80 hover:border-slate-200"
+                          ? "border-sky-300 bg-white shadow-sm shadow-sky-100"
+                          : "border-slate-100 bg-white hover:border-slate-200"
                       }`}
                     >
+                      <div
+                        className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${prestadorAccent(
+                          index,
+                        )} opacity-80 blur-xl`}
+                      />
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <p className="text-sm font-semibold text-slate-800">
@@ -701,6 +715,16 @@ export default function PrestadoresPage() {
                           Nenhuma regra cadastrada.
                         </p>
                       )}
+                      <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-slate-500">
+                        <span className="rounded-full bg-slate-100 px-2 py-1">
+                          {selectedPrestadorId === prestador.id
+                            ? "Selecionado"
+                            : "Clique para detalhes"}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-2 py-1">
+                          {prestador.usuarios.length} e-mail(s)
+                        </span>
+                      </div>
                     </button>
                   );
                 })}
@@ -750,6 +774,16 @@ export default function PrestadoresPage() {
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                       E-mails do prestador
                     </p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-slate-500">
+                      <span className="rounded-full bg-slate-100 px-2 py-1">
+                        {selectedPrestador.usuarios.length} e-mail(s)
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2 py-1">
+                        {selectedPrestador.usuarios.length > 0
+                          ? "Grupo ativo"
+                          : "Sem usuarios"}
+                      </span>
+                    </div>
                     <form onSubmit={handleEmailsSubmit} className="mt-2 space-y-2">
                       {emailsFeedback.error || emailsFeedback.success ? (
                         <div
@@ -810,6 +844,16 @@ export default function PrestadoresPage() {
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                       Regras de monitoramento
                     </p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-slate-500">
+                      <span className="rounded-full bg-slate-100 px-2 py-1">
+                        {regrasPorPrestador[selectedPrestador.id]?.length ?? 0} regra(s)
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2 py-1">
+                        {regrasPorPrestador[selectedPrestador.id]?.length
+                          ? "Monitorando"
+                          : "Sem regras"}
+                      </span>
+                    </div>
                     {regrasPorPrestador[selectedPrestador.id]?.length ? (
                       <div className="mt-2 space-y-2">
                         {regrasPorPrestador[selectedPrestador.id].map((regra) => {
