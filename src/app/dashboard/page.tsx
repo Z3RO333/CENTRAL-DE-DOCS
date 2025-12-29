@@ -8,6 +8,7 @@ import { BriefcaseBusiness, Eye, FileBadge, ReceiptText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { supabase } from "@/lib/supabaseClient";
+import { isInPeriodo, resolvePrestadorMeta } from "@/lib/prestadorMetas";
 
 type DashboardCard = {
   slug: string;
@@ -39,6 +40,7 @@ export default function DashboardPage() {
       arquivo_assinado_path?: string | null;
       created_at: string;
       dados: Record<string, unknown> | null;
+      prestador_id?: string | null;
     }[]
   >([]);
   const [historicoLoading, setHistoricoLoading] = useState(true);
@@ -216,6 +218,7 @@ export default function DashboardPage() {
           arquivo_assinado_path?: string | null;
           created_at: string;
           dados: Record<string, unknown> | null;
+          prestador_id?: string | null;
         }[];
         error?: string;
       };
@@ -327,6 +330,28 @@ export default function DashboardPage() {
     }, {});
   }, [historico]);
 
+  const prestadoresProgresso = useMemo(() => {
+    const now = new Date();
+    return prestadoresDoUsuario.map((prestador) => {
+      const meta = resolvePrestadorMeta(prestador);
+      const enviados = historico.filter(
+        (item) =>
+          item.prestador_id === prestador.id &&
+          isInPeriodo(item.created_at, meta.periodo, now),
+      ).length;
+      const percentual =
+        meta.quantidade > 0
+          ? Math.min((enviados / meta.quantidade) * 100, 100)
+          : 0;
+      return {
+        prestador,
+        meta,
+        enviados,
+        percentual,
+      };
+    });
+  }, [historico, prestadoresDoUsuario]);
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -410,6 +435,62 @@ export default function DashboardPage() {
           );
         })}
       </div>
+
+      <section className="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm shadow-slate-100/80">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Progresso por prestador
+            </p>
+            <span className="text-[11px] text-slate-500">
+              Acompanhamento dos envios no periodo atual.
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-400">
+            {prestadoresProgresso.length} prestador(es) monitorados
+          </span>
+        </div>
+
+        {prestadoresProgresso.length === 0 ? (
+          <p className="mt-4 text-xs text-slate-500">
+            Nenhum prestador vinculado ao seu usuario.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {prestadoresProgresso.map((item) => (
+              <div
+                key={item.prestador.id}
+                className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3 text-xs text-slate-600"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {item.prestador.nome}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {item.meta.label} · meta {item.meta.quantidade}{" "}
+                      {item.meta.periodo === "mensal" ? "mes" : "ano"}
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold text-slate-600">
+                    {item.enviados}/{item.meta.quantidade}
+                  </span>
+                </div>
+                <div className="mt-2 h-2 w-full rounded-full bg-white">
+                  <div
+                    className="h-2 rounded-full bg-gradient-to-r from-emerald-400 via-sky-400 to-sky-300 transition-all"
+                    style={{ width: `${item.percentual}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Progresso {Math.round(item.percentual)}% no{" "}
+                  {item.meta.periodo === "mensal" ? "mes atual" : "ano atual"}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm shadow-slate-100/80">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
