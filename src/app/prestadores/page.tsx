@@ -8,7 +8,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { supabase } from "@/lib/supabaseClient";
-import { isInPeriodo, type PrestadorRegra } from "@/lib/prestadorRegras";
+import { type PrestadorRegra } from "@/lib/prestadorRegras";
 
 export default function PrestadoresPage() {
   const router = useRouter();
@@ -33,17 +33,6 @@ export default function PrestadoresPage() {
   }>({ error: null, success: null });
   const [creatingPrestador, setCreatingPrestador] = useState(false);
   const [selectedPrestadorId, setSelectedPrestadorId] = useState<string>("");
-  const [documentos, setDocumentos] = useState<
-    {
-      id: string;
-      prestador_id?: string | null;
-      created_at: string;
-      tipo: string;
-      dados?: Record<string, unknown> | null;
-    }[]
-  >([]);
-  const [documentosLoading, setDocumentosLoading] = useState(false);
-  const [documentosError, setDocumentosError] = useState<string | null>(null);
   const [regras, setRegras] = useState<PrestadorRegra[]>([]);
   const [regrasLoading, setRegrasLoading] = useState(false);
   const [regrasError, setRegrasError] = useState<string | null>(null);
@@ -82,65 +71,6 @@ export default function PrestadoresPage() {
     { value: "retencao_trabalhista", label: "Retencao Trabalhista" },
     { value: "notas_fiscais", label: "Notas Fiscais" },
   ];
-
-  const carregarDocumentos = useCallback(async () => {
-    if (!user) {
-      return;
-    }
-    if (prestadores.length === 0) {
-      setDocumentos([]);
-      setDocumentosLoading(false);
-      setDocumentosError(null);
-      return;
-    }
-    setDocumentosLoading(true);
-    setDocumentosError(null);
-    try {
-      const { data, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        throw sessionError;
-      }
-      const token = data.session?.access_token;
-      if (!token) {
-        throw new Error("Sessao expirada. Faca login novamente.");
-      }
-      const params = new URLSearchParams();
-      prestadores.forEach((prestador) => params.append("prestadorId", prestador.id));
-      const url =
-        params.size > 0 ? `/api/documentos?${params.toString()}` : "/api/documentos";
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const payload = (await response.json()) as {
-        registros?: {
-          id: string;
-          prestador_id?: string | null;
-          created_at: string;
-          tipo: string;
-          dados?: Record<string, unknown> | null;
-        }[];
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Nao foi possivel carregar documentos.");
-      }
-      setDocumentos(payload.registros ?? []);
-    } catch (err) {
-      setDocumentosError(
-        err instanceof Error ? err.message : "Nao foi possivel carregar documentos.",
-      );
-    } finally {
-      setDocumentosLoading(false);
-    }
-  }, [prestadores, user]);
-
-  useEffect(() => {
-    if (user && !prestadoresLoading) {
-      void carregarDocumentos();
-    }
-  }, [user, prestadoresLoading, carregarDocumentos]);
 
   const carregarRegras = useCallback(async () => {
     if (!user) {
@@ -206,64 +136,6 @@ export default function PrestadoresPage() {
       return acc;
     }, {});
   }, [regras]);
-
-  const getTipoLaudo = (dados: Record<string, unknown> | null | undefined) => {
-    if (!dados) {
-      return "";
-    }
-    const value = dados["tipo_laudo"];
-    return typeof value === "string" ? value : "";
-  };
-
-  const progressoPrestadores = useMemo(() => {
-    const now = new Date();
-    return prestadores.map((prestador) => {
-      const regrasDoPrestador = regrasPorPrestador[prestador.id] ?? [];
-      const progresso = regrasDoPrestador.map((regra) => {
-        const enviados = documentos.filter((item) => {
-          if (item.prestador_id !== prestador.id) {
-            return false;
-          }
-          if (!isInPeriodo(item.created_at, regra.periodo, now)) {
-            return false;
-          }
-          if (regra.tipo_regra === "formulario") {
-            return item.tipo === regra.alvo;
-          }
-          if (regra.tipo_regra === "tipo_servico") {
-            if (item.tipo !== "registro_laudos") {
-              return false;
-            }
-            const tipoLaudo = getTipoLaudo(item.dados);
-            return tipoLaudo.toLowerCase() === regra.alvo.toLowerCase();
-          }
-          return false;
-        }).length;
-        const percentual =
-          regra.quantidade > 0
-            ? Math.min((enviados / regra.quantidade) * 100, 100)
-            : 0;
-        return {
-          regra,
-          enviados,
-          percentual,
-        };
-      });
-
-      return {
-        prestador,
-        progresso,
-      };
-    });
-  }, [documentos, prestadores, regrasPorPrestador]);
-
-  const selectedProgress = useMemo(
-    () =>
-      progressoPrestadores.find(
-        (item) => item.prestador.id === selectedPrestadorId,
-      ) ?? null,
-    [progressoPrestadores, selectedPrestadorId],
-  );
 
   useEffect(() => {
     if (!selectedPrestador) {
@@ -562,7 +434,7 @@ export default function PrestadoresPage() {
                   Prestadores cadastrados
                 </p>
                 <span className="text-[11px] text-slate-500">
-                  Selecione um prestador para ver detalhes e progresso.
+                  Selecione um prestador para ver detalhes e regras.
                 </span>
               </div>
               <span className="text-[11px] text-slate-400">
@@ -580,73 +452,57 @@ export default function PrestadoresPage() {
               </p>
             ) : (
               <div className="mt-4 grid gap-3 md:grid-cols-2">
-                {progressoPrestadores.map((item) => (
-                  <button
-                    key={item.prestador.id}
-                    type="button"
-                    onClick={() => setSelectedPrestadorId(item.prestador.id)}
-                    className={`text-left rounded-2xl border px-4 py-3 transition ${
-                      selectedPrestadorId === item.prestador.id
-                        ? "border-sky-300 bg-sky-50/60 shadow-sm shadow-sky-100"
-                        : "border-slate-100 bg-slate-50/80 hover:border-slate-200"
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">
-                          {item.prestador.nome}
-                        </p>
-                        <p className="text-[11px] text-slate-500">
-                          {item.prestador.tipo_servico}
-                        </p>
+                {prestadores.map((prestador) => {
+                  const regrasDoPrestador =
+                    regrasPorPrestador[prestador.id] ?? [];
+                  const regraDestaque = regrasDoPrestador[0] ?? null;
+                  const labelDestaque = regraDestaque
+                    ? regraDestaque.label?.trim() ||
+                      (regraDestaque.tipo_regra === "formulario"
+                        ? formularioOptions.find(
+                            (option) => option.value === regraDestaque.alvo,
+                          )?.label ?? regraDestaque.alvo
+                        : regraDestaque.alvo)
+                    : null;
+
+                  return (
+                    <button
+                      key={prestador.id}
+                      type="button"
+                      onClick={() => setSelectedPrestadorId(prestador.id)}
+                      className={`text-left rounded-2xl border px-4 py-3 transition ${
+                        selectedPrestadorId === prestador.id
+                          ? "border-sky-300 bg-sky-50/60 shadow-sm shadow-sky-100"
+                          : "border-slate-100 bg-slate-50/80 hover:border-slate-200"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">
+                            {prestador.nome}
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            {prestador.tipo_servico}
+                          </p>
+                        </div>
+                        <span className="text-[11px] text-slate-500">
+                          {regrasDoPrestador.length} regra(s)
+                        </span>
                       </div>
-                      <span className="text-[11px] text-slate-500">
-                        {item.progresso.length} regra(s)
-                      </span>
-                    </div>
-                    {item.progresso.length === 0 ? (
-                      <p className="mt-3 text-[11px] text-slate-500">
-                        Nenhuma regra cadastrada.
-                      </p>
-                    ) : (
-                      (() => {
-                        const destaque = item.progresso[0];
-                        const label =
-                          destaque.regra.label?.trim() ||
-                          (destaque.regra.tipo_regra === "formulario"
-                            ? formularioOptions.find(
-                                (option) => option.value === destaque.regra.alvo,
-                              )?.label ?? destaque.regra.alvo
-                            : destaque.regra.alvo);
-                        return (
-                          <div className="mt-2 space-y-1">
-                            <div className="flex items-center justify-between text-[11px] text-slate-500">
-                              <span className="font-semibold text-slate-700">
-                                {label}
-                              </span>
-                              <span>
-                                {destaque.enviados}/{destaque.regra.quantidade}
-                              </span>
-                            </div>
-                            <div className="h-2 w-full rounded-full bg-white">
-                              <div
-                                className="h-2 rounded-full bg-gradient-to-r from-emerald-400 via-sky-400 to-sky-300"
-                                style={{ width: `${destaque.percentual}%` }}
-                              />
-                            </div>
-                            <p className="text-[11px] text-slate-500">
-                              {Math.round(destaque.percentual)}% no{" "}
-                              {destaque.regra.periodo === "mensal"
-                                ? "mes"
-                                : "ano"}{" "}
-                              atual
-                            </p>
-                          </div>
-                        );
-                      })()
-                    )}
-                  </button>
-                ))}
+                      {labelDestaque ? (
+                        <p className="mt-2 text-[11px] text-slate-500">
+                          Regra destaque: {labelDestaque} ·{" "}
+                          {regraDestaque?.quantidade} /{" "}
+                          {regraDestaque?.periodo === "mensal" ? "mes" : "ano"}
+                        </p>
+                      ) : (
+                        <p className="mt-2 text-[11px] text-slate-500">
+                          Nenhuma regra cadastrada.
+                        </p>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -655,16 +511,6 @@ export default function PrestadoresPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Detalhes do prestador
             </p>
-            {documentosLoading && (
-              <p className="mt-2 text-xs text-slate-500">
-                Carregando monitoramento de documentos...
-              </p>
-            )}
-            {documentosError && (
-              <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                {documentosError}
-              </p>
-            )}
             {regrasLoading && (
               <p className="mt-2 text-xs text-slate-500">
                 Carregando regras de progresso...
@@ -685,10 +531,9 @@ export default function PrestadoresPage() {
                   <span className="font-semibold text-slate-700">CNPJ:</span>{" "}
                   {selectedPrestador.cnpj}
                 </p>
-                {selectedProgress?.progresso.length ? (
+                {regrasPorPrestador[selectedPrestador.id]?.length ? (
                   <div className="space-y-2">
-                    {selectedProgress.progresso.map(
-                      ({ regra, enviados, percentual }) => {
+                    {regrasPorPrestador[selectedPrestador.id].map((regra) => {
                         const label =
                           regra.label?.trim() ||
                           (regra.tipo_regra === "formulario"
@@ -713,14 +558,8 @@ export default function PrestadoresPage() {
                                 Remover
                               </button>
                             </div>
-                            <div className="mt-2 h-2 w-full rounded-full bg-slate-100">
-                              <div
-                                className="h-2 rounded-full bg-gradient-to-r from-emerald-400 via-sky-400 to-sky-300"
-                                style={{ width: `${percentual}%` }}
-                              />
-                            </div>
                             <p className="mt-1 text-[11px] text-slate-500">
-                              Enviados {enviados} de {regra.quantidade} no periodo{" "}
+                              Meta: {regra.quantidade} no periodo{" "}
                               {regra.periodo === "mensal" ? "mensal" : "anual"}
                             </p>
                           </div>
@@ -730,7 +569,7 @@ export default function PrestadoresPage() {
                   </div>
                 ) : (
                   <p className="text-[11px] text-slate-500">
-                    Nenhuma regra de progresso cadastrada para este prestador.
+                    Nenhuma regra cadastrada para este prestador.
                   </p>
                 )}
                 <div>
