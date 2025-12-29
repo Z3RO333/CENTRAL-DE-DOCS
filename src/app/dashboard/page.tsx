@@ -8,7 +8,7 @@ import { BriefcaseBusiness, Eye, FileBadge, ReceiptText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { supabase } from "@/lib/supabaseClient";
-import { isInPeriodo, resolvePrestadorMeta } from "@/lib/prestadorMetas";
+import { isInPeriodo, type PrestadorRegra } from "@/lib/prestadorRegras";
 
 type DashboardCard = {
   slug: string;
@@ -47,6 +47,9 @@ export default function DashboardPage() {
   const [historicoErro, setHistoricoErro] = useState<string | null>(null);
   const [historicoTipoFilter, setHistoricoTipoFilter] = useState("todos");
   const [historicoStatusFilter, setHistoricoStatusFilter] = useState("todos");
+  const [regras, setRegras] = useState<PrestadorRegra[]>([]);
+  const [regrasLoading, setRegrasLoading] = useState(true);
+  const [regrasErro, setRegrasErro] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -238,11 +241,69 @@ export default function DashboardPage() {
     }
   }, [user, prestadoresDoUsuario]);
 
+  const carregarRegras = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+    if (prestadoresDoUsuario.length === 0) {
+      setRegras([]);
+      setRegrasLoading(false);
+      setRegrasErro(null);
+      return;
+    }
+    setRegrasLoading(true);
+    setRegrasErro(null);
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        throw sessionError;
+      }
+      const token = data.session?.access_token;
+      if (!token) {
+        throw new Error("Sessao expirada. Faca login novamente.");
+      }
+      const params = new URLSearchParams();
+      prestadoresDoUsuario.forEach((prestador) =>
+        params.append("prestadorId", prestador.id),
+      );
+      const url =
+        params.size > 0
+          ? `/api/prestador-regras?${params.toString()}`
+          : "/api/prestador-regras";
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = (await response.json()) as {
+        regras?: PrestadorRegra[];
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Nao foi possivel carregar as regras.");
+      }
+      setRegras(payload.regras ?? []);
+    } catch (err) {
+      console.error("Erro ao carregar regras:", err);
+      setRegrasErro(
+        err instanceof Error ? err.message : "Nao foi possivel carregar as regras.",
+      );
+    } finally {
+      setRegrasLoading(false);
+    }
+  }, [prestadoresDoUsuario, user]);
+
   useEffect(() => {
     if (user && !prestadoresLoading) {
       void carregarHistorico();
     }
   }, [user, prestadoresLoading, carregarHistorico]);
+
+  useEffect(() => {
+    if (user && !prestadoresLoading) {
+      void carregarRegras();
+    }
+  }, [user, prestadoresLoading, carregarRegras]);
 
   const historicoRecentes = useMemo(
     () =>
@@ -330,27 +391,64 @@ export default function DashboardPage() {
     }, {});
   }, [historico]);
 
+  const regrasPorPrestador = useMemo(() => {
+    return regras.reduce<Record<string, PrestadorRegra[]>>((acc, regra) => {
+      if (!acc[regra.prestador_id]) {
+        acc[regra.prestador_id] = [];
+      }
+      acc[regra.prestador_id].push(regra);
+      return acc;
+    }, {});
+  }, [regras]);
+
+  const getTipoLaudo = (dados: Record<string, unknown> | null) => {
+    if (!dados) {
+      return "";
+    }
+    const value = dados["tipo_laudo"];
+    return typeof value === "string" ? value : "";
+  };
+
   const prestadoresProgresso = useMemo(() => {
     const now = new Date();
     return prestadoresDoUsuario.map((prestador) => {
-      const meta = resolvePrestadorMeta(prestador);
-      const enviados = historico.filter(
-        (item) =>
-          item.prestador_id === prestador.id &&
-          isInPeriodo(item.created_at, meta.periodo, now),
-      ).length;
-      const percentual =
-        meta.quantidade > 0
-          ? Math.min((enviados / meta.quantidade) * 100, 100)
-          : 0;
+      const regrasDoPrestador = regrasPorPrestador[prestador.id] ?? [];
+      const progresso = regrasDoPrestador.map((regra) => {
+        const enviados = historico.filter((item) => {
+          if (item.prestador_id !== prestador.id) {
+            return false;
+          }
+          if (!isInPeriodo(item.created_at, regra.periodo, now)) {
+            return false;
+          }
+          if (regra.tipo_regra === "formulario") {
+            return item.tipo === regra.alvo;
+          }
+          if (regra.tipo_regra === "tipo_servico") {
+            if (item.tipo !== "registro_laudos") {
+              return false;
+            }
+            const tipoLaudo = getTipoLaudo(item.dados);
+            return tipoLaudo.toLowerCase() === regra.alvo.toLowerCase();
+          }
+          return false;
+        }).length;
+        const percentual =
+          regra.quantidade > 0
+            ? Math.min((enviados / regra.quantidade) * 100, 100)
+            : 0;
+        return {
+          regra,
+          enviados,
+          percentual,
+        };
+      });
       return {
         prestador,
-        meta,
-        enviados,
-        percentual,
+        progresso,
       };
     });
-  }, [historico, prestadoresDoUsuario]);
+  }, [historico, prestadoresDoUsuario, regrasPorPrestador]);
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6">
@@ -443,7 +541,7 @@ export default function DashboardPage() {
               Progresso por prestador
             </p>
             <span className="text-[11px] text-slate-500">
-              Acompanhamento dos envios no periodo atual.
+              Regras ativas e andamento no periodo atual.
             </span>
           </div>
           <span className="text-[11px] text-slate-400">
@@ -451,7 +549,15 @@ export default function DashboardPage() {
           </span>
         </div>
 
-        {prestadoresProgresso.length === 0 ? (
+        {regrasLoading ? (
+          <p className="mt-4 text-xs text-slate-500">
+            Carregando regras de progresso...
+          </p>
+        ) : regrasErro ? (
+          <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {regrasErro}
+          </p>
+        ) : prestadoresProgresso.length === 0 ? (
           <p className="mt-4 text-xs text-slate-500">
             Nenhum prestador vinculado ao seu usuario.
           </p>
@@ -468,24 +574,52 @@ export default function DashboardPage() {
                       {item.prestador.nome}
                     </p>
                     <p className="text-[11px] text-slate-500">
-                      {item.meta.label} · meta {item.meta.quantidade}{" "}
-                      {item.meta.periodo === "mensal" ? "mes" : "ano"}
+                      {item.prestador.tipo_servico}
                     </p>
                   </div>
-                  <span className="text-xs font-semibold text-slate-600">
-                    {item.enviados}/{item.meta.quantidade}
+                  <span className="text-[11px] text-slate-500">
+                    {item.progresso.length} regra(s)
                   </span>
                 </div>
-                <div className="mt-2 h-2 w-full rounded-full bg-white">
-                  <div
-                    className="h-2 rounded-full bg-gradient-to-r from-emerald-400 via-sky-400 to-sky-300 transition-all"
-                    style={{ width: `${item.percentual}%` }}
-                  />
-                </div>
-                <p className="mt-1 text-[11px] text-slate-500">
-                  Progresso {Math.round(item.percentual)}% no{" "}
-                  {item.meta.periodo === "mensal" ? "mes atual" : "ano atual"}
-                </p>
+
+                {item.progresso.length === 0 ? (
+                  <p className="mt-3 text-[11px] text-slate-500">
+                    Nenhuma regra cadastrada.
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {item.progresso.map(({ regra, enviados, percentual }) => {
+                      const label =
+                        regra.label?.trim() ||
+                        (regra.tipo_regra === "formulario"
+                          ? tipoLabel[regra.alvo] ?? regra.alvo
+                          : regra.alvo);
+
+                      return (
+                        <div key={regra.id} className="space-y-1">
+                          <div className="flex items-center justify-between text-[11px] text-slate-500">
+                            <span className="font-semibold text-slate-700">
+                              {label}
+                            </span>
+                            <span>
+                              {enviados}/{regra.quantidade}
+                            </span>
+                          </div>
+                          <div className="h-2 w-full rounded-full bg-white">
+                            <div
+                              className="h-2 rounded-full bg-gradient-to-r from-emerald-400 via-sky-400 to-sky-300 transition-all"
+                              style={{ width: `${percentual}%` }}
+                            />
+                          </div>
+                          <p className="text-[11px] text-slate-500">
+                            {Math.round(percentual)}% no{" "}
+                            {regra.periodo === "mensal" ? "mes" : "ano"} atual
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             ))}
           </div>
