@@ -109,14 +109,6 @@ export async function GET(request: Request) {
     const email = user.email?.toLowerCase().trim() ?? null;
     const supabaseAdmin = createSupabaseAdminClient();
 
-    const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
-    if (!canAccess) {
-      throw new HttpError(
-        403,
-        "Você não possui permissão para consultar prestadores.",
-      );
-    }
-
     const { searchParams } = new URL(request.url);
     const assignedOnly = searchParams.get("assignedOnly") === "true";
 
@@ -124,6 +116,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ prestadores: [] });
     }
 
+    if (!assignedOnly) {
+      const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
+      if (!canAccess) {
+        throw new HttpError(
+          403,
+          "Voce nao possui permissao para consultar prestadores.",
+        );
+      }
+    }
     let query = supabaseAdmin
       .from("prestadores")
       .select("id,nome,cnpj,tipo_servico,usuarios,created_at")
