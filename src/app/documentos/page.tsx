@@ -30,7 +30,7 @@ type FormularioRecord = {
 };
 
 const tipoLabel: Record<string, string> = {
-  retencao_trabalhista: "Retencao Trabalhista",
+  retencao_trabalhista: "Retenção Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
 };
@@ -47,21 +47,21 @@ const FORM_FILTER_CARDS: FilterCardConfig[] = [
   {
     value: "retencao_trabalhista",
     label: tipoLabel.retencao_trabalhista,
-    description: "Documentos ligados a retencao de tributos trabalhistas.",
+    description: "Documentos ligados a retenção de tributos trabalhistas.",
     icon: BriefcaseBusiness,
     accent: "from-sky-100 via-sky-50 to-transparent",
   },
   {
     value: "registro_laudos",
     label: tipoLabel.registro_laudos,
-    description: "Registros tecnicos e laudos enviados para validacao.",
+    description: "Registros técnicos e laudos enviados para validação.",
     icon: FileBadge,
     accent: "from-emerald-100 via-emerald-50 to-transparent",
   },
   {
     value: "notas_fiscais",
     label: tipoLabel.notas_fiscais,
-    description: "Notas emitidas e anexadas via formularios.",
+    description: "Notas emitidas e anexadas via formulários.",
     icon: ReceiptText,
     accent: "from-amber-100 via-amber-50 to-transparent",
   },
@@ -87,7 +87,7 @@ async function getSignedFileUrl(
     .createSignedUrl(path, expiresIn);
 
   if (error || !data?.signedUrl) {
-    throw error ?? new Error("Nao foi possivel gerar o link do arquivo.");
+    throw error ?? new Error("Não foi possível gerar o link do arquivo.");
   }
 
   return data.signedUrl;
@@ -96,7 +96,7 @@ async function getSignedFileUrl(
 const statusLabelMap: Record<string, string> = {
   pendente: "Pendente",
   assinado: "Assinado",
-  em_analise: "Em analise",
+  em_analise: "Em análise",
 };
 
 const humanizeTexto = (value: string) =>
@@ -126,7 +126,7 @@ const identificacaoFieldMap: Record<
     campos: ["prestador", "responsavel"],
   },
   notas_fiscais: {
-    label: "Numero do pedido",
+    label: "Número do pedido",
     campos: ["numero_pedido"],
   },
 };
@@ -257,7 +257,7 @@ export default function DocumentosPage() {
     }
     const token = sessionData.session?.access_token;
     if (!token) {
-      throw new Error("Sessao expirada. Faca login novamente.");
+      throw new Error("Sessão expirada. Faça login novamente.");
     }
     return token;
   }, []);
@@ -340,7 +340,7 @@ export default function DocumentosPage() {
 
         if (!response.ok || !payload.registros) {
           throw new Error(
-            payload.error ?? "Nao foi possivel carregar os documentos.",
+            payload.error ?? "Não foi possível carregar os documentos.",
           );
         }
         const parsed = payload.registros ?? [];
@@ -355,7 +355,7 @@ export default function DocumentosPage() {
           setError(
             err instanceof Error
               ? err.message
-              : "Nao foi possivel carregar os documentos.",
+              : "Não foi possível carregar os documentos.",
           );
           setRegistros([]);
         }
@@ -414,7 +414,7 @@ export default function DocumentosPage() {
       document.body.removeChild(anchor);
     } catch (err) {
       console.error("Erro ao abrir documento:", err);
-      setError("Nao foi possivel abrir o documento. Tente novamente.");
+      setError("Não foi possível abrir o documento. Tente novamente.");
     }
   };
 
@@ -435,7 +435,7 @@ export default function DocumentosPage() {
       document.body.removeChild(link);
     } catch (err) {
       console.error("Erro ao baixar documento:", err);
-      setError("Nao foi possivel gerar o link de download.");
+      setError("Não foi possível gerar o link de download.");
     }
   };
 
@@ -471,7 +471,7 @@ export default function DocumentosPage() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
         throw new Error(
-          payload.error ?? "Nao foi possivel remover o documento.",
+          payload.error ?? "Não foi possível remover o documento.",
         );
       }
       setRegistros((prev) =>
@@ -485,7 +485,7 @@ export default function DocumentosPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Nao foi possivel remover o documento.",
+          : "Não foi possível remover o documento.",
       );
     } finally {
       setDeletingId(null);
@@ -522,7 +522,7 @@ export default function DocumentosPage() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
         throw new Error(
-          payload.error ?? "Nao foi possivel remover os documentos.",
+          payload.error ?? "Não foi possível remover os documentos.",
         );
       }
       setRegistros((prev) =>
@@ -534,7 +534,7 @@ export default function DocumentosPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Nao foi possivel remover os documentos.",
+          : "Não foi possível remover os documentos.",
       );
     } finally {
       setDeletingBatch(false);
@@ -778,12 +778,12 @@ export default function DocumentosPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6" onClick={() => setConfirmDialog(null)}>
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/20" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">
             <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Confirmar exclusao
+              Confirmar exclusão
             </p>
             <p id="confirm-desc" className="mt-2 text-sm text-slate-700">
               {confirmDialog.type === "batch"
-                ? "Tem certeza que deseja remover os documentos selecionados? Esta acao nao pode ser desfeita."
-                : "Tem certeza que deseja remover este documento? Esta acao nao pode ser desfeita."}
+                ? "Tem certeza que deseja remover os documentos selecionados? Esta ação não pode ser desfeita."
+                : "Tem certeza que deseja remover este documento? Esta ação não pode ser desfeita."}
             </p>
             {confirmDialog.type === "single" && confirmDialog.registro && (
               <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600">
@@ -832,7 +832,7 @@ export default function DocumentosPage() {
           </div>
           <p className="mt-1 text-sm text-slate-500">
             Consulte e filtre rapidamente os documentos enviados pelos
-            formularios.
+            formulários.
           </p>
         </div>
         <div className="hidden text-right text-xs text-slate-500 md:block">
@@ -865,10 +865,10 @@ export default function DocumentosPage() {
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Ultimos documentos enviados
+                Últimos documentos enviados
               </p>
               <p className="text-[11px] text-slate-500">
-                Lista rapida das ultimas submissoes, independente dos filtros.
+                Lista rápida das últimas submissões, independente dos filtros.
               </p>
             </div>
             <span className="text-xs font-semibold text-slate-400">
@@ -880,7 +880,7 @@ export default function DocumentosPage() {
               const identificacaoConfig = getIdentificacaoConfig(registro.tipo);
               const identificacaoValor =
                 getIdentificacaoValor(registro) ??
-                `${identificacaoConfig.label} nao informado`;
+                `${identificacaoConfig.label} não informado`;
               return (
                 <div
                   key={registro.id}
@@ -936,7 +936,7 @@ export default function DocumentosPage() {
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Filtros rapidos por formulario
+              Filtros rápidos por formulário
             </p>
             <p className="text-[11px] text-slate-500">
               Clique em um card para aplicar o filtro desejado.
@@ -1033,7 +1033,7 @@ export default function DocumentosPage() {
                 aria-pressed={viewMode === "cards"}
               >
                 <LayoutGrid className="h-4 w-4" />
-                Cartoes
+                Cartões
               </button>
             </div>
           </div>
@@ -1041,12 +1041,12 @@ export default function DocumentosPage() {
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <label className="text-xs font-semibold text-slate-600">
-            Identificacao (Empresa/Prestador/Numero do pedido)
+            Identificação (Empresa/Prestador/Número do pedido)
             <input
               type="text"
               value={identificacaoFilter}
               onChange={(event) => setIdentificacaoFilter(event.target.value)}
-              placeholder="Busque pela empresa, prestador ou numero do pedido"
+              placeholder="Busque pela empresa, prestador ou número do pedido"
               className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             />
           </label>
@@ -1099,7 +1099,7 @@ export default function DocumentosPage() {
             </select>
           </label>
           <label className="text-xs font-semibold text-slate-600">
-            Mes de envio
+            Mês de envio
             <select
               value={mesFilter}
               onChange={(event) => setMesFilter(event.target.value)}
@@ -1114,8 +1114,8 @@ export default function DocumentosPage() {
             </select>
           </label>
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-500">
-            Os filtros acima sao aplicados automaticamente. Por padrao
-            consideramos o mes corrente ({MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual"}).
+            Os filtros acima são aplicados automaticamente. Por padrão
+            consideramos o mês corrente ({MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual"}).
           </div>
         </div>
 
@@ -1138,7 +1138,7 @@ export default function DocumentosPage() {
                 setSomenteDisponiveisLote(event.target.checked)
               }
             />
-            Apenas disponiveis para assinatura em lote
+            Apenas disponíveis para assinatura em lote
           </label>
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
             Combine os filtros para chegar ao subconjunto desejado.
@@ -1150,7 +1150,7 @@ export default function DocumentosPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Assinaturas disponiveis
+              Assinaturas disponíveis
             </p>
             <p className="text-sm text-slate-600">
               {assinaturasPendentes.length > 0 ? (
@@ -1174,7 +1174,7 @@ export default function DocumentosPage() {
                       type="button"
                       onClick={() => toggleSelecionar(id)}
                       className="text-[10px] font-semibold text-slate-500 transition hover:text-slate-800"
-                      title="Remover da selecao"
+                      title="Remover da seleção"
                     >
                       x
                     </button>
@@ -1205,7 +1205,7 @@ export default function DocumentosPage() {
               disabled={!hasSelection}
               className="rounded-full border border-slate-200 px-4 py-1.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Limpar selecao
+              Limpar seleção
             </button>
             <button
               type="button"
@@ -1271,11 +1271,11 @@ export default function DocumentosPage() {
                     />
                   </th>
                   <th className="px-4 py-3 text-left">Documento</th>
-                  <th className="px-4 py-3 text-left">Identificacao</th>
+                  <th className="px-4 py-3 text-left">Identificação</th>
                   <th className="px-4 py-3 text-left">Tipo</th>
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-left">Enviado em</th>
-                  <th className="px-4 py-3 text-right">Acoes</th>
+                  <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
@@ -1285,7 +1285,7 @@ export default function DocumentosPage() {
                   );
                   const identificacaoValor =
                     getIdentificacaoValor(registro) ??
-                    `${identificacaoConfig.label} nao informado`;
+                    `${identificacaoConfig.label} não informado`;
                   const identificacaoComplemento =
                     getIdentificacaoComplemento(registro);
                   const isSelecionavel =
@@ -1387,7 +1387,7 @@ export default function DocumentosPage() {
             const identificacaoConfig = getIdentificacaoConfig(registro.tipo);
             const identificacaoValor =
               getIdentificacaoValor(registro) ??
-              `${identificacaoConfig.label} nao informado`;
+              `${identificacaoConfig.label} não informado`;
             const identificacaoComplemento =
               getIdentificacaoComplemento(registro);
             const isSelecionavel =
