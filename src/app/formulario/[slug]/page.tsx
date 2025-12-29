@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Eye, FilePlus2 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { usePrestadores } from "@/hooks/usePrestadores";
+import { resolveServicoOficial } from "@/lib/servicosVocab";
 
 type FormField = {
   name: string;
@@ -541,6 +542,13 @@ export default function FormularioPage() {
       }
 
       const valoresAtuais = { ...values };
+      if (
+        config.slug === "registro-laudos" &&
+        typeof valoresAtuais.tipo_laudo === "string"
+      ) {
+        const resolved = resolveServicoOficial(valoresAtuais.tipo_laudo);
+        valoresAtuais.tipo_laudo = resolved.canonical;
+      }
       const statusPadrao =
         config.defaultStatus ??
         (config.tipo === FORM_TIPO_ASSINAVEL ? "pendente" : "em_analise");
