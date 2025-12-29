@@ -343,3 +343,46 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await getSessionUser(request);
+    const email = user.email?.toLowerCase().trim() ?? null;
+    const supabaseAdmin = createSupabaseAdminClient();
+
+    const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
+    if (!canAccess) {
+      throw new HttpError(
+        403,
+        "Voce nao possui permissao para remover prestadores.",
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const prestadorId = searchParams.get("id")?.trim();
+    if (!prestadorId) {
+      throw new HttpError(400, "Informe o prestador.");
+    }
+
+    const { error } = await supabaseAdmin
+      .from("prestadores")
+      .delete()
+      .eq("id", prestadorId);
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("Erro ao remover prestador:", err);
+    if (err instanceof HttpError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Nao foi possivel remover o prestador.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

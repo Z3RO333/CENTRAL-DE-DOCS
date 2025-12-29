@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, ClipboardList, Mail, Target, UserPlus } from "lucide-react";
+import { Building2, ClipboardList, UserPlus } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
@@ -495,6 +495,53 @@ export default function PrestadoresPage() {
     }
   };
 
+  const handlePrestadorDelete = async () => {
+    if (!selectedPrestadorId) {
+      return;
+    }
+    setPrestadorFeedback({ error: null, success: null });
+    if (!window.confirm("Remover este prestador e suas regras?")) {
+      return;
+    }
+
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        throw sessionError;
+      }
+      const token = data.session?.access_token;
+      if (!token) {
+        throw new Error("Sessao expirada. Faca login novamente.");
+      }
+
+      const response = await fetch(`/api/prestadores?id=${selectedPrestadorId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Nao foi possivel remover o prestador.");
+      }
+
+      setPrestadorFeedback({
+        error: null,
+        success: "Prestador removido.",
+      });
+      await refreshPrestadores();
+      await carregarRegras();
+      setSelectedPrestadorId("");
+    } catch (err) {
+      setPrestadorFeedback({
+        error:
+          err instanceof Error ? err.message : "Nao foi possivel remover o prestador.",
+        success: null,
+      });
+    }
+  };
+
   const handleRegraDelete = async (regraId: string) => {
     setRegraFeedback({ error: null, success: null });
     if (!window.confirm("Remover esta regra de monitoramento?")) {
@@ -568,43 +615,17 @@ export default function PrestadoresPage() {
             prestadorFeedback.success}
         </div>
       )}
-      <div className="grid gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-xs text-slate-600">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            <ClipboardList className="h-4 w-4 text-slate-500" />
-            Passo 1
-          </div>
-          <p className="mt-2 text-sm font-semibold text-slate-800">
-            Escolha um prestador
-          </p>
-          <p className="mt-1 text-[11px] text-slate-500">
-            Selecione o prestador para ver detalhes e regras.
-          </p>
+      <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-xs text-slate-600">
+        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          <ClipboardList className="h-4 w-4 text-slate-500" />
+          Passo 1
         </div>
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-xs text-slate-600">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            <Mail className="h-4 w-4 text-slate-500" />
-            Passo 2
-          </div>
-          <p className="mt-2 text-sm font-semibold text-slate-800">
-            Adicione e-mails
-          </p>
-          <p className="mt-1 text-[11px] text-slate-500">
-            Inclua os usuarios que podem enviar documentos.
-          </p>
-        </div>
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-xs text-slate-600">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            <Target className="h-4 w-4 text-slate-500" />
-            Passo 3
-          </div>
-          <p className="mt-2 text-sm font-semibold text-slate-800">
-            Crie regras
-          </p>
-          <p className="mt-1 text-[11px] text-slate-500">
-            Defina metas por formulario ou tipo de servico.
-          </p>
-        </div>
+        <p className="mt-2 text-sm font-semibold text-slate-800">
+          Escolha um prestador
+        </p>
+        <p className="mt-1 text-[11px] text-slate-500">
+          Selecione o prestador para ver detalhes e regras.
+        </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
@@ -691,7 +712,7 @@ export default function PrestadoresPage() {
 
           <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              2. Detalhes e regras
+              2. Detalhes do prestador
             </p>
             {regrasLoading && (
               <p className="mt-2 text-xs text-slate-500">
@@ -705,14 +726,27 @@ export default function PrestadoresPage() {
             )}
             {selectedPrestador ? (
               <div className="mt-3 space-y-2 text-xs text-slate-600">
-                <p>
-                  <span className="font-semibold text-slate-700">Tipo de servico:</span>{" "}
-                  {selectedPrestador.tipo_servico}
-                </p>
-                <p>
-                  <span className="font-semibold text-slate-700">CNPJ:</span>{" "}
-                  {selectedPrestador.cnpj}
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="space-y-2">
+                    <p>
+                      <span className="font-semibold text-slate-700">
+                        Tipo de servico:
+                      </span>{" "}
+                      {selectedPrestador.tipo_servico}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-slate-700">CNPJ:</span>{" "}
+                      {selectedPrestador.cnpj}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handlePrestadorDelete()}
+                    className="rounded-full border border-red-200 px-3 py-1 text-[11px] font-semibold text-red-600 transition hover:border-red-300 hover:text-red-700"
+                  >
+                    Remover prestador
+                  </button>
+                </div>
                 <div className="grid gap-3 lg:grid-cols-2">
                   <div className="rounded-xl border border-slate-100 bg-white px-3 py-2">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
