@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -36,34 +36,34 @@ const FORM_CONFIGS: FormConfig[] = [
   {
     slug: "retencao-trabalhista",
     tipo: "retencao_trabalhista",
-    title: "Retenção Trabalhista",
+    title: "Retencao Trabalhista",
     description:
-      "Informe os dados necessários para análise e controle de retenções trabalhistas.",
+      "Informe os dados necessarios para analise e controle de retencoes trabalhistas.",
     defaultStatus: "em_analise",
     fields: [
       {
         name: "empresa",
         label: "Empresa",
         type: "text",
-        placeholder: "Razão social ou nome fantasia",
-      },
-      {
-        name: "cnpj",
-        label: "CNPJ do emitente",
-        type: "text",
-        placeholder: "00.000.000/0000-00",
+        placeholder: "Razao social ou nome fantasia",
       },
       {
         name: "competencia",
-        label: "Competência",
+        label: "Competencia",
         type: "text",
         placeholder: "MM/AAAA",
       },
       {
+        name: "prestador",
+        label: "Prestador",
+        type: "text",
+        placeholder: "Nome do prestador responsavel pelo documento",
+      },
+      {
         name: "observacoes",
-        label: "Observações",
+        label: "Observacoes",
         type: "textarea",
-        placeholder: "Detalhes adicionais sobre a retenção",
+        placeholder: "Detalhes adicionais sobre a retencao",
       },
     ],
   },
@@ -72,37 +72,37 @@ const FORM_CONFIGS: FormConfig[] = [
     tipo: "registro_laudos",
     title: "Registro e Laudos",
     description:
-      "Envie laudos e registros técnicos para armazenamento e controle interno.",
+      "Envie laudos e registros tecnicos para armazenamento e controle interno.",
     fields: [
-      {
-        name: "tipo_laudo",
-        label: "Tipo de laudo",
-        type: "text",
-        placeholder: "Ex.: Laudo Técnico, PPRA, LTCAT, etc.",
-        options: ["Corretiva", "Preventiva"],
-      },
       {
         name: "prestador",
         label: "Prestador",
         type: "text",
-        placeholder: "Nome do prestador responsável pelo documento",
+        placeholder: "Nome do prestador responsavel pelo documento",
+      },
+      {
+        name: "tipo_laudo",
+        label: "Tipo de laudo",
+        type: "text",
+        placeholder: "Ex.: Laudo Tecnico, PPRA, LTCAT, etc.",
+        options: ["Corretiva", "Preventiva"],
       },
       {
         name: "responsavel",
-        label: "Responsável",
+        label: "Responsavel",
         type: "text",
-        placeholder: "Nome do responsável técnico",
+        placeholder: "Nome do responsavel tecnico",
       },
       {
         name: "data_emissao",
-        label: "Data de emissão",
+        label: "Data de emissao",
         type: "date",
       },
       {
         name: "observacoes",
-        label: "Observações",
+        label: "Observacoes",
         type: "textarea",
-        placeholder: "Informações adicionais importantes",
+        placeholder: "Informacoes adicionais importantes",
       },
     ],
   },
@@ -115,22 +115,22 @@ const FORM_CONFIGS: FormConfig[] = [
     defaultStatus: "em_analise",
     fields: [
       {
+        name: "prestador",
+        label: "Prestador",
+        type: "text",
+        placeholder: "Nome do prestador responsavel pelo documento",
+      },
+      {
         name: "numero_pedido",
-        label: "Número do pedido",
+        label: "Numero do pedido",
         type: "text",
         placeholder: "Ex.: 12345",
       },
       {
         name: "numero_nf",
-        label: "Número da nota",
+        label: "Numero da nota",
         type: "text",
-        placeholder: "Número completo da nota fiscal",
-      },
-      {
-        name: "cnpj_emitente",
-        label: "CNPJ do emitente",
-        type: "text",
-        placeholder: "00.000.000/0000-00",
+        placeholder: "Numero completo da nota fiscal",
       },
       {
         name: "valor",
@@ -140,9 +140,9 @@ const FORM_CONFIGS: FormConfig[] = [
       },
       {
         name: "descricao",
-        label: "Descrição / Histórico",
+        label: "Descricao / Historico",
         type: "textarea",
-        placeholder: "Descrição dos serviços/produtos",
+        placeholder: "Descricao dos servicos/produtos",
       },
     ],
   },
@@ -153,7 +153,7 @@ const STORAGE_BUCKET = "formularios";
 const SIGNED_URL_EXPIRES_IN = 60 * 30;
 
 const tipoLabel: Record<string, string> = {
-  retencao_trabalhista: "Retenção Trabalhista",
+  retencao_trabalhista: "Retencao Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
 };
@@ -188,7 +188,9 @@ export default function FormularioPage() {
     () => FORM_CONFIGS.find((f) => f.slug === params.slug),
     [params.slug],
   );
-  const enablePrestadorDropdown = config?.slug === "registro-laudos";
+  const enablePrestadorDropdown = Boolean(
+    config?.fields.some((field) => field.name === "prestador"),
+  );
   const {
     prestadores: prestadoresDisponiveis,
     loading: prestadoresLoading,
@@ -259,7 +261,7 @@ export default function FormularioPage() {
       }
       const token = data.session?.access_token;
       if (!token) {
-        throw new Error("Sessão expirada. Faça login novamente.");
+        throw new Error("Sessao expirada. Faca login novamente.");
       }
       const params = new URLSearchParams();
       if (prestadoresDisponiveis.length > 0) {
@@ -282,16 +284,16 @@ export default function FormularioPage() {
       };
       if (!response.ok) {
         throw new Error(
-          payload.error ?? "Não foi possível carregar o histórico de envios.",
+          payload.error ?? "Nao foi possivel carregar o historico de envios.",
         );
       }
       setHistorico(payload.registros ?? []);
     } catch (err) {
-      console.error("Erro ao carregar histórico:", err);
+      console.error("Erro ao carregar historico:", err);
       setHistoricoErro(
         err instanceof Error
           ? err.message
-          : "Não foi possível carregar o histórico.",
+          : "Nao foi possivel carregar o historico.",
       );
     } finally {
       setHistoricoLoading(false);
@@ -315,7 +317,7 @@ export default function FormularioPage() {
   if (!config) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center text-sm text-slate-300">
-        <p>Formulário não encontrado.</p>
+        <p>Formulario nao encontrado.</p>
       </div>
     );
   }
@@ -323,7 +325,7 @@ export default function FormularioPage() {
   if (authLoading || !user) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
-        Carregando formulário...
+        Carregando formulario...
       </div>
     );
   }
@@ -371,7 +373,7 @@ export default function FormularioPage() {
 
   const statusLabelMap: Record<string, string> = {
     pendente: "Pendente",
-    em_analise: "Em análise",
+    em_analise: "Em analise",
     assinado: "Assinado",
   };
 
@@ -412,7 +414,7 @@ export default function FormularioPage() {
       .createSignedUrl(path, SIGNED_URL_EXPIRES_IN);
 
     if (error || !data?.signedUrl) {
-      throw error ?? new Error("Não foi possível gerar o link do arquivo.");
+      throw error ?? new Error("Nao foi possivel gerar o link do arquivo.");
     }
     return data.signedUrl;
   };
@@ -424,7 +426,7 @@ export default function FormularioPage() {
       registro.arquivo_path;
 
     if (!path) {
-      setError("Arquivo indisponível no momento.");
+      setError("Arquivo indisponivel no momento.");
       return;
     }
 
@@ -439,7 +441,7 @@ export default function FormularioPage() {
       document.body.removeChild(anchor);
     } catch (err) {
       console.error("Erro ao abrir documento:", err);
-      setError("Não foi possível abrir o documento. Tente novamente.");
+      setError("Nao foi possivel abrir o documento. Tente novamente.");
     }
   };
 
@@ -501,7 +503,7 @@ export default function FormularioPage() {
       }
 
       if (!user) {
-        setError("Sessão expirada. Faça login novamente.");
+        setError("Sessao expirada. Faca login novamente.");
         router.push("/login");
         return;
       }
@@ -568,16 +570,16 @@ export default function FormularioPage() {
       setSuccess(
         uploadResults.length > 1
           ? `${uploadResults.length} documentos enviados separadamente!`
-          : "Formulário enviado com sucesso!",
+          : "Formulario enviado com sucesso!",
       );
       completeFormProgress();
       setFiles([]);
       setValues(getInitialValues());
       setSelectedPrestadorId("");
     } catch (err) {
-      console.error("Erro ao enviar formulário:", err);
+      console.error("Erro ao enviar formulario:", err);
       resetFormProgress();
-      setError("Não foi possível enviar o formulário. Tente novamente.");
+      setError("Nao foi possivel enviar o formulario. Tente novamente.");
     } finally {
       setSubmitting(false);
     }
@@ -606,7 +608,7 @@ export default function FormularioPage() {
         <div className="rounded-2xl border border-sky-100 bg-sky-50/80 p-4 text-xs text-slate-600 shadow-sm shadow-sky-100">
           <div className="flex items-center justify-between">
             <p className="font-semibold text-slate-600">
-              Enviando formulário
+              Enviando formulario
             </p>
             <span className="text-[11px] font-semibold text-sky-700">
               {Math.min(formProgress, 100).toFixed(0)}%
@@ -650,7 +652,7 @@ export default function FormularioPage() {
                     {prestadoresLoading
                       ? "Carregando prestadores..."
                       : prestadoresDisponiveis.length === 0
-                        ? "Nenhum prestador disponível"
+                        ? "Nenhum prestador disponivel"
                         : "Selecione um prestador"}
                   </option>
                   {prestadoresDisponiveis.map((prestador) => (
@@ -692,9 +694,9 @@ export default function FormularioPage() {
               {enablePrestadorDropdown && field.name === "prestador" && (
                 <p className="text-[11px] text-slate-500">
                   {prestadoresLoading
-                    ? "Buscando prestadores vinculados ao seu usuário..."
+                    ? "Buscando prestadores vinculados ao seu usuario..."
                     : prestadoresDisponiveis.length === 0
-                      ? "Nenhum prestador foi associado à sua conta. Peça ao administrador para adicionar seu e-mail ao grupo correto."
+                      ? "Nenhum prestador foi associado a sua conta. Peca ao administrador para adicionar seu e-mail ao grupo correto."
                       : "Escolha um prestador cadastrado pelo administrador para vincular o envio."}
                 </p>
               )}
@@ -702,11 +704,11 @@ export default function FormularioPage() {
           ))}
         </div>
 
-      <div className="mt-2 space-y-2 text-sm">
-        <label
-          htmlFor="arquivo"
-          className="block text-xs font-medium uppercase tracking-wide text-slate-600"
-        >
+        <div className="mt-2 space-y-2 text-sm">
+          <label
+            htmlFor="arquivo"
+            className="block text-xs font-medium uppercase tracking-wide text-slate-600"
+          >
             Arquivos (PDF, PNG ou JPEG)
           </label>
           <input
@@ -723,9 +725,7 @@ export default function FormularioPage() {
             }}
             className="block w-full cursor-pointer rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-sky-500 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:border-sky-500"
           />
-          <p className="text-[11px] text-slate-500">
-            Png, Jpeg ou PDF
-          </p>
+          <p className="text-[11px] text-slate-500">Png, Jpeg ou PDF</p>
         </div>
 
         {error && (
@@ -740,19 +740,13 @@ export default function FormularioPage() {
         )}
 
         <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-200 pt-4">
-          <p className="text-[11px] text-slate-500">
-            
-            
-            
-            
-      
-          </p>
+          <p className="text-[11px] text-slate-500"></p>
           <button
             type="submit"
             disabled={submitting}
             className="inline-flex items-center rounded-lg bg-sky-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-sky-300/70 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {submitting ? "Enviando..." : "Enviar formulário"}
+            {submitting ? "Enviando..." : "Enviar formulario"}
           </button>
         </div>
       </form>
@@ -761,10 +755,10 @@ export default function FormularioPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Histórico de envios
+              Historico de envios
             </p>
             <span className="text-[11px] text-slate-500">
-              Consulte rapidamente os formulários enviados pelo seu grupo.
+              Consulte rapidamente os formularios enviados pelo seu grupo.
             </span>
           </div>
           <span className="text-[11px] text-slate-400">
@@ -774,7 +768,7 @@ export default function FormularioPage() {
 
         {historicoLoading ? (
           <p className="mt-4 text-xs text-slate-500">
-            Carregando histórico de envios...
+            Carregando historico de envios...
           </p>
         ) : historicoErro ? (
           <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -782,7 +776,7 @@ export default function FormularioPage() {
           </p>
         ) : historicoRecentes.length === 0 ? (
           <p className="mt-4 text-xs text-slate-500">
-            Ainda não há envios registrados para o seu acesso.
+            Ainda nao ha envios registrados para o seu acesso.
           </p>
         ) : (
           <ul className="mt-4 space-y-3 text-xs text-slate-600">
@@ -833,9 +827,9 @@ export default function FormularioPage() {
                   </div>
                   {registro.dados &&
                     typeof registro.dados.numero_pedido === "string" && (
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Pedido: {registro.dados.numero_pedido as string}
-                    </p>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Pedido: {registro.dados.numero_pedido as string}
+                      </p>
                     )}
                 </li>
               );
@@ -846,4 +840,3 @@ export default function FormularioPage() {
     </div>
   );
 }
-
