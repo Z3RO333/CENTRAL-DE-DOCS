@@ -1,4 +1,4 @@
-"use client";
+Ôªø"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -30,7 +30,7 @@ type FormularioRecord = {
 };
 
 const tipoLabel: Record<string, string> = {
-  retencao_trabalhista: "RetenÁ„o Trabalhista",
+  retencao_trabalhista: "Reten√ß√£o Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
 };
@@ -47,21 +47,21 @@ const FORM_FILTER_CARDS: FilterCardConfig[] = [
   {
     value: "retencao_trabalhista",
     label: tipoLabel.retencao_trabalhista,
-    description: "Documentos ligados ‡ retenÁ„o de tributos trabalhistas.",
+    description: "Documentos ligados √† reten√ß√£o de tributos trabalhistas.",
     icon: BriefcaseBusiness,
     accent: "from-sky-100 via-sky-50 to-transparent",
   },
   {
     value: "registro_laudos",
     label: tipoLabel.registro_laudos,
-    description: "Registros tÈcnicos e laudos enviados para validaÁ„o.",
+    description: "Registros t√©cnicos e laudos enviados para valida√ß√£o.",
     icon: FileBadge,
     accent: "from-emerald-100 via-emerald-50 to-transparent",
   },
   {
     value: "notas_fiscais",
     label: tipoLabel.notas_fiscais,
-    description: "Notas emitidas e anexadas via formul·rios.",
+    description: "Notas emitidas e anexadas via formul√°rios.",
     icon: ReceiptText,
     accent: "from-amber-100 via-amber-50 to-transparent",
   },
@@ -87,7 +87,7 @@ async function getSignedFileUrl(
     .createSignedUrl(path, expiresIn);
 
   if (error || !data?.signedUrl) {
-    throw error ?? new Error("N„o foi possÌvel gerar o link do arquivo.");
+    throw error ?? new Error("N√£o foi poss√≠vel gerar o link do arquivo.");
   }
 
   return data.signedUrl;
@@ -96,7 +96,7 @@ async function getSignedFileUrl(
 const statusLabelMap: Record<string, string> = {
   pendente: "Pendente",
   assinado: "Assinado",
-  em_analise: "Em an·lise",
+  em_analise: "Em an√°lise",
 };
 
 const humanizeTexto = (value: string) =>
@@ -126,7 +126,7 @@ const identificacaoFieldMap: Record<
     campos: ["prestador", "responsavel"],
   },
   notas_fiscais: {
-    label: "N˙mero do pedido",
+    label: "N√∫mero do pedido",
     campos: ["numero_pedido"],
   },
 };
@@ -139,7 +139,7 @@ const defaultIdentificacaoConfig = {
 const MESES = [
   { value: "01", label: "Janeiro" },
   { value: "02", label: "Fevereiro" },
-  { value: "03", label: "MarÁo" },
+  { value: "03", label: "Mar√ßo" },
   { value: "04", label: "Abril" },
   { value: "05", label: "Maio" },
   { value: "06", label: "Junho" },
@@ -257,7 +257,7 @@ export default function DocumentosPage() {
     }
     const token = sessionData.session?.access_token;
     if (!token) {
-      throw new Error("Sess„o expirada. FaÁa login novamente.");
+      throw new Error("Sess√£o expirada. Fa√ßa login novamente.");
     }
     return token;
   }, []);
@@ -356,7 +356,7 @@ export default function DocumentosPage() {
           </div>
           <p className="mt-1 text-sm text-slate-500">
             Consulte e filtre rapidamente os documentos enviados pelos
-            formul·rios.
+            formul√°rios.
           </p>
         </div>
         <div className="hidden text-right text-xs text-slate-500 md:block">
@@ -389,10 +389,10 @@ export default function DocumentosPage() {
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
               <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                ⁄ltimos documentos enviados
+                √öltimos documentos enviados
               </p>
               <p className="text-[11px] text-slate-500">
-                Lista r·pida das ˙ltimas submissıes, independente dos filtros.
+                Lista r√°pida das √∫ltimas submiss√µes, independente dos filtros.
               </p>
             </div>
             <span className="text-xs font-semibold text-slate-400">
@@ -404,7 +404,7 @@ export default function DocumentosPage() {
               const identificacaoConfig = getIdentificacaoConfig(registro.tipo);
               const identificacaoValor =
                 getIdentificacaoValor(registro) ??
-                `${identificacaoConfig.label} n„o informado`;
+                `${identificacaoConfig.label} n√£o informado`;
               return (
                 <div
                   key={registro.id}
@@ -460,7 +460,7 @@ export default function DocumentosPage() {
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
             <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Filtros r·pidos por formul·rio
+              Filtros r√°pidos por formul√°rio
             </p>
             <p className="text-[11px] text-slate-500">
               Clique em um card para aplicar o filtro desejado.
@@ -557,7 +557,7 @@ export default function DocumentosPage() {
                 aria-pressed={viewMode === "cards"}
               >
                 <LayoutGrid className="h-4 w-4" />
-                Cartıes
+                Cart√µes
               </button>
             </div>
           </div>
@@ -565,17 +565,17 @@ export default function DocumentosPage() {
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <label className="text-xs font-semibold text-slate-600">
-            IdentificaÁ„o (Empresa/Prestador/N˙mero do pedido)
+            Identifica√ß√£o (Empresa/Prestador/N√∫mero do pedido)
             <input
               type="text"
               value={identificacaoFilter}
               onChange={(event) => setIdentificacaoFilter(event.target.value)}
-              placeholder="Busque pela empresa, prestador ou n˙mero do pedido"
+              placeholder="Busque pela empresa, prestador ou n√∫mero do pedido"
               className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             />
           </label>
           <label className="text-xs font-semibold text-slate-600">
-            Tipo de formul·rio
+            Tipo de formul√°rio
             <select
               value={tipoFilter}
               onChange={(event) => setTipoFilter(event.target.value)}
@@ -623,7 +623,7 @@ export default function DocumentosPage() {
             </select>
           </label>
           <label className="text-xs font-semibold text-slate-600">
-            MÍs de envio
+            M√™s de envio
             <select
               value={mesFilter}
               onChange={(event) => setMesFilter(event.target.value)}
@@ -638,8 +638,8 @@ export default function DocumentosPage() {
             </select>
           </label>
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-500">
-            Os filtros acima s„o aplicados automaticamente. Por padr„o
-            consideramos o mÍs corrente ({MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual"}).
+            Os filtros acima s√£o aplicados automaticamente. Por padr√£o
+            consideramos o m√™s corrente ({MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual"}).
           </div>
         </div>
 
@@ -662,7 +662,7 @@ export default function DocumentosPage() {
                 setSomenteDisponiveisLote(event.target.checked)
               }
             />
-            Apenas disponÌveis para assinatura em lote
+            Apenas dispon√≠veis para assinatura em lote
           </label>
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
             Combine os filtros para chegar ao subconjunto desejado.
@@ -674,7 +674,7 @@ export default function DocumentosPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Assinaturas disponÌveis
+              Assinaturas dispon√≠veis
             </p>
             <p className="text-sm text-slate-600">
               {assinaturasPendentes.length > 0 ? (
@@ -698,7 +698,7 @@ export default function DocumentosPage() {
                       type="button"
                       onClick={() => toggleSelecionar(id)}
                       className="text-[10px] font-semibold text-slate-500 transition hover:text-slate-800"
-                      title="Remover da seleÁ„o"
+                      title="Remover da sele√ß√£o"
                     >
                       x
                     </button>
@@ -729,7 +729,7 @@ export default function DocumentosPage() {
               disabled={!hasSelection}
               className="rounded-full border border-slate-200 px-4 py-1.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Limpar seleÁ„o
+              Limpar sele√ß√£o
             </button>
             <button
               type="button"
@@ -795,11 +795,11 @@ export default function DocumentosPage() {
                     />
                   </th>
                   <th className="px-4 py-3 text-left">Documento</th>
-                  <th className="px-4 py-3 text-left">IdentificaÁ„o</th>
+                  <th className="px-4 py-3 text-left">Identifica√ß√£o</th>
                   <th className="px-4 py-3 text-left">Tipo</th>
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-left">Enviado em</th>
-                  <th className="px-4 py-3 text-right">AÁıes</th>
+                  <th className="px-4 py-3 text-right">A√ß√µes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
@@ -809,7 +809,7 @@ export default function DocumentosPage() {
                   );
                   const identificacaoValor =
                     getIdentificacaoValor(registro) ??
-                    `${identificacaoConfig.label} n„o informado`;
+                    `${identificacaoConfig.label} n√£o informado`;
                   const identificacaoComplemento =
                     getIdentificacaoComplemento(registro);
                   const isSelecionavel =
@@ -911,7 +911,7 @@ export default function DocumentosPage() {
             const identificacaoConfig = getIdentificacaoConfig(registro.tipo);
             const identificacaoValor =
               getIdentificacaoValor(registro) ??
-              `${identificacaoConfig.label} n„o informado`;
+              `${identificacaoConfig.label} n√£o informado`;
             const identificacaoComplemento =
               getIdentificacaoComplemento(registro);
             const isSelecionavel =
