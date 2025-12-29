@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -30,7 +30,7 @@ type FormularioRecord = {
 };
 
 const tipoLabel: Record<string, string> = {
-  retencao_trabalhista: "Retenção Trabalhista",
+  retencao_trabalhista: "Retencao Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
 };
@@ -47,21 +47,21 @@ const FORM_FILTER_CARDS: FilterCardConfig[] = [
   {
     value: "retencao_trabalhista",
     label: tipoLabel.retencao_trabalhista,
-    description: "Documentos ligados à retenção de tributos trabalhistas.",
+    description: "Documentos ligados a retencao de tributos trabalhistas.",
     icon: BriefcaseBusiness,
     accent: "from-sky-100 via-sky-50 to-transparent",
   },
   {
     value: "registro_laudos",
     label: tipoLabel.registro_laudos,
-    description: "Registros técnicos e laudos enviados para validação.",
+    description: "Registros tecnicos e laudos enviados para validacao.",
     icon: FileBadge,
     accent: "from-emerald-100 via-emerald-50 to-transparent",
   },
   {
     value: "notas_fiscais",
     label: tipoLabel.notas_fiscais,
-    description: "Notas emitidas e anexadas via formulários.",
+    description: "Notas emitidas e anexadas via formularios.",
     icon: ReceiptText,
     accent: "from-amber-100 via-amber-50 to-transparent",
   },
@@ -87,7 +87,7 @@ async function getSignedFileUrl(
     .createSignedUrl(path, expiresIn);
 
   if (error || !data?.signedUrl) {
-    throw error ?? new Error("Não foi possível gerar o link do arquivo.");
+    throw error ?? new Error("Nao foi possivel gerar o link do arquivo.");
   }
 
   return data.signedUrl;
@@ -96,7 +96,7 @@ async function getSignedFileUrl(
 const statusLabelMap: Record<string, string> = {
   pendente: "Pendente",
   assinado: "Assinado",
-  em_analise: "Em análise",
+  em_analise: "Em analise",
 };
 
 const humanizeTexto = (value: string) =>
@@ -126,7 +126,7 @@ const identificacaoFieldMap: Record<
     campos: ["prestador", "responsavel"],
   },
   notas_fiscais: {
-    label: "Número do pedido",
+    label: "Numero do pedido",
     campos: ["numero_pedido"],
   },
 };
@@ -139,7 +139,7 @@ const defaultIdentificacaoConfig = {
 const MESES = [
   { value: "01", label: "Janeiro" },
   { value: "02", label: "Fevereiro" },
-  { value: "03", label: "Março" },
+  { value: "03", label: "Marco" },
   { value: "04", label: "Abril" },
   { value: "05", label: "Maio" },
   { value: "06", label: "Junho" },
@@ -257,7 +257,7 @@ export default function DocumentosPage() {
     }
     const token = sessionData.session?.access_token;
     if (!token) {
-      throw new Error("Sessão expirada. Faça login novamente.");
+      throw new Error("Sessao expirada. Faca login novamente.");
     }
     return token;
   }, []);
@@ -287,6 +287,482 @@ export default function DocumentosPage() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [confirmDialog]);
+
+  useEffect(() => {
+    if (authLoading || accessLoading) {
+      return;
+    }
+
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+
+    if (!canAccessDocumentos) {
+      router.replace("/dashboard");
+      return;
+    }
+
+    if (!canViewAllDocuments && prestadoresUsuarioLoading) {
+      return;
+    }
+
+    let active = true;
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const token = await getAccessToken();
+        const params = new URLSearchParams();
+        if (!canViewAllDocuments) {
+          if (prestadoresDoUsuario.length > 0) {
+            prestadoresDoUsuario.forEach((prestador) => {
+              params.append("prestadorId", prestador.id);
+            });
+          } else {
+            params.set("userId", user.id);
+          }
+        }
+
+        const url =
+          params.size > 0 ? `/api/documentos?${params.toString()}` : "/api/documentos";
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const payload = (await response.json()) as {
+          registros?: FormularioRecord[];
+          error?: string;
+        };
+
+        if (!response.ok || !payload.registros) {
+          throw new Error(
+            payload.error ?? "Nao foi possivel carregar os documentos.",
+          );
+        }
+        const parsed = payload.registros ?? [];
+
+        if (active) {
+          setRegistros(
+            parsed.map((registro) => normalizeRegistroStatus(registro)),
+          );
+        }
+      } catch (err) {
+        if (active) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Nao foi possivel carregar os documentos.",
+          );
+          setRegistros([]);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void load();
+
+    return () => {
+      active = false;
+    };
+  }, [
+    authLoading,
+    accessLoading,
+    user,
+    canAccessDocumentos,
+    router,
+    canViewAllDocuments,
+    getAccessToken,
+    prestadoresUsuarioLoading,
+    prestadoresDoUsuario,
+  ]);
+
+  const getPathParaVisualizacao = (registro: FormularioRecord) =>
+    resolveSignedPdfPath(registro.arquivo_assinado_path) ??
+    registro.arquivo_assinado_path ??
+    registro.arquivo_path;
+
+  const getPathParaDownload = (registro: FormularioRecord) => {
+    const assinadoPdf = resolveSignedPdfPath(registro.arquivo_assinado_path);
+    if (assinadoPdf) {
+      return assinadoPdf;
+    }
+    return registro.arquivo_assinado_path ?? registro.arquivo_path;
+  };
+
+  const abrirDocumento = async (registro: FormularioRecord) => {
+    const path = getPathParaVisualizacao(registro);
+    if (!path) {
+      setError("Arquivo indisponivel no momento.");
+      return;
+    }
+
+    try {
+      const signedUrl = await getSignedFileUrl(path);
+      const anchor = document.createElement("a");
+      anchor.href = signedUrl;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+    } catch (err) {
+      console.error("Erro ao abrir documento:", err);
+      setError("Nao foi possivel abrir o documento. Tente novamente.");
+    }
+  };
+
+  const baixarDocumento = async (registro: FormularioRecord) => {
+    const path = getPathParaDownload(registro);
+    if (!path) {
+      setError("Arquivo indisponivel no momento.");
+      return;
+    }
+
+    try {
+      const signedUrl = await getSignedFileUrl(path);
+      const link = document.createElement("a");
+      link.href = signedUrl;
+      link.download = path.split("/").pop() ?? "documento.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("Erro ao baixar documento:", err);
+      setError("Nao foi possivel gerar o link de download.");
+    }
+  };
+
+  const removerDocumento = async (registro: FormularioRecord) => {
+    setConfirmDialog({ type: "single", registro });
+  };
+
+  const confirmarRemocao = async () => {
+    if (!confirmDialog) {
+      return;
+    }
+    if (confirmDialog.type === "batch") {
+      await executarRemocaoEmLote();
+      return;
+    }
+    if (!confirmDialog.registro) {
+      return;
+    }
+
+    try {
+      setDeletingId(confirmDialog.registro.id);
+      setError(null);
+      const token = await getAccessToken();
+      const response = await fetch(
+        `/api/documentos?id=${encodeURIComponent(confirmDialog.registro.id)}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(
+          payload.error ?? "Nao foi possivel remover o documento.",
+        );
+      }
+      setRegistros((prev) =>
+        prev.filter((item) => item.id !== confirmDialog.registro?.id),
+      );
+      setSelectedIds((prev) =>
+        prev.filter((id) => id !== confirmDialog.registro?.id),
+      );
+    } catch (err) {
+      console.error("Erro ao remover documento:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Nao foi possivel remover o documento.",
+      );
+    } finally {
+      setDeletingId(null);
+      setConfirmDialog(null);
+    }
+  };
+
+  const removerSelecionados = () => {
+    if (selectedIds.length === 0) {
+      return;
+    }
+    setConfirmDialog({ type: "batch" });
+  };
+
+  const executarRemocaoEmLote = async () => {
+    if (selectedIds.length === 0) {
+      setConfirmDialog(null);
+      return;
+    }
+
+    try {
+      setDeletingBatch(true);
+      setError(null);
+      const token = await getAccessToken();
+      const query = selectedIds
+        .map((id) => `id=${encodeURIComponent(id)}`)
+        .join("&");
+      const response = await fetch(`/api/documentos?${query}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(
+          payload.error ?? "Nao foi possivel remover os documentos.",
+        );
+      }
+      setRegistros((prev) =>
+        prev.filter((item) => !selectedIds.includes(item.id)),
+      );
+      setSelectedIds([]);
+    } catch (err) {
+      console.error("Erro ao remover documentos:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Nao foi possivel remover os documentos.",
+      );
+    } finally {
+      setDeletingBatch(false);
+      setConfirmDialog(null);
+    }
+  };
+
+  const anosDisponiveis = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          registros.map((r) => new Date(r.created_at).getFullYear().toString()),
+        ),
+      ).sort((a, b) => Number(b) - Number(a)),
+    [registros],
+  );
+
+  const registrosFiltrados = useMemo(
+    () =>
+      registros.filter((registro) => {
+        if (tipoFilter !== "todos" && registro.tipo !== tipoFilter) {
+          return false;
+        }
+
+        if (statusFilter !== "todos" && registro.status !== statusFilter) {
+          return false;
+        }
+
+        const dataReg = new Date(registro.created_at);
+        if (anoFilter !== "todos") {
+          const anoRegistro = dataReg.getFullYear().toString();
+          if (anoRegistro !== anoFilter) {
+            return false;
+          }
+        }
+
+        if (mesFilter !== "todos") {
+          const mesRegistro = String(dataReg.getMonth() + 1).padStart(2, "0");
+          if (mesRegistro !== mesFilter) {
+            return false;
+          }
+        }
+
+        if (identificacaoFilter.trim()) {
+          const query = identificacaoFilter.toLowerCase();
+          const identificacaoValor = getIdentificacaoValor(registro);
+          if (
+            !identificacaoValor ||
+            !identificacaoValor.toLowerCase().includes(query)
+          ) {
+            return false;
+          }
+        }
+
+        if (somenteAssinados && registro.status !== "assinado") {
+          return false;
+        }
+
+        if (somenteDisponiveisLote) {
+          if (
+            registro.tipo !== TIPO_ASSINAVEL ||
+            registro.status === "assinado"
+          ) {
+            return false;
+          }
+        }
+
+        return true;
+      }),
+    [
+      registros,
+      tipoFilter,
+      statusFilter,
+      anoFilter,
+      mesFilter,
+      identificacaoFilter,
+      somenteAssinados,
+      somenteDisponiveisLote,
+    ],
+  );
+
+  const assinaturasPendentes = useMemo(
+    () =>
+      registrosFiltrados
+        .filter(
+          (registro) =>
+            registro.status !== "assinado" &&
+            registro.tipo === TIPO_ASSINAVEL,
+        )
+        .map((registro) => registro.id),
+    [registrosFiltrados],
+  );
+
+  const registrosRecentes = useMemo(() => registros.slice(0, 3), [registros]);
+
+  const resumoStatus = useMemo(() => {
+    const total = registrosFiltrados.length;
+    const assinados = registrosFiltrados.filter(
+      (registro) => registro.status === "assinado",
+    ).length;
+    const pendentes = total - assinados;
+    const assinaveis = registrosFiltrados.filter(
+      (registro) => registro.tipo === TIPO_ASSINAVEL,
+    ).length;
+    return { total, pendentes, assinados, assinaveis };
+  }, [registrosFiltrados]);
+
+  const contagemPorTipo = useMemo(
+    () =>
+      registros.reduce<Record<string, number>>((acc, registro) => {
+        acc[registro.tipo] = (acc[registro.tipo] ?? 0) + 1;
+        return acc;
+      }, {}),
+    [registros],
+  );
+
+  useEffect(() => {
+    const idsDisponiveis = new Set(registrosFiltrados.map((item) => item.id));
+    setSelectedIds((prev) => prev.filter((id) => idsDisponiveis.has(id)));
+  }, [registrosFiltrados]);
+
+  const toggleSelecionar = (id: string) => {
+    const registro = registrosFiltrados.find((item) => item.id === id);
+    if (!registro) {
+      return;
+    }
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
+  const selecionarTodos = () => {
+    const todosIds = registrosFiltrados.map((item) => item.id);
+    if (todosIds.length === 0) {
+      return;
+    }
+    const allSelected = todosIds.every((id) => selectedIds.includes(id));
+    setSelectedIds(allSelected ? [] : todosIds);
+  };
+
+  const iniciarAssinaturaEmLote = () => {
+    const assinaturasSelecionadas = selectedIds.filter((id) =>
+      assinaturasPendentes.includes(id),
+    );
+    if (assinaturasSelecionadas.length === 0) {
+      setError("Selecione ao menos um documento pendente para assinar.");
+      return;
+    }
+    setStartingBatch(true);
+    const queue = assinaturasSelecionadas.join(",");
+    if (assinaturasSelecionadas.length === 1) {
+      router.push(`/documentos/${assinaturasSelecionadas[0]}`);
+      return;
+    }
+    router.push(
+      `/documentos/${assinaturasSelecionadas[0]}?lote=${encodeURIComponent(queue)}`,
+    );
+  };
+
+  const limparSelecao = () => {
+    setSelectedIds([]);
+  };
+
+  const resetFilters = () => {
+    setTipoFilter("todos");
+    setStatusFilter("todos");
+    setIdentificacaoFilter("");
+    setAnoFilter(anoAtual);
+    setMesFilter(mesAtual);
+    setSomenteAssinados(false);
+    setSomenteDisponiveisLote(false);
+  };
+
+  const tipoOptions = useMemo(
+    () => {
+      const extras = Array.from(
+        new Set(
+          registros
+            .map((registro) => registro.tipo)
+            .filter((tipo) => !(tipo in tipoLabel)),
+        ),
+      );
+
+      return [
+        { value: "todos", label: "Todos os tipos" },
+        ...Object.entries(tipoLabel).map(([value, label]) => ({
+          value,
+          label,
+        })),
+        ...extras.map((tipo) => ({
+          value: tipo,
+          label: humanizeTexto(tipo),
+        })),
+      ];
+    },
+    [registros],
+  );
+
+  const statusOptions = useMemo(() => {
+    const base = ["todos", "pendente", "em_analise", "assinado"];
+    const extras = Array.from(
+      new Set(
+        registros
+          .map((registro) => registro.status)
+          .filter((status) => !base.includes(status)),
+      ),
+    );
+    const unique = Array.from(new Set([...base, ...extras]));
+    const ordered = [
+      ...base.filter((status) => unique.includes(status)),
+      ...extras,
+    ];
+    const seen = new Set<string>();
+    return ordered.filter((status) => {
+      if (seen.has(status)) {
+        return false;
+      }
+      seen.add(status);
+      return true;
+    });
+  }, [registros]);
+
+  const showErrorMessage = error ?? authError ?? accessError;
+  const hasSelection = selectedIds.length > 0;
+  const assinaturasSelecionadasCount = selectedIds.filter((id) =>
+    assinaturasPendentes.includes(id),
+  ).length;
+  const totalResultados = registrosFiltrados.length;
 
   if (authLoading || accessLoading || loading) {
     return (
@@ -356,7 +832,7 @@ export default function DocumentosPage() {
           </div>
           <p className="mt-1 text-sm text-slate-500">
             Consulte e filtre rapidamente os documentos enviados pelos
-            formulários.
+            formularios.
           </p>
         </div>
         <div className="hidden text-right text-xs text-slate-500 md:block">
@@ -388,11 +864,11 @@ export default function DocumentosPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
-              <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Últimos documentos enviados
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Ultimos documentos enviados
               </p>
               <p className="text-[11px] text-slate-500">
-                Lista rápida das últimas submissões, independente dos filtros.
+                Lista rapida das ultimas submissoes, independente dos filtros.
               </p>
             </div>
             <span className="text-xs font-semibold text-slate-400">
@@ -404,7 +880,7 @@ export default function DocumentosPage() {
               const identificacaoConfig = getIdentificacaoConfig(registro.tipo);
               const identificacaoValor =
                 getIdentificacaoValor(registro) ??
-                `${identificacaoConfig.label} não informado`;
+                `${identificacaoConfig.label} nao informado`;
               return (
                 <div
                   key={registro.id}
@@ -459,8 +935,8 @@ export default function DocumentosPage() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
-            <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Filtros rápidos por formulário
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Filtros rapidos por formulario
             </p>
             <p className="text-[11px] text-slate-500">
               Clique em um card para aplicar o filtro desejado.
@@ -557,7 +1033,7 @@ export default function DocumentosPage() {
                 aria-pressed={viewMode === "cards"}
               >
                 <LayoutGrid className="h-4 w-4" />
-                Cartões
+                Cartoes
               </button>
             </div>
           </div>
@@ -565,17 +1041,17 @@ export default function DocumentosPage() {
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <label className="text-xs font-semibold text-slate-600">
-            Identificação (Empresa/Prestador/Número do pedido)
+            Identificacao (Empresa/Prestador/Numero do pedido)
             <input
               type="text"
               value={identificacaoFilter}
               onChange={(event) => setIdentificacaoFilter(event.target.value)}
-              placeholder="Busque pela empresa, prestador ou número do pedido"
+              placeholder="Busque pela empresa, prestador ou numero do pedido"
               className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             />
           </label>
           <label className="text-xs font-semibold text-slate-600">
-            Tipo de formulário
+            Tipo de formulario
             <select
               value={tipoFilter}
               onChange={(event) => setTipoFilter(event.target.value)}
@@ -623,7 +1099,7 @@ export default function DocumentosPage() {
             </select>
           </label>
           <label className="text-xs font-semibold text-slate-600">
-            Mês de envio
+            Mes de envio
             <select
               value={mesFilter}
               onChange={(event) => setMesFilter(event.target.value)}
@@ -638,8 +1114,8 @@ export default function DocumentosPage() {
             </select>
           </label>
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-500">
-            Os filtros acima são aplicados automaticamente. Por padrão
-            consideramos o mês corrente ({MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual"}).
+            Os filtros acima sao aplicados automaticamente. Por padrao
+            consideramos o mes corrente ({MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual"}).
           </div>
         </div>
 
@@ -662,7 +1138,7 @@ export default function DocumentosPage() {
                 setSomenteDisponiveisLote(event.target.checked)
               }
             />
-            Apenas disponíveis para assinatura em lote
+            Apenas disponiveis para assinatura em lote
           </label>
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
             Combine os filtros para chegar ao subconjunto desejado.
@@ -673,8 +1149,8 @@ export default function DocumentosPage() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Assinaturas disponíveis
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Assinaturas disponiveis
             </p>
             <p className="text-sm text-slate-600">
               {assinaturasPendentes.length > 0 ? (
@@ -698,7 +1174,7 @@ export default function DocumentosPage() {
                       type="button"
                       onClick={() => toggleSelecionar(id)}
                       className="text-[10px] font-semibold text-slate-500 transition hover:text-slate-800"
-                      title="Remover da seleção"
+                      title="Remover da selecao"
                     >
                       x
                     </button>
@@ -729,7 +1205,7 @@ export default function DocumentosPage() {
               disabled={!hasSelection}
               className="rounded-full border border-slate-200 px-4 py-1.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Limpar seleção
+              Limpar selecao
             </button>
             <button
               type="button"
@@ -795,11 +1271,11 @@ export default function DocumentosPage() {
                     />
                   </th>
                   <th className="px-4 py-3 text-left">Documento</th>
-                  <th className="px-4 py-3 text-left">Identificação</th>
+                  <th className="px-4 py-3 text-left">Identificacao</th>
                   <th className="px-4 py-3 text-left">Tipo</th>
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-left">Enviado em</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
+                  <th className="px-4 py-3 text-right">Acoes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
@@ -809,7 +1285,7 @@ export default function DocumentosPage() {
                   );
                   const identificacaoValor =
                     getIdentificacaoValor(registro) ??
-                    `${identificacaoConfig.label} não informado`;
+                    `${identificacaoConfig.label} nao informado`;
                   const identificacaoComplemento =
                     getIdentificacaoComplemento(registro);
                   const isSelecionavel =
@@ -834,7 +1310,7 @@ export default function DocumentosPage() {
                         </p>
                       </td>
                       <td className="px-4 py-3">
-                        <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                           {identificacaoConfig.label}
                         </p>
                         <p className="text-sm font-medium text-slate-900">
@@ -911,7 +1387,7 @@ export default function DocumentosPage() {
             const identificacaoConfig = getIdentificacaoConfig(registro.tipo);
             const identificacaoValor =
               getIdentificacaoValor(registro) ??
-              `${identificacaoConfig.label} não informado`;
+              `${identificacaoConfig.label} nao informado`;
             const identificacaoComplemento =
               getIdentificacaoComplemento(registro);
             const isSelecionavel =
@@ -926,7 +1402,7 @@ export default function DocumentosPage() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Documento
                     </p>
                     <p className="font-mono text-xs text-slate-500">
@@ -945,7 +1421,7 @@ export default function DocumentosPage() {
                 </div>
                 <div className="mt-3 space-y-2 text-sm text-slate-600">
                   <div>
-                    <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       {identificacaoConfig.label}
                     </p>
                     <p className="text-sm font-semibold text-slate-900">
@@ -1019,6 +1495,8 @@ export default function DocumentosPage() {
     </div>
   );
 }
+
+
 
 
 
