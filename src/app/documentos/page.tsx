@@ -1,6 +1,6 @@
-Ôªø"use client";
+"use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BriefcaseBusiness,
@@ -30,7 +30,7 @@ type FormularioRecord = {
 };
 
 const tipoLabel: Record<string, string> = {
-  retencao_trabalhista: "Reten√ß√£o Trabalhista",
+  retencao_trabalhista: "RetenÁ„o Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
 };
@@ -47,21 +47,21 @@ const FORM_FILTER_CARDS: FilterCardConfig[] = [
   {
     value: "retencao_trabalhista",
     label: tipoLabel.retencao_trabalhista,
-    description: "Documentos ligados √† reten√ß√£o de tributos trabalhistas.",
+    description: "Documentos ligados ‡ retenÁ„o de tributos trabalhistas.",
     icon: BriefcaseBusiness,
     accent: "from-sky-100 via-sky-50 to-transparent",
   },
   {
     value: "registro_laudos",
     label: tipoLabel.registro_laudos,
-    description: "Registros t√©cnicos e laudos enviados para valida√ß√£o.",
+    description: "Registros tÈcnicos e laudos enviados para validaÁ„o.",
     icon: FileBadge,
     accent: "from-emerald-100 via-emerald-50 to-transparent",
   },
   {
     value: "notas_fiscais",
     label: tipoLabel.notas_fiscais,
-    description: "Notas emitidas e anexadas via formul√°rios.",
+    description: "Notas emitidas e anexadas via formul·rios.",
     icon: ReceiptText,
     accent: "from-amber-100 via-amber-50 to-transparent",
   },
@@ -87,7 +87,7 @@ async function getSignedFileUrl(
     .createSignedUrl(path, expiresIn);
 
   if (error || !data?.signedUrl) {
-    throw error ?? new Error("N√£o foi poss√≠vel gerar o link do arquivo.");
+    throw error ?? new Error("N„o foi possÌvel gerar o link do arquivo.");
   }
 
   return data.signedUrl;
@@ -96,7 +96,7 @@ async function getSignedFileUrl(
 const statusLabelMap: Record<string, string> = {
   pendente: "Pendente",
   assinado: "Assinado",
-  em_analise: "Em an√°lise",
+  em_analise: "Em an·lise",
 };
 
 const humanizeTexto = (value: string) =>
@@ -126,7 +126,7 @@ const identificacaoFieldMap: Record<
     campos: ["prestador", "responsavel"],
   },
   notas_fiscais: {
-    label: "N√∫mero do pedido",
+    label: "N˙mero do pedido",
     campos: ["numero_pedido"],
   },
 };
@@ -139,7 +139,7 @@ const defaultIdentificacaoConfig = {
 const MESES = [
   { value: "01", label: "Janeiro" },
   { value: "02", label: "Fevereiro" },
-  { value: "03", label: "Mar√ßo" },
+  { value: "03", label: "MarÁo" },
   { value: "04", label: "Abril" },
   { value: "05", label: "Maio" },
   { value: "06", label: "Junho" },
@@ -242,6 +242,12 @@ export default function DocumentosPage() {
   const [viewMode, setViewMode] = useState<"tabela" | "cards">("tabela");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingBatch, setDeletingBatch] = useState(false);
+  const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    type: "single" | "batch";
+    registro?: FormularioRecord;
+  } | null>(null);
 
   const getAccessToken = useCallback(async () => {
     const { data: sessionData, error: sessionError } =
@@ -251,475 +257,36 @@ export default function DocumentosPage() {
     }
     const token = sessionData.session?.access_token;
     if (!token) {
-      throw new Error("Sess√£o expirada. Fa√ßa login novamente.");
+      throw new Error("Sess„o expirada. FaÁa login novamente.");
     }
     return token;
   }, []);
 
   useEffect(() => {
-    if (authLoading || accessLoading) {
+    if (!confirmDialog) {
+      if (previousFocusRef.current) {
+        previousFocusRef.current.focus();
+        previousFocusRef.current = null;
+      }
       return;
     }
 
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    const focusTimer = window.setTimeout(() => {
+      confirmCancelRef.current?.focus();
+    }, 0);
 
-    if (!canAccessDocumentos) {
-      router.replace("/dashboard");
-      return;
-    }
-
-    if (!canViewAllDocuments && prestadoresUsuarioLoading) {
-      return;
-    }
-
-    let active = true;
-
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const token = await getAccessToken();
-        const params = new URLSearchParams();
-        if (!canViewAllDocuments) {
-          if (prestadoresDoUsuario.length > 0) {
-            prestadoresDoUsuario.forEach((prestador) => {
-              params.append("prestadorId", prestador.id);
-            });
-          } else {
-            params.set("userId", user.id);
-          }
-        }
-
-        const url =
-          params.size > 0 ? `/api/documentos?${params.toString()}` : "/api/documentos";
-        const response = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        const payload = (await response.json()) as {
-          registros?: FormularioRecord[];
-          error?: string;
-        };
-
-        if (!response.ok || !payload.registros) {
-          throw new Error(
-            payload.error ?? "N√£o foi poss√≠vel carregar os documentos.",
-          );
-        }
-        const parsed = payload.registros ?? [];
-
-        if (active) {
-          setRegistros(
-            parsed.map((registro) => normalizeRegistroStatus(registro)),
-          );
-        }
-      } catch (err) {
-        if (active) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "N√£o foi poss√≠vel carregar os documentos.",
-          );
-          setRegistros([]);
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setConfirmDialog(null);
       }
     };
-
-    void load();
-
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
-      active = false;
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [
-    authLoading,
-    accessLoading,
-    user,
-    canAccessDocumentos,
-    router,
-    canViewAllDocuments,
-    getAccessToken,
-    prestadoresUsuarioLoading,
-    prestadoresDoUsuario,
-  ]);
-
-  const getPathParaVisualizacao = (registro: FormularioRecord) =>
-    resolveSignedPdfPath(registro.arquivo_assinado_path) ??
-    registro.arquivo_assinado_path ??
-    registro.arquivo_path;
-
-  const getPathParaDownload = (registro: FormularioRecord) => {
-    const assinadoPdf = resolveSignedPdfPath(registro.arquivo_assinado_path);
-    if (assinadoPdf) {
-      return assinadoPdf;
-    }
-    return registro.arquivo_assinado_path ?? registro.arquivo_path;
-  };
-
-  const abrirDocumento = async (registro: FormularioRecord) => {
-    const signedPdfPath = resolveSignedPdfPath(registro.arquivo_assinado_path);
-    const path =
-      signedPdfPath ?? registro.arquivo_assinado_path ?? registro.arquivo_path;
-    if (!path) {
-      setError("Arquivo indispon√≠vel no momento.");
-      return;
-    }
-
-    try {
-      const signedUrl = await getSignedFileUrl(path);
-
-      const anchor = document.createElement("a");
-      anchor.href = signedUrl;
-      anchor.target = "_blank";
-      anchor.rel = "noopener noreferrer";
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-    } catch (err) {
-      console.error("Erro ao abrir documento:", err);
-      setError("N√£o foi poss√≠vel abrir o documento. Tente novamente.");
-    }
-  };
-
-  const baixarDocumento = async (registro: FormularioRecord) => {
-    const path = getPathParaDownload(registro);
-    if (!path) {
-      setError("Arquivo indispon√≠vel no momento.");
-      return;
-    }
-
-    try {
-      const signedUrl = await getSignedFileUrl(path);
-      const link = document.createElement("a");
-      link.href = signedUrl;
-      link.download = path.split("/").pop() ?? "documento.pdf";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err) {
-      console.error("Erro ao baixar documento:", err);
-      setError("N√£o foi poss√≠vel gerar o link de download.");
-    }
-  };
-
-  const removerDocumento = async (registro: FormularioRecord) => {
-    if (
-      !window.confirm(
-        "Tem certeza que deseja remover este documento? Esta a√ß√£o n√£o pode ser desfeita.",
-      )
-    ) {
-      return;
-    }
-
-    try {
-      setDeletingId(registro.id);
-      setError(null);
-      const token = await getAccessToken();
-      const response = await fetch(
-        `/api/documentos?id=${encodeURIComponent(registro.id)}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(
-          payload.error ?? "N√£o foi poss√≠vel remover o documento.",
-        );
-      }
-      setRegistros((prev) => prev.filter((item) => item.id !== registro.id));
-      setSelectedIds((prev) => prev.filter((id) => id !== registro.id));
-    } catch (err) {
-      console.error("Erro ao remover documento:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "N√£o foi poss√≠vel remover o documento.",
-      );
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  const removerSelecionados = async () => {
-    if (selectedIds.length === 0) {
-      return;
-    }
-    if (
-      !window.confirm(
-        "Tem certeza que deseja remover os documentos selecionados? Esta a√ß√£o n√£o pode ser desfeita.",
-      )
-    ) {
-      return;
-    }
-
-    try {
-      setDeletingBatch(true);
-      setError(null);
-      const token = await getAccessToken();
-      const query = selectedIds
-        .map((id) => `id=${encodeURIComponent(id)}`)
-        .join("&");
-      const response = await fetch(`/api/documentos?${query}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(
-          payload.error ?? "N√£o foi poss√≠vel remover os documentos.",
-        );
-      }
-      setRegistros((prev) =>
-        prev.filter((item) => !selectedIds.includes(item.id)),
-      );
-      setSelectedIds([]);
-    } catch (err) {
-      console.error("Erro ao remover documentos:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "N√£o foi poss√≠vel remover os documentos.",
-      );
-    } finally {
-      setDeletingBatch(false);
-    }
-  };
-
-  const anosDisponiveis = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          registros.map((r) => new Date(r.created_at).getFullYear().toString()),
-        ),
-      ).sort((a, b) => Number(b) - Number(a)),
-    [registros],
-  );
-
-  const registrosFiltrados = useMemo(
-    () =>
-      registros.filter((registro) => {
-        if (tipoFilter !== "todos" && registro.tipo !== tipoFilter) {
-          return false;
-        }
-
-        if (statusFilter !== "todos" && registro.status !== statusFilter) {
-          return false;
-        }
-
-        const dataReg = new Date(registro.created_at);
-        if (anoFilter !== "todos") {
-          const anoRegistro = dataReg.getFullYear().toString();
-          if (anoRegistro !== anoFilter) {
-            return false;
-          }
-        }
-
-        if (mesFilter !== "todos") {
-          const mesRegistro = String(dataReg.getMonth() + 1).padStart(2, "0");
-          if (mesRegistro !== mesFilter) {
-            return false;
-          }
-        }
-
-        if (identificacaoFilter.trim()) {
-          const query = identificacaoFilter.toLowerCase();
-          const identificacaoValor = getIdentificacaoValor(registro);
-          if (
-            !identificacaoValor ||
-            !identificacaoValor.toLowerCase().includes(query)
-          ) {
-            return false;
-          }
-        }
-
-        if (somenteAssinados && registro.status !== "assinado") {
-          return false;
-        }
-
-        if (somenteDisponiveisLote) {
-          if (
-            registro.tipo !== TIPO_ASSINAVEL ||
-            registro.status === "assinado"
-          ) {
-            return false;
-          }
-        }
-
-        return true;
-      }),
-    [
-      registros,
-      tipoFilter,
-      statusFilter,
-      anoFilter,
-      mesFilter,
-      identificacaoFilter,
-      somenteAssinados,
-      somenteDisponiveisLote,
-    ],
-  );
-
-  const assinaturasPendentes = useMemo(
-    () =>
-      registrosFiltrados
-        .filter(
-          (registro) =>
-            registro.status !== "assinado" &&
-            registro.tipo === TIPO_ASSINAVEL,
-        )
-        .map((registro) => registro.id),
-    [registrosFiltrados],
-  );
-
-  const registrosRecentes = useMemo(
-    () => registros.slice(0, 3),
-    [registros],
-  );
-
-  const resumoStatus = useMemo(() => {
-    const total = registrosFiltrados.length;
-    const assinados = registrosFiltrados.filter(
-      (registro) => registro.status === "assinado",
-    ).length;
-    const pendentes = total - assinados;
-    const assinaveis = registrosFiltrados.filter(
-      (registro) => registro.tipo === TIPO_ASSINAVEL,
-    ).length;
-    return { total, pendentes, assinados, assinaveis };
-  }, [registrosFiltrados]);
-
-  const contagemPorTipo = useMemo(
-    () =>
-      registros.reduce<Record<string, number>>((acc, registro) => {
-        acc[registro.tipo] = (acc[registro.tipo] ?? 0) + 1;
-        return acc;
-      }, {}),
-    [registros],
-  );
-
-  useEffect(() => {
-    const idsDisponiveis = new Set(registrosFiltrados.map((item) => item.id));
-    setSelectedIds((prev) => prev.filter((id) => idsDisponiveis.has(id)));
-  }, [registrosFiltrados]);
-
-  const toggleSelecionar = (id: string) => {
-    const registro = registrosFiltrados.find((item) => item.id === id);
-    if (!registro) {
-      return;
-    }
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
-    );
-  };
-
-  const selecionarTodos = () => {
-    const todosIds = registrosFiltrados.map((item) => item.id);
-    if (todosIds.length === 0) {
-      return;
-    }
-    const allSelected = todosIds.every((id) => selectedIds.includes(id));
-    setSelectedIds(allSelected ? [] : todosIds);
-  };
-
-  const iniciarAssinaturaEmLote = () => {
-    const assinaturasSelecionadas = selectedIds.filter((id) =>
-      assinaturasPendentes.includes(id),
-    );
-    if (assinaturasSelecionadas.length === 0) {
-      setError("Selecione ao menos um documento pendente para assinar.");
-      return;
-    }
-    setStartingBatch(true);
-    const queue = assinaturasSelecionadas.join(",");
-    if (assinaturasSelecionadas.length === 1) {
-      router.push(`/documentos/${assinaturasSelecionadas[0]}`);
-      return;
-    }
-    router.push(
-      `/documentos/${assinaturasSelecionadas[0]}?lote=${encodeURIComponent(queue)}`,
-    );
-  };
-
-  const limparSelecao = () => {
-    setSelectedIds([]);
-  };
-
-  const resetFilters = () => {
-    setTipoFilter("todos");
-    setStatusFilter("todos");
-    setIdentificacaoFilter("");
-    setAnoFilter(anoAtual);
-    setMesFilter(mesAtual);
-    setSomenteAssinados(false);
-    setSomenteDisponiveisLote(false);
-  };
-
-  const tipoOptions = useMemo(
-    () => {
-      const extras = Array.from(
-        new Set(
-          registros
-            .map((registro) => registro.tipo)
-            .filter((tipo) => !(tipo in tipoLabel)),
-        ),
-      );
-
-      return [
-        { value: "todos", label: "Todos os tipos" },
-        ...Object.entries(tipoLabel).map(([value, label]) => ({
-          value,
-          label,
-        })),
-        ...extras.map((tipo) => ({
-          value: tipo,
-          label: humanizeTexto(tipo),
-        })),
-      ];
-    },
-    [registros],
-  );
-
-  const statusOptions = useMemo(() => {
-    const base = ["pendente", "assinado"];
-    const unique = Array.from(
-      new Set(registros.map((registro) => registro.status)),
-    );
-    const extras = unique.filter((status) => !base.includes(status)).sort();
-    const ordered = [
-      "todos",
-      ...base.filter((status) => unique.includes(status)),
-      ...extras,
-    ];
-    const seen = new Set<string>();
-    return ordered.filter((status) => {
-      if (seen.has(status)) {
-        return false;
-      }
-      seen.add(status);
-      return true;
-    });
-  }, [registros]);
-
-  const showErrorMessage = error ?? authError ?? accessError;
-  const hasSelection = selectedIds.length > 0;
-  const assinaturasSelecionadasCount = selectedIds.filter((id) =>
-    assinaturasPendentes.includes(id),
-  ).length;
-  const totalResultados = registrosFiltrados.length;
+  }, [confirmDialog]);
 
   if (authLoading || accessLoading || loading) {
     return (
@@ -731,6 +298,54 @@ export default function DocumentosPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 py-4">
+      {confirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6" onClick={() => setConfirmDialog(null)}>
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/20" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">
+            <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Confirmar exclusao
+            </p>
+            <p id="confirm-desc" className="mt-2 text-sm text-slate-700">
+              {confirmDialog.type === "batch"
+                ? "Tem certeza que deseja remover os documentos selecionados? Esta acao nao pode ser desfeita."
+                : "Tem certeza que deseja remover este documento? Esta acao nao pode ser desfeita."}
+            </p>
+            {confirmDialog.type === "single" && confirmDialog.registro && (
+              <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600">
+                <p className="font-mono text-[11px] text-slate-500">
+                  {confirmDialog.registro.id}
+                </p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {getTipoDescricao(confirmDialog.registro.tipo)}
+                </p>
+              </div>
+            )}
+            <div className="mt-4 flex justify-end gap-2 text-[11px]">
+              <button
+                type="button"
+                ref={confirmCancelRef}
+                onClick={() => setConfirmDialog(null)}
+                className="rounded-full border border-slate-300 px-4 py-1.5 text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmarRemocao()}
+                disabled={deletingBatch || deletingId !== null}
+                className="rounded-full border border-red-200 bg-red-50 px-4 py-1.5 text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {confirmDialog.type === "batch"
+                  ? deletingBatch
+                    ? "Removendo..."
+                    : "Remover selecionados"
+                  : deletingId
+                    ? "Removendo..."
+                    : "Remover documento"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -741,7 +356,7 @@ export default function DocumentosPage() {
           </div>
           <p className="mt-1 text-sm text-slate-500">
             Consulte e filtre rapidamente os documentos enviados pelos
-            formul√°rios.
+            formul·rios.
           </p>
         </div>
         <div className="hidden text-right text-xs text-slate-500 md:block">
@@ -773,11 +388,11 @@ export default function DocumentosPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                √öltimos documentos enviados
+              <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                ⁄ltimos documentos enviados
               </p>
               <p className="text-[11px] text-slate-500">
-                Lista r√°pida das √∫ltimas submiss√µes, independente dos filtros.
+                Lista r·pida das ˙ltimas submissıes, independente dos filtros.
               </p>
             </div>
             <span className="text-xs font-semibold text-slate-400">
@@ -789,7 +404,7 @@ export default function DocumentosPage() {
               const identificacaoConfig = getIdentificacaoConfig(registro.tipo);
               const identificacaoValor =
                 getIdentificacaoValor(registro) ??
-                `${identificacaoConfig.label} n√£o informado`;
+                `${identificacaoConfig.label} n„o informado`;
               return (
                 <div
                   key={registro.id}
@@ -844,8 +459,8 @@ export default function DocumentosPage() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Filtros r√°pidos por formul√°rio
+            <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Filtros r·pidos por formul·rio
             </p>
             <p className="text-[11px] text-slate-500">
               Clique em um card para aplicar o filtro desejado.
@@ -942,7 +557,7 @@ export default function DocumentosPage() {
                 aria-pressed={viewMode === "cards"}
               >
                 <LayoutGrid className="h-4 w-4" />
-                Cart√µes
+                Cartıes
               </button>
             </div>
           </div>
@@ -950,17 +565,17 @@ export default function DocumentosPage() {
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <label className="text-xs font-semibold text-slate-600">
-            Identifica√ß√£o (Empresa/Prestador/N√∫mero do pedido)
+            IdentificaÁ„o (Empresa/Prestador/N˙mero do pedido)
             <input
               type="text"
               value={identificacaoFilter}
               onChange={(event) => setIdentificacaoFilter(event.target.value)}
-              placeholder="Busque pela empresa, prestador ou n√∫mero do pedido"
+              placeholder="Busque pela empresa, prestador ou n˙mero do pedido"
               className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             />
           </label>
           <label className="text-xs font-semibold text-slate-600">
-            Tipo de formul√°rio
+            Tipo de formul·rio
             <select
               value={tipoFilter}
               onChange={(event) => setTipoFilter(event.target.value)}
@@ -1008,7 +623,7 @@ export default function DocumentosPage() {
             </select>
           </label>
           <label className="text-xs font-semibold text-slate-600">
-            M√™s de envio
+            MÍs de envio
             <select
               value={mesFilter}
               onChange={(event) => setMesFilter(event.target.value)}
@@ -1023,8 +638,8 @@ export default function DocumentosPage() {
             </select>
           </label>
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-500">
-            Os filtros acima s√£o aplicados automaticamente. Por padr√£o
-            consideramos o m√™s corrente ({MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual"}).
+            Os filtros acima s„o aplicados automaticamente. Por padr„o
+            consideramos o mÍs corrente ({MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual"}).
           </div>
         </div>
 
@@ -1047,7 +662,7 @@ export default function DocumentosPage() {
                 setSomenteDisponiveisLote(event.target.checked)
               }
             />
-            Apenas dispon√≠veis para assinatura em lote
+            Apenas disponÌveis para assinatura em lote
           </label>
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
             Combine os filtros para chegar ao subconjunto desejado.
@@ -1058,8 +673,8 @@ export default function DocumentosPage() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Assinaturas dispon√≠veis
+            <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Assinaturas disponÌveis
             </p>
             <p className="text-sm text-slate-600">
               {assinaturasPendentes.length > 0 ? (
@@ -1083,7 +698,7 @@ export default function DocumentosPage() {
                       type="button"
                       onClick={() => toggleSelecionar(id)}
                       className="text-[10px] font-semibold text-slate-500 transition hover:text-slate-800"
-                      title="Remover da sele√ß√£o"
+                      title="Remover da seleÁ„o"
                     >
                       x
                     </button>
@@ -1114,7 +729,7 @@ export default function DocumentosPage() {
               disabled={!hasSelection}
               className="rounded-full border border-slate-200 px-4 py-1.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Limpar sele√ß√£o
+              Limpar seleÁ„o
             </button>
             <button
               type="button"
@@ -1180,11 +795,11 @@ export default function DocumentosPage() {
                     />
                   </th>
                   <th className="px-4 py-3 text-left">Documento</th>
-                  <th className="px-4 py-3 text-left">Identifica√ß√£o</th>
+                  <th className="px-4 py-3 text-left">IdentificaÁ„o</th>
                   <th className="px-4 py-3 text-left">Tipo</th>
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-left">Enviado em</th>
-                  <th className="px-4 py-3 text-right">A√ß√µes</th>
+                  <th className="px-4 py-3 text-right">AÁıes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
@@ -1194,7 +809,7 @@ export default function DocumentosPage() {
                   );
                   const identificacaoValor =
                     getIdentificacaoValor(registro) ??
-                    `${identificacaoConfig.label} n√£o informado`;
+                    `${identificacaoConfig.label} n„o informado`;
                   const identificacaoComplemento =
                     getIdentificacaoComplemento(registro);
                   const isSelecionavel =
@@ -1219,7 +834,7 @@ export default function DocumentosPage() {
                         </p>
                       </td>
                       <td className="px-4 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                           {identificacaoConfig.label}
                         </p>
                         <p className="text-sm font-medium text-slate-900">
@@ -1296,7 +911,7 @@ export default function DocumentosPage() {
             const identificacaoConfig = getIdentificacaoConfig(registro.tipo);
             const identificacaoValor =
               getIdentificacaoValor(registro) ??
-              `${identificacaoConfig.label} n√£o informado`;
+              `${identificacaoConfig.label} n„o informado`;
             const identificacaoComplemento =
               getIdentificacaoComplemento(registro);
             const isSelecionavel =
@@ -1311,7 +926,7 @@ export default function DocumentosPage() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Documento
                     </p>
                     <p className="font-mono text-xs text-slate-500">
@@ -1330,7 +945,7 @@ export default function DocumentosPage() {
                 </div>
                 <div className="mt-3 space-y-2 text-sm text-slate-600">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       {identificacaoConfig.label}
                     </p>
                     <p className="text-sm font-semibold text-slate-900">
@@ -1404,6 +1019,23 @@ export default function DocumentosPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
