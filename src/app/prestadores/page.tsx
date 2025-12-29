@@ -640,9 +640,9 @@ export default function PrestadoresPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-slate-100 bg-white/80 p-4">
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start lg:gap-8">
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm shadow-slate-100">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -732,7 +732,7 @@ export default function PrestadoresPage() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+          <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm shadow-slate-100">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               2. Detalhes do prestador
             </p>
@@ -897,10 +897,10 @@ export default function PrestadoresPage() {
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           <form
             onSubmit={handlePrestadorSubmit}
-            className="space-y-4 rounded-2xl border border-slate-100 bg-slate-50/60 p-4"
+            className="space-y-4 rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm shadow-slate-100"
           >
             <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <UserPlus className="h-4 w-4 text-slate-600" />
@@ -974,7 +974,7 @@ export default function PrestadoresPage() {
 
           <form
             onSubmit={handleRegraSubmit}
-            className="space-y-4 rounded-2xl border border-slate-100 bg-white/80 p-4"
+            className="space-y-4 rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm shadow-slate-100"
           >
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               4. Criar regra de monitoramento
