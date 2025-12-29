@@ -385,6 +385,14 @@ export default function PrestadoresPage() {
       return;
     }
 
+    if (
+      !window.confirm(
+        `Adicionar ${emails.length} e-mail(s) ao prestador selecionado?`,
+      )
+    ) {
+      return;
+    }
+
     try {
       const { data, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) {
@@ -420,6 +428,61 @@ export default function PrestadoresPage() {
         success: "E-mails adicionados ao prestador.",
       });
       setEmailsForm("");
+      await refreshPrestadores();
+    } catch (err) {
+      setEmailsFeedback({
+        error:
+          err instanceof Error
+            ? err.message
+            : "Nao foi possivel atualizar o prestador.",
+        success: null,
+      });
+    }
+  };
+
+  const handleEmailRemove = async (emailToRemove: string) => {
+    if (!selectedPrestadorId) {
+      return;
+    }
+    setEmailsFeedback({ error: null, success: null });
+    if (!window.confirm(`Remover o e-mail ${emailToRemove}?`)) {
+      return;
+    }
+
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        throw sessionError;
+      }
+      const token = data.session?.access_token;
+      if (!token) {
+        throw new Error("Sessao expirada. Faca login novamente.");
+      }
+
+      const response = await fetch("/api/prestadores", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          id: selectedPrestadorId,
+          remove_emails: [emailToRemove],
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Nao foi possivel atualizar o prestador.");
+      }
+
+      setEmailsFeedback({
+        error: null,
+        success: "E-mail removido do prestador.",
+      });
       await refreshPrestadores();
     } catch (err) {
       setEmailsFeedback({
@@ -685,13 +748,29 @@ export default function PrestadoresPage() {
                 )}
                 <div>
                   <span className="font-semibold text-slate-700">Usuarios vinculados:</span>
-                  <ul className="mt-1 list-disc pl-4 text-[11px]">
-                    {selectedPrestador.usuarios.map((usuario) => (
-                      <li key={usuario} className="text-slate-600">
-                        {usuario}
-                      </li>
-                    ))}
-                  </ul>
+                  {selectedPrestador.usuarios.length === 0 ? (
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Nenhum e-mail vinculado.
+                    </p>
+                  ) : (
+                    <ul className="mt-2 space-y-1 text-[11px] text-slate-600">
+                      {selectedPrestador.usuarios.map((usuario) => (
+                        <li
+                          key={usuario}
+                          className="flex items-center justify-between gap-2"
+                        >
+                          <span>{usuario}</span>
+                          <button
+                            type="button"
+                            onClick={() => void handleEmailRemove(usuario)}
+                            className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] text-slate-500 transition hover:border-red-200 hover:text-red-600"
+                          >
+                            Remover
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
             ) : (

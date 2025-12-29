@@ -258,16 +258,43 @@ export async function PATCH(request: Request) {
     const body = (await request.json()) as {
       id?: string;
       emails?: string[];
+      remove_emails?: string[];
     };
 
     const prestadorId = body.id?.trim();
     const novosEmails = normalizeEmails(body.emails ?? []);
+    const removerEmails = normalizeEmails(body.remove_emails ?? []);
 
     if (!prestadorId) {
       throw new HttpError(400, "Informe o prestador.");
     }
-    if (novosEmails.length === 0) {
+    if (novosEmails.length === 0 && removerEmails.length === 0) {
       throw new HttpError(400, "Informe ao menos um e-mail.");
+    }
+
+    if (novosEmails.length > 0) {
+      const { data: authUsers, error: authUsersError } = await supabaseAdmin
+        .from("auth.users")
+        .select("email")
+        .in("email", novosEmails);
+
+      if (authUsersError) {
+        throw authUsersError;
+      }
+
+      const encontrados = new Set(
+        (authUsers ?? [])
+          .map((item) => (item.email as string | null) ?? "")
+          .map((value) => value.toLowerCase().trim())
+          .filter(Boolean),
+      );
+      const faltando = novosEmails.filter((emailItem) => !encontrados.has(emailItem));
+      if (faltando.length > 0) {
+        throw new HttpError(
+          400,
+          `E-mails nao cadastrados na aplicacao: ${faltando.join(", ")}`,
+        );
+      }
     }
 
     const { data: prestadorData, error: prestadorError } = await supabaseAdmin
@@ -281,7 +308,9 @@ export async function PATCH(request: Request) {
     }
 
     const existentes = (prestadorData?.usuarios as string[] | null) ?? [];
-    const usuarios = normalizeEmails([...existentes, ...novosEmails]);
+    const usuarios = normalizeEmails([...existentes, ...novosEmails]).filter(
+      (value) => !removerEmails.includes(value),
+    );
 
     const { data, error } = await supabaseAdmin
       .from("prestadores")
