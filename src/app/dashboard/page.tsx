@@ -424,17 +424,11 @@ export default function DashboardPage() {
           if (!isInPeriodo(item.created_at, regra.periodo, now)) {
             return false;
           }
-          if (regra.tipo_regra === "formulario") {
-            return item.tipo === regra.alvo;
-          }
-          if (regra.tipo_regra === "tipo_servico") {
-            if (item.tipo !== "registro_laudos") {
-              return false;
-            }
+          if (item.tipo === "registro_laudos") {
             const tipoLaudo = getTipoLaudo(item.dados);
             return tipoLaudo.toLowerCase() === regra.alvo.toLowerCase();
           }
-          return false;
+          return item.tipo === regra.alvo;
         }).length;
         const percentual =
           regra.quantidade > 0
