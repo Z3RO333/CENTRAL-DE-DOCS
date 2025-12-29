@@ -240,3 +240,77 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await getSessionUser(request);
+    const email = user.email?.toLowerCase().trim() ?? null;
+    const supabaseAdmin = createSupabaseAdminClient();
+
+    const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
+    if (!canAccess) {
+      throw new HttpError(
+        403,
+        "Voce nao possui permissao para atualizar prestadores.",
+      );
+    }
+
+    const body = (await request.json()) as {
+      id?: string;
+      emails?: string[];
+    };
+
+    const prestadorId = body.id?.trim();
+    const novosEmails = normalizeEmails(body.emails ?? []);
+
+    if (!prestadorId) {
+      throw new HttpError(400, "Informe o prestador.");
+    }
+    if (novosEmails.length === 0) {
+      throw new HttpError(400, "Informe ao menos um e-mail.");
+    }
+
+    const { data: prestadorData, error: prestadorError } = await supabaseAdmin
+      .from("prestadores")
+      .select("id,nome,cnpj,tipo_servico,usuarios,created_at")
+      .eq("id", prestadorId)
+      .single();
+
+    if (prestadorError) {
+      throw prestadorError;
+    }
+
+    const existentes = (prestadorData?.usuarios as string[] | null) ?? [];
+    const usuarios = normalizeEmails([...existentes, ...novosEmails]);
+
+    const { data, error } = await supabaseAdmin
+      .from("prestadores")
+      .update({ usuarios })
+      .eq("id", prestadorId)
+      .select("id,nome,cnpj,tipo_servico,usuarios,created_at")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    const prestador: PrestadorRow = data as PrestadorRow;
+
+    return NextResponse.json({
+      prestador: {
+        ...prestador,
+        usuarios: prestador.usuarios ?? [],
+      },
+    });
+  } catch (err) {
+    console.error("Erro ao atualizar prestador:", err);
+    if (err instanceof HttpError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Nao foi possivel atualizar o prestador.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

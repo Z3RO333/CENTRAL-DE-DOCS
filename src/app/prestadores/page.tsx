@@ -20,6 +20,7 @@ export default function PrestadoresPage() {
     loading: prestadoresLoading,
     error: prestadoresError,
     createPrestador,
+    refresh: refreshPrestadores,
   } = usePrestadores({ enabled: canManagePrestadores });
   const [prestadorForm, setPrestadorForm] = useState({
     nome: "",
@@ -47,6 +48,11 @@ export default function PrestadoresPage() {
     quantidade: "12",
     label: "",
   });
+  const [emailsForm, setEmailsForm] = useState("");
+  const [emailsFeedback, setEmailsFeedback] = useState<{
+    error: string | null;
+    success: string | null;
+  }>({ error: null, success: null });
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -354,6 +360,78 @@ export default function PrestadoresPage() {
     }
   };
 
+  const handleEmailsSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setEmailsFeedback({ error: null, success: null });
+
+    if (!selectedPrestadorId) {
+      setEmailsFeedback({
+        error: "Selecione um prestador para adicionar e-mails.",
+        success: null,
+      });
+      return;
+    }
+
+    const emails = emailsForm
+      .split(/[,;\n]/)
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (emails.length === 0) {
+      setEmailsFeedback({
+        error: "Informe ao menos um e-mail valido.",
+        success: null,
+      });
+      return;
+    }
+
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        throw sessionError;
+      }
+      const token = data.session?.access_token;
+      if (!token) {
+        throw new Error("Sessao expirada. Faca login novamente.");
+      }
+
+      const response = await fetch("/api/prestadores", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          id: selectedPrestadorId,
+          emails,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Nao foi possivel atualizar o prestador.");
+      }
+
+      setEmailsFeedback({
+        error: null,
+        success: "E-mails adicionados ao prestador.",
+      });
+      setEmailsForm("");
+      await refreshPrestadores();
+    } catch (err) {
+      setEmailsFeedback({
+        error:
+          err instanceof Error
+            ? err.message
+            : "Nao foi possivel atualizar o prestador.",
+        success: null,
+      });
+    }
+  };
+
   const handleRegraDelete = async (regraId: string) => {
     setRegraFeedback({ error: null, success: null });
     try {
@@ -531,11 +609,44 @@ export default function PrestadoresPage() {
                   <span className="font-semibold text-slate-700">CNPJ:</span>{" "}
                   {selectedPrestador.cnpj}
                 </p>
+                <form
+                  onSubmit={handleEmailsSubmit}
+                  className="rounded-xl border border-slate-100 bg-white px-3 py-2"
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Adicionar e-mails ao prestador
+                  </p>
+                  {emailsFeedback.error || emailsFeedback.success ? (
+                    <div
+                      className={`mt-2 rounded-md border px-2 py-1 text-[11px] ${
+                        emailsFeedback.error
+                          ? "border-red-200 bg-red-50 text-red-700"
+                          : "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      }`}
+                    >
+                      {emailsFeedback.error || emailsFeedback.success}
+                    </div>
+                  ) : null}
+                  <textarea
+                    value={emailsForm}
+                    onChange={(event) => setEmailsForm(event.target.value)}
+                    className="mt-2 min-h-[80px] w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-700 outline-none transition focus:border-sky-400"
+                    placeholder="Informe os e-mails separados por virgula"
+                  />
+                  <div className="mt-2 flex justify-end">
+                    <button
+                      type="submit"
+                      className="rounded-full bg-sky-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm shadow-sky-200 transition hover:bg-sky-500"
+                    >
+                      Adicionar e-mails
+                    </button>
+                  </div>
+                </form>
                 {regrasPorPrestador[selectedPrestador.id]?.length ? (
                   <div className="space-y-2">
                     {regrasPorPrestador[selectedPrestador.id].map((regra) => {
-                        const label =
-                          regra.label?.trim() ||
+                      const label =
+                        regra.label?.trim() ||
                           (regra.tipo_regra === "formulario"
                             ? formularioOptions.find(
                                 (option) => option.value === regra.alvo,
