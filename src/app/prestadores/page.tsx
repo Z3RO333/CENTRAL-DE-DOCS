@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, ClipboardList, UserPlus } from "lucide-react";
+import { Building2, ClipboardList, HelpCircle, UserPlus, X } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
@@ -53,6 +53,7 @@ export default function PrestadoresPage() {
     error: string | null;
     success: string | null;
   }>({ error: null, success: null });
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -593,7 +594,7 @@ export default function PrestadoresPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6">
+    <div className="relative mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
         <div>
           <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1118,6 +1119,78 @@ export default function PrestadoresPage() {
           </form>
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setIsHelpOpen(true)}
+        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-3 text-xs font-semibold text-white shadow-lg shadow-sky-200 transition hover:bg-sky-500"
+        aria-label="Ajuda"
+      >
+        <HelpCircle className="h-4 w-4" />
+        Ajuda
+      </button>
+
+      {isHelpOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Ajuda
+                </p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">
+                  Como usar o aplicativo
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHelpOpen(false)}
+                className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                aria-label="Fechar ajuda"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 grid gap-4 text-sm text-slate-600">
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Parte administrativa
+                </p>
+                <ul className="mt-2 space-y-1 text-sm text-slate-600">
+                  <li>Cadastre prestadores com nome, tipo de serviço e CNPJ.</li>
+                  <li>Adicione e-mails autorizados para cada prestador.</li>
+                  <li>Crie regras de monitoramento por período e quantidade.</li>
+                  <li>Revise e remova regras ou prestadores quando necessário.</li>
+                </ul>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Parte do prestador
+                </p>
+                <ul className="mt-2 space-y-1 text-sm text-slate-600">
+                  <li>Selecione o prestador permitido no formulário.</li>
+                  <li>Envie documentos conforme o tipo de serviço.</li>
+                  <li>Acompanhe envios e pendências no painel de documentos.</li>
+                  <li>Atualize informações com o administrador quando preciso.</li>
+                </ul>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsHelpOpen(false)}
+                className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
