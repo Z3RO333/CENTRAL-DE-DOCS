@@ -47,6 +47,10 @@ export default function DashboardPage() {
   const [historicoErro, setHistoricoErro] = useState<string | null>(null);
   const [historicoTipoFilter, setHistoricoTipoFilter] = useState("todos");
   const [historicoStatusFilter, setHistoricoStatusFilter] = useState("todos");
+  const [historicoPrestadorFilter, setHistoricoPrestadorFilter] =
+    useState("todos");
+  const [historicoPeriodoFilter, setHistoricoPeriodoFilter] =
+    useState("ultimos_30_dias");
   const [regras, setRegras] = useState<PrestadorRegra[]>([]);
   const [regrasLoading, setRegrasLoading] = useState(true);
   const [regrasErro, setRegrasErro] = useState<string | null>(null);
@@ -309,20 +313,8 @@ export default function DashboardPage() {
   }, [user, prestadoresLoading, carregarRegras]);
 
   const historicoRecentes = useMemo(
-    () =>
-      historico.filter((item) => {
-        if (historicoTipoFilter !== "todos" && item.tipo !== historicoTipoFilter) {
-          return false;
-        }
-        if (
-          historicoStatusFilter !== "todos" &&
-          item.status !== historicoStatusFilter
-        ) {
-          return false;
-        }
-        return true;
-      }),
-    [historico, historicoTipoFilter, historicoStatusFilter],
+    () => historicoFiltrado,
+    [historicoFiltrado],
   );
 
   const historicoTipoOptions = useMemo(() => {
@@ -361,8 +353,99 @@ export default function DashboardPage() {
     });
   }, [historico]);
 
+  const prestadoresFiltrados = useMemo(() => {
+    if (historicoPrestadorFilter === "todos") {
+      return prestadoresDoUsuario;
+    }
+    return prestadoresDoUsuario.filter(
+      (prestador) => prestador.id === historicoPrestadorFilter,
+    );
+  }, [prestadoresDoUsuario, historicoPrestadorFilter]);
+
+  const isDentroPeriodoGlobal = useCallback(
+    (dateValue: string) => {
+      if (historicoPeriodoFilter === "todos") {
+        return true;
+      }
+      const date = new Date(dateValue);
+      if (Number.isNaN(date.getTime())) {
+        return false;
+      }
+      const now = new Date();
+      if (historicoPeriodoFilter === "mes_atual") {
+        return (
+          date.getFullYear() === now.getFullYear() &&
+          date.getMonth() === now.getMonth()
+        );
+      }
+      if (historicoPeriodoFilter === "ano_atual") {
+        return date.getFullYear() === now.getFullYear();
+      }
+      const dias =
+        historicoPeriodoFilter === "ultimos_90_dias" ? 90 : 30;
+      const start = new Date(now);
+      start.setDate(now.getDate() - dias);
+      return date >= start && date <= now;
+    },
+    [historicoPeriodoFilter],
+  );
+
+  const historicoFiltrado = useMemo(() => {
+    return historico.filter((item) => {
+      if (
+        historicoPrestadorFilter !== "todos" &&
+        item.prestador_id !== historicoPrestadorFilter
+      ) {
+        return false;
+      }
+      if (historicoTipoFilter !== "todos" && item.tipo !== historicoTipoFilter) {
+        return false;
+      }
+      if (
+        historicoStatusFilter !== "todos" &&
+        item.status !== historicoStatusFilter
+      ) {
+        return false;
+      }
+      return isDentroPeriodoGlobal(item.created_at);
+    });
+  }, [
+    historico,
+    historicoPrestadorFilter,
+    historicoTipoFilter,
+    historicoStatusFilter,
+    isDentroPeriodoGlobal,
+  ]);
+
+  const historicoParaMetas = useMemo(() => {
+    return historico.filter((item) => {
+      if (
+        historicoPrestadorFilter !== "todos" &&
+        item.prestador_id !== historicoPrestadorFilter
+      ) {
+        return false;
+      }
+      if (historicoTipoFilter !== "todos" && item.tipo !== historicoTipoFilter) {
+        return false;
+      }
+      if (
+        historicoStatusFilter !== "todos" &&
+        item.status !== historicoStatusFilter
+      ) {
+        return false;
+      }
+      return isDentroPeriodoGlobal(item.created_at);
+    });
+  }, [
+    historico,
+    historicoPrestadorFilter,
+    historicoTipoFilter,
+    historicoStatusFilter,
+    isDentroPeriodoGlobal,
+  ]);
+
   const resumoPorTipo = useMemo(() => {
-    return historico.reduce<
+    return historicoFiltrado.reduce<
       Record<
         string,
         {
@@ -392,7 +475,111 @@ export default function DashboardPage() {
       }
       return acc;
     }, {});
-  }, [historico]);
+  }, [historicoFiltrado]);
+
+  const statusResumo = useMemo(() => {
+    return historicoFiltrado.reduce<Record<string, number>>((acc, item) => {
+      acc[item.status] = (acc[item.status] ?? 0) + 1;
+      return acc;
+    }, {});
+  }, [historicoFiltrado]);
+
+  const tipoResumo = useMemo(() => {
+    return historicoFiltrado.reduce<Record<string, number>>((acc, item) => {
+      acc[item.tipo] = (acc[item.tipo] ?? 0) + 1;
+      return acc;
+    }, {});
+  }, [historicoFiltrado]);
+
+  const prestadorResumo = useMemo(() => {
+    const base = prestadoresFiltrados.reduce<Record<string, number>>(
+      (acc, prestador) => {
+        acc[prestador.id] = 0;
+        return acc;
+      },
+      {},
+    );
+    return historicoFiltrado.reduce<Record<string, number>>((acc, item) => {
+      if (!item.prestador_id) {
+        return acc;
+      }
+      acc[item.prestador_id] = (acc[item.prestador_id] ?? 0) + 1;
+      return acc;
+    }, base);
+  }, [historicoFiltrado, prestadoresFiltrados]);
+
+  const enviosUltimos30Dias = useMemo(() => {
+    const today = new Date();
+    const days: { key: string; label: string; count: number }[] = [];
+    for (let offset = 29; offset >= 0; offset -= 1) {
+      const day = new Date(today);
+      day.setDate(today.getDate() - offset);
+      const key = day.toISOString().slice(0, 10);
+      days.push({
+        key,
+        label: `${day.getDate().toString().padStart(2, "0")}/${(
+          day.getMonth() + 1
+        )
+          .toString()
+          .padStart(2, "0")}`,
+        count: 0,
+      });
+    }
+
+    const indexByKey = days.reduce<Record<string, number>>((acc, item, index) => {
+      acc[item.key] = index;
+      return acc;
+    }, {});
+
+    historicoFiltrado.forEach((item) => {
+      const date = new Date(item.created_at);
+      if (Number.isNaN(date.getTime())) {
+        return;
+      }
+      const key = date.toISOString().slice(0, 10);
+      const index = indexByKey[key];
+      if (index === undefined) {
+        return;
+      }
+      days[index].count += 1;
+    });
+
+    return days;
+  }, [historicoFiltrado]);
+
+  const maxEnviosDia = Math.max(
+    1,
+    ...enviosUltimos30Dias.map((item) => item.count),
+  );
+  const maxPrestadorEnvios = Math.max(
+    1,
+    ...Object.values(prestadorResumo),
+  );
+  const maxTipoEnvios = Math.max(1, ...Object.values(tipoResumo));
+  const maxStatusEnvios = Math.max(1, ...Object.values(statusResumo));
+
+  const statusOrdenado = useMemo(
+    () =>
+      Object.entries(statusResumo).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0)),
+    [statusResumo],
+  );
+
+  const tipoOrdenado = useMemo(
+    () =>
+      Object.entries(tipoResumo).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0)),
+    [tipoResumo],
+  );
+
+  const prestadorOrdenado = useMemo(() => {
+    return prestadoresFiltrados
+      .map((prestador) => ({
+        id: prestador.id,
+        nome: prestador.nome,
+        tipo: prestador.tipo_servico,
+        total: prestadorResumo[prestador.id] ?? 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [prestadoresFiltrados, prestadorResumo]);
 
   const regrasPorPrestador = useMemo(() => {
     return regras.reduce<Record<string, PrestadorRegra[]>>((acc, regra) => {
@@ -406,10 +593,10 @@ export default function DashboardPage() {
 
   const prestadoresProgresso = useMemo(() => {
     const now = new Date();
-    return prestadoresDoUsuario.map((prestador) => {
+    return prestadoresFiltrados.map((prestador) => {
       const regrasDoPrestador = regrasPorPrestador[prestador.id] ?? [];
       const progresso = regrasDoPrestador.map((regra) => {
-        const enviados = historico.filter((item) => {
+        const enviados = historicoParaMetas.filter((item) => {
           if (item.prestador_id !== prestador.id) {
             return false;
           }
@@ -433,7 +620,7 @@ export default function DashboardPage() {
         progresso,
       };
     });
-  }, [historico, prestadoresDoUsuario, regrasPorPrestador]);
+  }, [historicoParaMetas, prestadoresFiltrados, regrasPorPrestador]);
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6">
@@ -477,6 +664,79 @@ export default function DashboardPage() {
           >
             Monitoramento
           </button>
+        </div>
+      </div>
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 text-xs text-slate-600 shadow-sm shadow-slate-100/80">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Filtros globais
+            </p>
+            <span className="text-[11px] text-slate-500">
+              Ajuste os filtros para todas as visualizacoes do dashboard.
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <label className="text-xs font-semibold text-slate-600">
+            Periodo
+            <select
+              value={historicoPeriodoFilter}
+              onChange={(event) => setHistoricoPeriodoFilter(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+            >
+              <option value="ultimos_30_dias">Ultimos 30 dias</option>
+              <option value="ultimos_90_dias">Ultimos 90 dias</option>
+              <option value="mes_atual">Mes atual</option>
+              <option value="ano_atual">Ano atual</option>
+              <option value="todos">Todos os periodos</option>
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Prestador
+            <select
+              value={historicoPrestadorFilter}
+              onChange={(event) => setHistoricoPrestadorFilter(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+            >
+              <option value="todos">Todos os prestadores</option>
+              {prestadoresDoUsuario.map((prestador) => (
+                <option key={prestador.id} value={prestador.id}>
+                  {prestador.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Tipo
+            <select
+              value={historicoTipoFilter}
+              onChange={(event) => setHistoricoTipoFilter(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+            >
+              {historicoTipoOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Status
+            <select
+              value={historicoStatusFilter}
+              onChange={(event) => setHistoricoStatusFilter(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+            >
+              {historicoStatusOptions.map((statusOption) => (
+                <option key={statusOption} value={statusOption}>
+                  {statusOption === "todos"
+                    ? "Todos os status"
+                    : formatStatus(statusOption)}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
       {dashboardTab === "formularios" ? (
@@ -550,6 +810,157 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Visao rapida
+            </p>
+            <span className="text-[11px] text-slate-500">
+              Indicadores gerais dos envios do seu grupo.
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-400">
+            Total: {historicoFiltrado.length} envio(s)
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Status dos envios
+            </p>
+            {statusOrdenado.length === 0 ? (
+              <p className="mt-2 text-[11px] text-slate-500">
+                Sem dados de status.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {statusOrdenado.map(([status, total]) => {
+                  const percentual = Math.round(
+                    (total / maxStatusEnvios) * 100,
+                  );
+                  return (
+                    <div key={status} className="space-y-1">
+                      <div className="flex items-center justify-between text-[11px] text-slate-600">
+                        <span className="font-semibold text-slate-700">
+                          {formatStatus(status)}
+                        </span>
+                        <span>{total}</span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-white">
+                        <div
+                          className="h-2 rounded-full bg-gradient-to-r from-sky-400 via-emerald-400 to-sky-300"
+                          style={{ width: `${percentual}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Envios por tipo
+            </p>
+            {tipoOrdenado.length === 0 ? (
+              <p className="mt-2 text-[11px] text-slate-500">
+                Sem dados por tipo.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {tipoOrdenado.map(([tipo, total]) => {
+                  const percentual = Math.round((total / maxTipoEnvios) * 100);
+                  return (
+                    <div key={tipo} className="space-y-1">
+                      <div className="flex items-center justify-between text-[11px] text-slate-600">
+                        <span className="font-semibold text-slate-700">
+                          {formatTipo(tipo)}
+                        </span>
+                        <span>{total}</span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-white">
+                        <div
+                          className="h-2 rounded-full bg-gradient-to-r from-amber-400 via-rose-400 to-amber-300"
+                          style={{ width: `${percentual}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Envios nos ultimos 30 dias
+            </p>
+            <div className="mt-3 flex h-24 items-end gap-1">
+              {enviosUltimos30Dias.map((item) => {
+                const altura = Math.round((item.count / maxEnviosDia) * 100);
+                return (
+                  <div
+                    key={item.key}
+                    className="group flex h-full flex-1 items-end"
+                    title={`${item.label} - ${item.count} envio(s)`}
+                  >
+                    <div
+                      className="w-full rounded-t-sm bg-sky-400/70 transition-all group-hover:bg-sky-500"
+                      style={{ height: `${altura}%` }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
+              <span>{enviosUltimos30Dias[0]?.label ?? "--/--"}</span>
+              <span>{enviosUltimos30Dias[enviosUltimos30Dias.length - 1]?.label ?? "--/--"}</span>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Envios por prestador
+            </p>
+            {prestadorOrdenado.length === 0 ? (
+              <p className="mt-2 text-[11px] text-slate-500">
+                Nenhum prestador vinculado.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {prestadorOrdenado.map((prestador) => {
+                  const percentual = Math.round(
+                    (prestador.total / maxPrestadorEnvios) * 100,
+                  );
+                  return (
+                    <div key={prestador.id} className="space-y-1">
+                      <div className="flex items-center justify-between text-[11px] text-slate-600">
+                        <span className="font-semibold text-slate-700">
+                          {prestador.nome}
+                        </span>
+                        <span>{prestador.total}</span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-white">
+                        <div
+                          className="h-2 rounded-full bg-gradient-to-r from-emerald-400 via-sky-400 to-sky-300"
+                          style={{ width: `${percentual}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400">
+                        {prestador.tipo}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm shadow-slate-100/80">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Histórico de envios
             </p>
             <span className="text-[11px] text-slate-500">
@@ -557,41 +968,8 @@ export default function DashboardPage() {
             </span>
           </div>
           <span className="text-[11px] text-slate-400">
-            Mostrando {historicoRecentes.length} de {historico.length} registros
+            Mostrando {historicoRecentes.length} registro(s) apos filtros
           </span>
-        </div>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <label className="text-xs font-semibold text-slate-600">
-            Tipo
-            <select
-              value={historicoTipoFilter}
-              onChange={(event) => setHistoricoTipoFilter(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            >
-              {historicoTipoOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-slate-600">
-            Status
-            <select
-              value={historicoStatusFilter}
-              onChange={(event) => setHistoricoStatusFilter(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            >
-              {historicoStatusOptions.map((statusOption) => (
-                <option key={statusOption} value={statusOption}>
-                  {statusOption === "todos"
-                    ? "Todos os status"
-                    : formatStatus(statusOption)}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
 
         {historicoLoading ? (
@@ -674,7 +1052,7 @@ export default function DashboardPage() {
               Progresso por prestador
             </p>
             <span className="text-[11px] text-slate-500">
-              Monitoramento de envios no periodo atual.
+              Monitoramento de envios no periodo da regra (mensal/anual).
             </span>
           </div>
           <span className="text-[11px] text-slate-400">
@@ -727,6 +1105,7 @@ export default function DashboardPage() {
                         (regra.tipo_regra === "formulario"
                           ? tipoLabel[regra.alvo] ?? regra.alvo
                           : regra.alvo);
+                      const faltam = Math.max(regra.quantidade - enviados, 0);
 
                       return (
                         <div key={regra.id} className="space-y-1">
@@ -735,7 +1114,7 @@ export default function DashboardPage() {
                               {label}
                             </span>
                             <span>
-                              {enviados}/{regra.quantidade}
+                              Enviados: {enviados} / Meta: {regra.quantidade}
                             </span>
                           </div>
                           <div className="h-2 w-full rounded-full bg-white">
@@ -744,6 +1123,9 @@ export default function DashboardPage() {
                               style={{ width: `${percentual}%` }}
                             />
                           </div>
+                          <p className="text-[11px] text-slate-500">
+                            Faltam {faltam} envio(s)
+                          </p>
                           <p className="text-[11px] text-slate-500">
                             {Math.round(percentual)}% no {regra.periodo === "mensal" ? "mes" : "ano"} atual
                           </p>
