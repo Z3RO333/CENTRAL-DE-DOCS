@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -10,6 +11,8 @@ import {
   BarChart3,
   ShieldCheck,
   Building2,
+  HelpCircle,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabaseClient";
@@ -36,6 +39,7 @@ export default function AppShell({
     modulesAccess.dashboards && !documentsAccessLoading;
   const canAccessPerfil = modulesAccess.perfil && !documentsAccessLoading;
   const resolvedWithoutUser = !isLoading && !isAuthenticated;
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -154,6 +158,15 @@ export default function AppShell({
                 Permissões
               </Link>
             )}
+            <button
+              type="button"
+              onClick={() => setIsHelpOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-sky-500 hover:bg-sky-50 hover:text-sky-700"
+              aria-label="Ajuda"
+            >
+              <HelpCircle className="h-3.5 w-3.5" />
+              Ajuda
+            </button>
             {isAuthenticated && (
               <button
                 type="button"
@@ -207,6 +220,105 @@ export default function AppShell({
           )}
         </div>
       </main>
+
+      {isHelpOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Ajuda
+                </p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">
+                  Como usar o sistema
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHelpOpen(false)}
+                className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                aria-label="Fechar ajuda"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 grid gap-4 text-sm text-slate-600 lg:grid-cols-2">
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Formulario
+                </p>
+                <ul className="mt-2 space-y-1">
+                  <li>Escolha o tipo de formulario e envie os documentos.</li>
+                  <li>Use o prestador correto ao preencher as informacoes.</li>
+                  <li>Consulte o historico de envios do seu grupo.</li>
+                </ul>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Documentos
+                </p>
+                <ul className="mt-2 space-y-1">
+                  <li>Veja documentos enviados e seus status.</li>
+                  <li>Filtre por tipo, periodo e prestador.</li>
+                  <li>Abra, baixe ou assine quando aplicavel.</li>
+                </ul>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Prestadores
+                </p>
+                <ul className="mt-2 space-y-1">
+                  <li>Cadastre prestadores com nome, tipo e CNPJ.</li>
+                  <li>Adicione e-mails autorizados por prestador.</li>
+                  <li>Crie regras de monitoramento por periodo.</li>
+                </ul>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Dashboards
+                </p>
+                <ul className="mt-2 space-y-1">
+                  <li>Acompanhe volume de envios e metas.</li>
+                  <li>Analise por mes, ano e tipo de servico.</li>
+                  <li>Use os graficos para identificar tendencias.</li>
+                </ul>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Permissoes
+                </p>
+                <ul className="mt-2 space-y-1">
+                  <li>Conceda acesso por modulo e e-mail.</li>
+                  <li>Revise permissoes periodicamente.</li>
+                  <li>Remova acessos quando necessario.</li>
+                </ul>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Perfil
+                </p>
+                <ul className="mt-2 space-y-1">
+                  <li>Gerencie assinatura e dados pessoais.</li>
+                  <li>Atualize suas preferencias quando precisar.</li>
+                </ul>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsHelpOpen(false)}
+                className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
