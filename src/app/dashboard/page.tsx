@@ -404,14 +404,6 @@ export default function DashboardPage() {
     }, {});
   }, [regras]);
 
-  const getTipoLaudo = (dados: Record<string, unknown> | null) => {
-    if (!dados) {
-      return "";
-    }
-    const value = dados["tipo_laudo"];
-    return typeof value === "string" ? value : "";
-  };
-
   const prestadoresProgresso = useMemo(() => {
     const now = new Date();
     return prestadoresDoUsuario.map((prestador) => {
@@ -424,11 +416,7 @@ export default function DashboardPage() {
           if (!isInPeriodo(item.created_at, regra.periodo, now)) {
             return false;
           }
-          if (item.tipo === "registro_laudos") {
-            const tipoLaudo = getTipoLaudo(item.dados);
-            return tipoLaudo.toLowerCase() === regra.alvo.toLowerCase();
-          }
-          return item.tipo === regra.alvo;
+          return true;
         }).length;
         const percentual =
           regra.quantidade > 0
