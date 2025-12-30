@@ -674,13 +674,18 @@ export default function PrestadoresPage() {
                   const labelDestaque = regraDestaque
                     ? resolveRegraLabel(regraDestaque.alvo, regraDestaque.label)
                     : null;
+                  const emailsPreview = prestador.usuarios.slice(0, 3);
+                  const extraEmails = Math.max(
+                    prestador.usuarios.length - emailsPreview.length,
+                    0,
+                  );
 
                   return (
                     <button
                       key={prestador.id}
                       type="button"
                       onClick={() => setSelectedPrestadorId(prestador.id)}
-                      className={`relative overflow-hidden text-left rounded-2xl border px-4 py-3 transition ${
+                      className={`relative overflow-hidden text-left rounded-2xl border px-4 py-4 transition ${
                         selectedPrestadorId === prestador.id
                           ? "border-sky-300 bg-white shadow-sm shadow-sky-100"
                           : "border-slate-100 bg-white hover:border-slate-200"
@@ -691,16 +696,37 @@ export default function PrestadoresPage() {
                           index,
                         )} opacity-80 blur-xl`}
                       />
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-800">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-base font-semibold text-slate-900 md:text-lg">
                             {prestador.nome}
                           </p>
-                          <p className="text-[11px] text-slate-500">
+                          <p className="text-xs text-slate-500">
                             {prestador.tipo_servico}
                           </p>
+                          {prestador.usuarios.length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {emailsPreview.map((email) => (
+                                <span
+                                  key={email}
+                                  className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600"
+                                >
+                                  {email}
+                                </span>
+                              ))}
+                              {extraEmails > 0 ? (
+                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600">
+                                  +{extraEmails}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-[11px] text-slate-400">
+                              Sem emails cadastrados.
+                            </p>
+                          )}
                         </div>
-                        <span className="text-[11px] text-slate-500">
+                        <span className="text-[11px] font-semibold text-slate-500">
                           {regrasDoPrestador.length} regra(s)
                         </span>
                       </div>
@@ -747,7 +773,23 @@ export default function PrestadoresPage() {
               </p>
             )}
             {selectedPrestador ? (
-              <div className="mt-3 space-y-2 text-xs text-slate-600">
+              <div className="mt-3 space-y-3 text-xs text-slate-600">
+                <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Prestador selecionado
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-slate-900">
+                    {selectedPrestador.nome}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-600">
+                    <span className="rounded-full bg-white px-2 py-1">
+                      {selectedPrestador.usuarios.length} e-mail(s)
+                    </span>
+                    <span className="rounded-full bg-white px-2 py-1">
+                      {selectedPrestador.tipo_servico}
+                    </span>
+                  </div>
+                </div>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="space-y-2">
                     <p>
@@ -774,7 +816,7 @@ export default function PrestadoresPage() {
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                       E-mails do prestador
                     </p>
-                    <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-slate-500">
+                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
                       <span className="rounded-full bg-slate-100 px-2 py-1">
                         {selectedPrestador.usuarios.length} e-mail(s)
                       </span>
@@ -820,13 +862,15 @@ export default function PrestadoresPage() {
                           Nenhum e-mail vinculado.
                         </p>
                       ) : (
-                        <ul className="mt-2 space-y-1 text-[11px] text-slate-600">
+                        <ul className="mt-2 space-y-2 text-sm text-slate-700">
                           {selectedPrestador.usuarios.map((usuario) => (
                             <li
                               key={usuario}
                               className="flex items-center justify-between gap-2"
                             >
-                              <span>{usuario}</span>
+                              <span className="rounded-full bg-slate-100 px-3 py-1">
+                                {usuario}
+                              </span>
                               <button
                                 type="button"
                                 onClick={() => void handleEmailRemove(usuario)}
