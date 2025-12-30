@@ -249,12 +249,12 @@ export default function AppShell({
             <div className="mt-4 grid gap-4 text-sm text-slate-600 lg:grid-cols-2">
               <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Formulario
+                  Formulário
                 </p>
                 <ul className="mt-2 space-y-1">
-                  <li>Escolha o tipo de formulario e envie os documentos.</li>
-                  <li>Use o prestador correto ao preencher as informacoes.</li>
-                  <li>Consulte o historico de envios do seu grupo.</li>
+                  <li>Escolha o tipo de formulário e envie os documentos.</li>
+                  <li>Use o prestador correto ao preencher as informações.</li>
+                  <li>Consulte o histórico de envios do seu grupo.</li>
                 </ul>
               </div>
               <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
@@ -263,8 +263,8 @@ export default function AppShell({
                 </p>
                 <ul className="mt-2 space-y-1">
                   <li>Veja documentos enviados e seus status.</li>
-                  <li>Filtre por tipo, periodo e prestador.</li>
-                  <li>Abra, baixe ou assine quando aplicavel.</li>
+                  <li>Filtre por tipo, período e prestador.</li>
+                  <li>Abra, baixe ou assine quando aplicável.</li>
                 </ul>
               </div>
               <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
@@ -274,7 +274,7 @@ export default function AppShell({
                 <ul className="mt-2 space-y-1">
                   <li>Cadastre prestadores com nome, tipo e CNPJ.</li>
                   <li>Adicione e-mails autorizados por prestador.</li>
-                  <li>Crie regras de monitoramento por periodo.</li>
+                  <li>Crie regras de monitoramento por período.</li>
                 </ul>
               </div>
               <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
@@ -283,18 +283,18 @@ export default function AppShell({
                 </p>
                 <ul className="mt-2 space-y-1">
                   <li>Acompanhe volume de envios e metas.</li>
-                  <li>Analise por mes, ano e tipo de servico.</li>
-                  <li>Use os graficos para identificar tendencias.</li>
+                  <li>Analise por mês, ano e tipo de serviço.</li>
+                  <li>Use os gráficos para identificar tendências.</li>
                 </ul>
               </div>
               <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Permissoes
+                  Permissões
                 </p>
                 <ul className="mt-2 space-y-1">
-                  <li>Conceda acesso por modulo e e-mail.</li>
-                  <li>Revise permissoes periodicamente.</li>
-                  <li>Remova acessos quando necessario.</li>
+                  <li>Conceda acesso por módulo e e-mail.</li>
+                  <li>Revise permissões periodicamente.</li>
+                  <li>Remova acessos quando necessário.</li>
                 </ul>
               </div>
               <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
@@ -303,7 +303,7 @@ export default function AppShell({
                 </p>
                 <ul className="mt-2 space-y-1">
                   <li>Gerencie assinatura e dados pessoais.</li>
-                  <li>Atualize suas preferencias quando precisar.</li>
+                  <li>Atualize suas preferências quando precisar.</li>
                 </ul>
               </div>
             </div>
