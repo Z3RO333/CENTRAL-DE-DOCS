@@ -312,11 +312,6 @@ export default function DashboardPage() {
     }
   }, [user, prestadoresLoading, carregarRegras]);
 
-  const historicoRecentes = useMemo(
-    () => historicoFiltrado,
-    [historicoFiltrado],
-  );
-
   const historicoTipoOptions = useMemo(() => {
     const extras = Array.from(new Set(historico.map((item) => item.tipo)))
       .filter((tipo) => !(tipo in tipoLabel))
@@ -416,6 +411,11 @@ export default function DashboardPage() {
     historicoStatusFilter,
     isDentroPeriodoGlobal,
   ]);
+
+  const historicoRecentes = useMemo(
+    () => historicoFiltrado,
+    [historicoFiltrado],
+  );
 
   const historicoParaMetas = useMemo(() => {
     return historico.filter((item) => {
