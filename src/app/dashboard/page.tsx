@@ -673,23 +673,23 @@ export default function DashboardPage() {
               Filtros globais
             </p>
             <span className="text-[11px] text-slate-500">
-              Ajuste os filtros para todas as visualizacoes do dashboard.
+              Ajuste os filtros para todas as visualizações do dashboard.
             </span>
           </div>
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="text-xs font-semibold text-slate-600">
-            Periodo
+            Período
             <select
               value={historicoPeriodoFilter}
               onChange={(event) => setHistoricoPeriodoFilter(event.target.value)}
               className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             >
-              <option value="ultimos_30_dias">Ultimos 30 dias</option>
-              <option value="ultimos_90_dias">Ultimos 90 dias</option>
-              <option value="mes_atual">Mes atual</option>
+              <option value="ultimos_30_dias">Últimos 30 dias</option>
+              <option value="ultimos_90_dias">Últimos 90 dias</option>
+              <option value="mes_atual">Mês atual</option>
               <option value="ano_atual">Ano atual</option>
-              <option value="todos">Todos os periodos</option>
+              <option value="todos">Todos os períodos</option>
             </select>
           </label>
           <label className="text-xs font-semibold text-slate-600">
@@ -810,7 +810,7 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Visao rapida
+              Visão rápida
             </p>
             <span className="text-[11px] text-slate-500">
               Indicadores gerais dos envios do seu grupo.
@@ -892,7 +892,7 @@ export default function DashboardPage() {
 
           <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Envios nos ultimos 30 dias
+              Envios nos últimos 30 dias
             </p>
             <div className="mt-3 flex h-24 items-end gap-1">
               {enviosUltimos30Dias.map((item) => {
@@ -968,7 +968,7 @@ export default function DashboardPage() {
             </span>
           </div>
           <span className="text-[11px] text-slate-400">
-            Mostrando {historicoRecentes.length} registro(s) apos filtros
+            Mostrando {historicoRecentes.length} registro(s) após filtros
           </span>
         </div>
 
@@ -1052,7 +1052,7 @@ export default function DashboardPage() {
               Progresso por prestador
             </p>
             <span className="text-[11px] text-slate-500">
-              Monitoramento de envios no periodo da regra (mensal/anual).
+              Monitoramento de envios no período da regra (mensal/anual).
             </span>
           </div>
           <span className="text-[11px] text-slate-400">
@@ -1070,7 +1070,7 @@ export default function DashboardPage() {
           </p>
         ) : prestadoresProgresso.length === 0 ? (
           <p className="mt-4 text-xs text-slate-500">
-            Nenhum prestador vinculado ao seu usuario.
+            Nenhum prestador vinculado ao seu usuário.
           </p>
         ) : (
           <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -1127,7 +1127,7 @@ export default function DashboardPage() {
                             Faltam {faltam} envio(s)
                           </p>
                           <p className="text-[11px] text-slate-500">
-                            {Math.round(percentual)}% no {regra.periodo === "mensal" ? "mes" : "ano"} atual
+                            {Math.round(percentual)}% no {regra.periodo === "mensal" ? "mês" : "ano"} atual
                           </p>
                         </div>
                       );
