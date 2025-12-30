@@ -640,7 +640,7 @@ export default function PrestadoresPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2 lg:items-start lg:gap-8">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-start lg:gap-10">
         <div className="space-y-6">
           <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm shadow-slate-100">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
@@ -662,11 +662,16 @@ export default function PrestadoresPage() {
                 Carregando prestadores...
               </p>
             ) : prestadores.length === 0 ? (
-              <p className="mt-3 text-xs text-slate-500">
-                Nenhum prestador cadastrado ainda.
-              </p>
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
+                <p className="text-sm font-semibold text-slate-700">
+                  Nenhum prestador cadastrado ainda.
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Cadastre um prestador para ver nome e e-mails destacados aqui.
+                </p>
+              </div>
             ) : (
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="mt-4 grid gap-3 md:grid-cols-1 xl:grid-cols-2">
                 {prestadores.map((prestador, index) => {
                   const regrasDoPrestador =
                     regrasPorPrestador[prestador.id] ?? [];
@@ -685,7 +690,7 @@ export default function PrestadoresPage() {
                       key={prestador.id}
                       type="button"
                       onClick={() => setSelectedPrestadorId(prestador.id)}
-                      className={`relative overflow-hidden text-left rounded-2xl border px-4 py-4 transition ${
+                      className={`relative min-h-[160px] overflow-hidden text-left rounded-2xl border px-4 py-4 transition ${
                         selectedPrestadorId === prestador.id
                           ? "border-sky-300 bg-white shadow-sm shadow-sky-100"
                           : "border-slate-100 bg-white hover:border-slate-200"
@@ -709,13 +714,13 @@ export default function PrestadoresPage() {
                               {emailsPreview.map((email) => (
                                 <span
                                   key={email}
-                                  className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600"
+                                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600"
                                 >
                                   {email}
                                 </span>
                               ))}
                               {extraEmails > 0 ? (
-                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600">
+                                <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] text-slate-600">
                                   +{extraEmails}
                                 </span>
                               ) : null}
@@ -778,14 +783,14 @@ export default function PrestadoresPage() {
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     Prestador selecionado
                   </p>
-                  <p className="mt-1 text-lg font-semibold text-slate-900">
+                  <p className="mt-1 text-xl font-semibold text-slate-900 md:text-2xl">
                     {selectedPrestador.nome}
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-600">
-                    <span className="rounded-full bg-white px-2 py-1">
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+                    <span className="rounded-full bg-white px-3 py-1">
                       {selectedPrestador.usuarios.length} e-mail(s)
                     </span>
-                    <span className="rounded-full bg-white px-2 py-1">
+                    <span className="rounded-full bg-white px-3 py-1">
                       {selectedPrestador.tipo_servico}
                     </span>
                   </div>
