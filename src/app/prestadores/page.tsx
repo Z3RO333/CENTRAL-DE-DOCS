@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
@@ -74,7 +74,7 @@ export default function PrestadoresPage() {
 
   const formularioOptions = [
     { value: "registro_laudos", label: "Registro e Laudos" },
-    { value: "retencao_trabalhista", label: "Retencao Trabalhista" },
+    { value: "retencao_trabalhista", label: "Retenção Trabalhista" },
     { value: "notas_fiscais", label: "Notas Fiscais" },
   ];
   const alvoSugestoes = useMemo(
@@ -120,7 +120,7 @@ export default function PrestadoresPage() {
       }
       const token = data.session?.access_token;
       if (!token) {
-        throw new Error("Sessao expirada. Faca login novamente.");
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
       const params = new URLSearchParams();
       prestadores.forEach((prestador) => params.append("prestadorId", prestador.id));
@@ -138,12 +138,12 @@ export default function PrestadoresPage() {
         error?: string;
       };
       if (!response.ok) {
-        throw new Error(payload.error ?? "Nao foi possivel carregar as regras.");
+        throw new Error(payload.error ?? "Não foi possível carregar as regras.");
       }
       setRegras(payload.regras ?? []);
     } catch (err) {
       setRegrasError(
-        err instanceof Error ? err.message : "Nao foi possivel carregar as regras.",
+        err instanceof Error ? err.message : "Não foi possível carregar as regras.",
       );
     } finally {
       setRegrasLoading(false);
@@ -310,7 +310,7 @@ export default function PrestadoresPage() {
     }
     if (!Number.isFinite(quantidade) || quantidade <= 0) {
       setRegraFeedback({
-        error: "Informe uma quantidade valida.",
+        error: "Informe uma quantidade válida.",
         success: null,
       });
       return;
@@ -323,7 +323,7 @@ export default function PrestadoresPage() {
       }
       const token = data.session?.access_token;
       if (!token) {
-        throw new Error("Sessao expirada. Faca login novamente.");
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
 
       const response = await fetch("/api/prestador-regras", {
@@ -348,7 +348,7 @@ export default function PrestadoresPage() {
       };
 
       if (!response.ok || !payload.regra) {
-        throw new Error(payload.error ?? "Nao foi possivel cadastrar a regra.");
+        throw new Error(payload.error ?? "Não foi possível cadastrar a regra.");
       }
 
       setRegraFeedback({
@@ -366,7 +366,7 @@ export default function PrestadoresPage() {
         error:
           err instanceof Error
             ? err.message
-            : "Nao foi possivel cadastrar a regra.",
+            : "Não foi possível cadastrar a regra.",
         success: null,
       });
     }
@@ -391,7 +391,7 @@ export default function PrestadoresPage() {
 
     if (emails.length === 0) {
       setEmailsFeedback({
-        error: "Informe ao menos um e-mail valido.",
+        error: "Informe ao menos um e-mail válido.",
         success: null,
       });
       return;
@@ -412,7 +412,7 @@ export default function PrestadoresPage() {
       }
       const token = data.session?.access_token;
       if (!token) {
-        throw new Error("Sessao expirada. Faca login novamente.");
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
 
       const response = await fetch("/api/prestadores", {
@@ -432,7 +432,7 @@ export default function PrestadoresPage() {
       };
 
       if (!response.ok) {
-        throw new Error(payload.error ?? "Nao foi possivel atualizar o prestador.");
+        throw new Error(payload.error ?? "Não foi possível atualizar o prestador.");
       }
 
       setEmailsFeedback({
@@ -446,7 +446,7 @@ export default function PrestadoresPage() {
         error:
           err instanceof Error
             ? err.message
-            : "Nao foi possivel atualizar o prestador.",
+            : "Não foi possível atualizar o prestador.",
         success: null,
       });
     }
@@ -468,7 +468,7 @@ export default function PrestadoresPage() {
       }
       const token = data.session?.access_token;
       if (!token) {
-        throw new Error("Sessao expirada. Faca login novamente.");
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
 
       const response = await fetch("/api/prestadores", {
@@ -488,7 +488,7 @@ export default function PrestadoresPage() {
       };
 
       if (!response.ok) {
-        throw new Error(payload.error ?? "Nao foi possivel atualizar o prestador.");
+        throw new Error(payload.error ?? "Não foi possível atualizar o prestador.");
       }
 
       setEmailsFeedback({
@@ -501,7 +501,7 @@ export default function PrestadoresPage() {
         error:
           err instanceof Error
             ? err.message
-            : "Nao foi possivel atualizar o prestador.",
+            : "Não foi possível atualizar o prestador.",
         success: null,
       });
     }
@@ -523,7 +523,7 @@ export default function PrestadoresPage() {
       }
       const token = data.session?.access_token;
       if (!token) {
-        throw new Error("Sessao expirada. Faca login novamente.");
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
 
       const response = await fetch(`/api/prestadores?id=${selectedPrestadorId}`, {
@@ -535,7 +535,7 @@ export default function PrestadoresPage() {
 
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
-        throw new Error(payload.error ?? "Nao foi possivel remover o prestador.");
+        throw new Error(payload.error ?? "Não foi possível remover o prestador.");
       }
 
       setPrestadorFeedback({
@@ -548,7 +548,7 @@ export default function PrestadoresPage() {
     } catch (err) {
       setPrestadorFeedback({
         error:
-          err instanceof Error ? err.message : "Nao foi possivel remover o prestador.",
+          err instanceof Error ? err.message : "Não foi possível remover o prestador.",
         success: null,
       });
     }
@@ -566,7 +566,7 @@ export default function PrestadoresPage() {
       }
       const token = data.session?.access_token;
       if (!token) {
-        throw new Error("Sessao expirada. Faca login novamente.");
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
       const response = await fetch(`/api/prestador-regras?id=${regraId}`, {
         method: "DELETE",
@@ -576,7 +576,7 @@ export default function PrestadoresPage() {
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
-        throw new Error(payload.error ?? "Nao foi possivel remover a regra.");
+        throw new Error(payload.error ?? "Não foi possível remover a regra.");
       }
       setRegraFeedback({
         error: null,
@@ -586,7 +586,7 @@ export default function PrestadoresPage() {
     } catch (err) {
       setRegraFeedback({
         error:
-          err instanceof Error ? err.message : "Nao foi possivel remover a regra.",
+          err instanceof Error ? err.message : "Não foi possível remover a regra.",
         success: null,
       });
     }
@@ -608,7 +608,7 @@ export default function PrestadoresPage() {
           href="/dashboard"
           className="inline-flex items-center rounded-full border border-slate-200 px-4 py-1.5 text-xs font-medium text-slate-600 transition hover:border-sky-400 hover:text-sky-600"
         >
-          Voltar para formularios
+          Voltar para formulários
         </Link>
       </div>
 
@@ -708,7 +708,7 @@ export default function PrestadoresPage() {
                         <p className="mt-2 text-[11px] text-slate-500">
                           Regra destaque: {labelDestaque} -{" "}
                           {regraDestaque?.quantidade} /{" "}
-                          {regraDestaque?.periodo === "mensal" ? "mes" : "ano"}
+                          {regraDestaque?.periodo === "mensal" ? "mês" : "ano"}
                         </p>
                       ) : (
                         <p className="mt-2 text-[11px] text-slate-500">
@@ -752,7 +752,7 @@ export default function PrestadoresPage() {
                   <div className="space-y-2">
                     <p>
                       <span className="font-semibold text-slate-700">
-                        Tipo de servico:
+                        Tipo de serviço:
                       </span>{" "}
                       {selectedPrestador.tipo_servico}
                     </p>
@@ -781,7 +781,7 @@ export default function PrestadoresPage() {
                       <span className="rounded-full bg-slate-100 px-2 py-1">
                         {selectedPrestador.usuarios.length > 0
                           ? "Grupo ativo"
-                          : "Sem usuarios"}
+                          : "Sem usuários"}
                       </span>
                     </div>
                     <form onSubmit={handleEmailsSubmit} className="mt-2 space-y-2">
@@ -813,7 +813,7 @@ export default function PrestadoresPage() {
                     </form>
                     <div className="mt-3">
                       <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        Usuarios vinculados
+                        Usuários vinculados
                       </span>
                       {selectedPrestador.usuarios.length === 0 ? (
                         <p className="mt-1 text-[11px] text-slate-500">
@@ -876,7 +876,7 @@ export default function PrestadoresPage() {
                                 </button>
                               </div>
                               <p className="mt-1 text-[11px] text-slate-500">
-                                Meta: {regra.quantidade} no periodo {regra.periodo === "mensal" ? "mensal" : "anual"}
+                                Meta: {regra.quantidade} no período {regra.periodo === "mensal" ? "mensal" : "anual"}
                               </p>
                             </div>
                           );
@@ -916,12 +916,12 @@ export default function PrestadoresPage() {
                     handlePrestadorFieldChange("nome", event.target.value)
                   }
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                  placeholder="Ex.: Laboratorio XPTO"
+                  placeholder="Ex.: Laboratório XPTO"
                   required
                 />
               </label>
               <label className="text-xs font-semibold text-slate-600">
-                Tipo de servico
+                Tipo de serviço
                 <input
                   type="text"
                   value={prestadorForm.tipoServico}
@@ -929,7 +929,7 @@ export default function PrestadoresPage() {
                     handlePrestadorFieldChange("tipoServico", event.target.value)
                   }
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                  placeholder="Ex.: Laudos tecnicos"
+                  placeholder="Ex.: Laudos técnicos"
                   required
                 />
               </label>
@@ -947,7 +947,7 @@ export default function PrestadoresPage() {
                 />
               </label>
               <label className="text-xs font-semibold text-slate-600">
-                Usuarios autorizados
+                Usuários autorizados
                 <textarea
                   value={prestadorForm.usuarios}
                   onChange={(event) =>
@@ -957,7 +957,7 @@ export default function PrestadoresPage() {
                   placeholder="Ex.: ana@empresa.com, bruno@empresa.com"
                 />
                 <span className="text-[11px] text-slate-500">
-                  Digite os e-mails de quem podera usar esse prestador no formulario.
+                  Digite os e-mails de quem poderá usar esse prestador no formulário.
                 </span>
               </label>
             </div>
@@ -986,7 +986,7 @@ export default function PrestadoresPage() {
               </span>
             </p>
             <p className="text-[11px] text-slate-500">
-              Informe o alvo da regra e a quantidade por periodo.
+              Informe o alvo da regra e a quantidade por período.
             </p>
             {(regraFeedback.error || regraFeedback.success) && (
               <div
@@ -1009,7 +1009,7 @@ export default function PrestadoresPage() {
                     handleRegraFieldChange("alvo", event.target.value)
                   }
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                  placeholder="Ex.: refrigeracao, notas_fiscais, retencao_trabalhista"
+                  placeholder="Ex.: refrigeração, notas_fiscais, retencao_trabalhista"
                   list="regra-alvos-sugestoes"
                   required
                 />
@@ -1020,7 +1020,7 @@ export default function PrestadoresPage() {
                 ))}
               </datalist>
               <label className="text-xs font-semibold text-slate-600">
-                Periodo
+                Período
                 <select
                   value={regraForm.periodo}
                   onChange={(event) =>
@@ -1054,7 +1054,7 @@ export default function PrestadoresPage() {
                     handleRegraFieldChange("label", event.target.value)
                   }
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                  placeholder="Ex.: Refrigeracao mensal"
+                  placeholder="Ex.: Refrigeração mensal"
                 />
               </label>
             </div>
@@ -1072,3 +1072,4 @@ export default function PrestadoresPage() {
     </div>
   );
 }
+
