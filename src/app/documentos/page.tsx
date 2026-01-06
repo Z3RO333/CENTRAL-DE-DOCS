@@ -199,6 +199,21 @@ const getCampoTexto = (
   return null;
 };
 
+const getDocumentoNome = (registro: FormularioRecord) => {
+  const anexos = registro.dados?.anexos;
+  if (Array.isArray(anexos) && anexos.length > 0) {
+    const primeiro = anexos[0] as { nome?: unknown } | null;
+    if (primeiro && typeof primeiro.nome === "string" && primeiro.nome.trim()) {
+      return primeiro.nome.trim();
+    }
+  }
+  const path = registro.arquivo_assinado_path ?? registro.arquivo_path;
+  if (path) {
+    return path.split("/").pop() ?? path;
+  }
+  return registro.id;
+};
+
 const formatDateTime = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -1283,6 +1298,7 @@ export default function DocumentosPage() {
                   const identificacaoConfig = getIdentificacaoConfig(
                     registro.tipo,
                   );
+                  const nomeDocumento = getDocumentoNome(registro);
                   const identificacaoValor =
                     getIdentificacaoValor(registro) ??
                     `${identificacaoConfig.label} não informado`;
@@ -1305,8 +1321,11 @@ export default function DocumentosPage() {
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <p className="font-mono text-xs text-slate-500">
-                          {registro.id}
+                        <p
+                          className="text-sm font-semibold text-slate-900"
+                          title={nomeDocumento}
+                        >
+                          {nomeDocumento}
                         </p>
                       </td>
                       <td className="px-4 py-3">
@@ -1385,6 +1404,7 @@ export default function DocumentosPage() {
         <div className="grid gap-4 md:grid-cols-2">
           {registrosFiltrados.map((registro) => {
             const identificacaoConfig = getIdentificacaoConfig(registro.tipo);
+            const nomeDocumento = getDocumentoNome(registro);
             const identificacaoValor =
               getIdentificacaoValor(registro) ??
               `${identificacaoConfig.label} não informado`;
@@ -1405,8 +1425,11 @@ export default function DocumentosPage() {
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Documento
                     </p>
-                    <p className="font-mono text-xs text-slate-500">
-                      {registro.id}
+                    <p
+                      className="text-sm font-semibold text-slate-900"
+                      title={nomeDocumento}
+                    >
+                      {nomeDocumento}
                     </p>
                   </div>
                   <label className="flex items-center gap-2 text-xs text-slate-500">

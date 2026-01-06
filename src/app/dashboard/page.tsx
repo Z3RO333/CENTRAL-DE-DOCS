@@ -47,8 +47,6 @@ export default function DashboardPage() {
   const [historicoErro, setHistoricoErro] = useState<string | null>(null);
   const [historicoTipoFilter, setHistoricoTipoFilter] = useState("todos");
   const [historicoStatusFilter, setHistoricoStatusFilter] = useState("todos");
-  const [historicoPrestadorFilter, setHistoricoPrestadorFilter] =
-    useState("todos");
   const [historicoPeriodoFilter, setHistoricoPeriodoFilter] =
     useState("ultimos_30_dias");
   const [regras, setRegras] = useState<PrestadorRegra[]>([]);
@@ -348,14 +346,10 @@ export default function DashboardPage() {
     });
   }, [historico]);
 
-  const prestadoresFiltrados = useMemo(() => {
-    if (historicoPrestadorFilter === "todos") {
-      return prestadoresDoUsuario;
-    }
-    return prestadoresDoUsuario.filter(
-      (prestador) => prestador.id === historicoPrestadorFilter,
-    );
-  }, [prestadoresDoUsuario, historicoPrestadorFilter]);
+  const prestadoresFiltrados = useMemo(
+    () => prestadoresDoUsuario,
+    [prestadoresDoUsuario],
+  );
 
   const isDentroPeriodoGlobal = useCallback(
     (dateValue: string) => {
@@ -387,12 +381,6 @@ export default function DashboardPage() {
 
   const historicoFiltrado = useMemo(() => {
     return historico.filter((item) => {
-      if (
-        historicoPrestadorFilter !== "todos" &&
-        item.prestador_id !== historicoPrestadorFilter
-      ) {
-        return false;
-      }
       if (historicoTipoFilter !== "todos" && item.tipo !== historicoTipoFilter) {
         return false;
       }
@@ -406,7 +394,6 @@ export default function DashboardPage() {
     });
   }, [
     historico,
-    historicoPrestadorFilter,
     historicoTipoFilter,
     historicoStatusFilter,
     isDentroPeriodoGlobal,
@@ -419,12 +406,6 @@ export default function DashboardPage() {
 
   const historicoParaMetas = useMemo(() => {
     return historico.filter((item) => {
-      if (
-        historicoPrestadorFilter !== "todos" &&
-        item.prestador_id !== historicoPrestadorFilter
-      ) {
-        return false;
-      }
       if (historicoTipoFilter !== "todos" && item.tipo !== historicoTipoFilter) {
         return false;
       }
@@ -438,7 +419,6 @@ export default function DashboardPage() {
     });
   }, [
     historico,
-    historicoPrestadorFilter,
     historicoTipoFilter,
     historicoStatusFilter,
     isDentroPeriodoGlobal,
@@ -690,21 +670,6 @@ export default function DashboardPage() {
               <option value="mes_atual">Mês atual</option>
               <option value="ano_atual">Ano atual</option>
               <option value="todos">Todos os períodos</option>
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-slate-600">
-            Prestador
-            <select
-              value={historicoPrestadorFilter}
-              onChange={(event) => setHistoricoPrestadorFilter(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            >
-              <option value="todos">Todos os prestadores</option>
-              {prestadoresDoUsuario.map((prestador) => (
-                <option key={prestador.id} value={prestador.id}>
-                  {prestador.nome}
-                </option>
-              ))}
             </select>
           </label>
           <label className="text-xs font-semibold text-slate-600">
