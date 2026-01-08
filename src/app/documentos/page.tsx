@@ -70,6 +70,19 @@ const FORM_FILTER_CARDS: FilterCardConfig[] = [
 const TIPO_ASSINAVEL = "registro_laudos";
 const STORAGE_BUCKET = "formularios";
 const SIGNED_URL_EXPIRES_IN = 60 * 30;
+const LIST_STATE_STORAGE_KEY = "documentos:list-state";
+
+type DocumentosListState = {
+  tipoFilter: string;
+  statusFilter: string;
+  identificacaoFilter: string;
+  anoFilter: string;
+  mesFilter: string;
+  somenteAssinados: boolean;
+  somenteDisponiveisLote: boolean;
+  viewMode: "tabela" | "cards";
+  scrollY: number;
+};
 
 const normalizeRegistroStatus = (registro: FormularioRecord) => {
   if (registro.tipo !== TIPO_ASSINAVEL && registro.status === "pendente") {
@@ -199,6 +212,12 @@ const getCampoTexto = (
   return null;
 };
 
+const getTipoLaudo = (registro: FormularioRecord) =>
+  getCampoTexto(registro.dados, ["tipo_laudo"]);
+
+const getObservacoes = (registro: FormularioRecord) =>
+  getCampoTexto(registro.dados, ["observacoes"]);
+
 const getDocumentoNome = (registro: FormularioRecord) => {
   const anexos = registro.dados?.anexos;
   if (Array.isArray(anexos) && anexos.length > 0) {
@@ -257,8 +276,10 @@ export default function DocumentosPage() {
   const [viewMode, setViewMode] = useState<"tabela" | "cards">("tabela");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingBatch, setDeletingBatch] = useState(false);
+  const [hasRestoredState, setHasRestoredState] = useState(false);
   const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const listStateRef = useRef<DocumentosListState | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     type: "single" | "batch";
     registro?: FormularioRecord;
@@ -302,6 +323,119 @@ export default function DocumentosPage() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [confirmDialog]);
+
+  useEffect(() => {
+    if (hasRestoredState || typeof window === "undefined") {
+      return;
+    }
+
+    const raw = window.sessionStorage.getItem(LIST_STATE_STORAGE_KEY);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as Partial<DocumentosListState>;
+        if (parsed.tipoFilter) {
+          setTipoFilter(parsed.tipoFilter);
+        }
+        if (parsed.statusFilter) {
+          setStatusFilter(parsed.statusFilter);
+        }
+        if (typeof parsed.identificacaoFilter === "string") {
+          setIdentificacaoFilter(parsed.identificacaoFilter);
+        }
+        if (parsed.anoFilter) {
+          setAnoFilter(parsed.anoFilter);
+        }
+        if (parsed.mesFilter) {
+          setMesFilter(parsed.mesFilter);
+        }
+        if (typeof parsed.somenteAssinados === "boolean") {
+          setSomenteAssinados(parsed.somenteAssinados);
+        }
+        if (typeof parsed.somenteDisponiveisLote === "boolean") {
+          setSomenteDisponiveisLote(parsed.somenteDisponiveisLote);
+        }
+        if (parsed.viewMode === "tabela" || parsed.viewMode === "cards") {
+          setViewMode(parsed.viewMode);
+        }
+        if (typeof parsed.scrollY === "number") {
+          window.requestAnimationFrame(() => {
+            window.scrollTo(0, parsed.scrollY ?? 0);
+          });
+        }
+        listStateRef.current = {
+          tipoFilter: parsed.tipoFilter ?? "todos",
+          statusFilter: parsed.statusFilter ?? "todos",
+          identificacaoFilter: parsed.identificacaoFilter ?? "",
+          anoFilter: parsed.anoFilter ?? anoAtual,
+          mesFilter: parsed.mesFilter ?? mesAtual,
+          somenteAssinados: parsed.somenteAssinados ?? false,
+          somenteDisponiveisLote: parsed.somenteDisponiveisLote ?? false,
+          viewMode: parsed.viewMode === "cards" ? "cards" : "tabela",
+          scrollY: parsed.scrollY ?? 0,
+        };
+      } catch {
+        window.sessionStorage.removeItem(LIST_STATE_STORAGE_KEY);
+      }
+    }
+
+    setHasRestoredState(true);
+  }, [hasRestoredState]);
+
+  useEffect(() => {
+    if (!hasRestoredState || typeof window === "undefined") {
+      return;
+    }
+
+    const next: DocumentosListState = {
+      tipoFilter,
+      statusFilter,
+      identificacaoFilter,
+      anoFilter,
+      mesFilter,
+      somenteAssinados,
+      somenteDisponiveisLote,
+      viewMode,
+      scrollY: listStateRef.current?.scrollY ?? window.scrollY,
+    };
+
+    listStateRef.current = next;
+    window.sessionStorage.setItem(
+      LIST_STATE_STORAGE_KEY,
+      JSON.stringify(next),
+    );
+  }, [
+    hasRestoredState,
+    tipoFilter,
+    statusFilter,
+    identificacaoFilter,
+    anoFilter,
+    mesFilter,
+    somenteAssinados,
+    somenteDisponiveisLote,
+    viewMode,
+  ]);
+
+  useEffect(() => {
+    if (!hasRestoredState || typeof window === "undefined") {
+      return;
+    }
+
+    const handleScroll = () => {
+      const current = listStateRef.current;
+      if (!current) {
+        return;
+      }
+      const next = { ...current, scrollY: window.scrollY };
+      listStateRef.current = next;
+      window.sessionStorage.setItem(
+        LIST_STATE_STORAGE_KEY,
+        JSON.stringify(next),
+      );
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [hasRestoredState]);
 
   useEffect(() => {
     if (authLoading || accessLoading) {
@@ -420,13 +554,10 @@ export default function DocumentosPage() {
 
     try {
       const signedUrl = await getSignedFileUrl(path);
-      const anchor = document.createElement("a");
-      anchor.href = signedUrl;
-      anchor.target = "_blank";
-      anchor.rel = "noopener noreferrer";
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
+      const opened = window.open(signedUrl, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        setError("Não foi possível abrir o documento. Verifique o bloqueador de pop-up.");
+      }
     } catch (err) {
       console.error("Erro ao abrir documento:", err);
       setError("Não foi possível abrir o documento. Tente novamente.");
@@ -1288,6 +1419,8 @@ export default function DocumentosPage() {
                   <th className="px-4 py-3 text-left">Documento</th>
                   <th className="px-4 py-3 text-left">Identificação</th>
                   <th className="px-4 py-3 text-left">Tipo</th>
+                  <th className="px-4 py-3 text-left">Tipo de laudo</th>
+                  <th className="px-4 py-3 text-left">ObservaÇõÇæes</th>
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-left">Enviado em</th>
                   <th className="px-4 py-3 text-right">Ações</th>
@@ -1304,6 +1437,8 @@ export default function DocumentosPage() {
                     `${identificacaoConfig.label} não informado`;
                   const identificacaoComplemento =
                     getIdentificacaoComplemento(registro);
+                  const tipoLaudo = getTipoLaudo(registro);
+                  const observacoes = getObservacoes(registro);
                   const isSelecionavel =
                     registro.tipo === TIPO_ASSINAVEL &&
                     registro.status !== "assinado";
@@ -1343,6 +1478,16 @@ export default function DocumentosPage() {
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-600">
                         {getTipoDescricao(registro.tipo)}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-500">
+                        {registro.tipo === TIPO_ASSINAVEL && tipoLaudo
+                          ? tipoLaudo
+                          : "-"}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-500">
+                        {registro.tipo === TIPO_ASSINAVEL && observacoes
+                          ? observacoes
+                          : "-"}
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -1410,6 +1555,8 @@ export default function DocumentosPage() {
               `${identificacaoConfig.label} não informado`;
             const identificacaoComplemento =
               getIdentificacaoComplemento(registro);
+            const tipoLaudo = getTipoLaudo(registro);
+            const observacoes = getObservacoes(registro);
             const isSelecionavel =
               registro.tipo === TIPO_ASSINAVEL &&
               registro.status !== "assinado";
@@ -1462,6 +1609,22 @@ export default function DocumentosPage() {
                     </p>
                     <p>{getTipoDescricao(registro.tipo)}</p>
                   </div>
+                  {registro.tipo === TIPO_ASSINAVEL && tipoLaudo && (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500">
+                        Tipo de laudo
+                      </p>
+                      <p>{tipoLaudo}</p>
+                    </div>
+                  )}
+                  {registro.tipo === TIPO_ASSINAVEL && observacoes && (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500">
+                        ObservaÇõÇæes
+                      </p>
+                      <p className="text-xs text-slate-500">{observacoes}</p>
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-2">
                     <span
                       className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${

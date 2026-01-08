@@ -25,6 +25,7 @@ type FormularioRecord = {
   arquivo_assinado_path?: string | null;
   created_at: string;
   assinado_por?: string | null;
+  dados?: Record<string, unknown> | null;
 };
 
 const tipoLabel: Record<string, string> = {
@@ -44,6 +45,22 @@ const resolveSignedPdfPath = (path?: string | null) => {
     return path.replace(/\.html$/, ".pdf");
   }
   return path;
+};
+
+const getCampoTexto = (
+  dados: Record<string, unknown> | null | undefined,
+  campos: string[],
+): string | null => {
+  if (!dados) {
+    return null;
+  }
+  for (const campo of campos) {
+    const valor = dados[campo];
+    if (typeof valor === "string" && valor.trim()) {
+      return valor.trim();
+    }
+  }
+  return null;
 };
 
 const SIGNATURE_STORAGE_PREFIX = "digital-signature:";
@@ -321,6 +338,7 @@ export default function AssinaturaDocumentoPage() {
           arquivo_assinado_path: data.arquivo_assinado_path as string | null,
           created_at: data.created_at as string,
           assinado_por: data.assinado_por as string | null,
+          dados: (data.dados as Record<string, unknown> | null) ?? null,
         };
 
         if (!active) {
@@ -745,6 +763,16 @@ export default function AssinaturaDocumentoPage() {
     document.body.removeChild(link);
   };
 
+  const tipoLaudo =
+    registro?.tipo === "registro_laudos"
+      ? getCampoTexto(registro.dados, ["tipo_laudo"])
+      : null;
+  const observacoes =
+    registro?.tipo === "registro_laudos"
+      ? getCampoTexto(registro.dados, ["observacoes"])
+      : null;
+  const exibirInfosFormulario = Boolean(tipoLaudo || observacoes);
+
   if (authLoading || accessLoading || loading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
@@ -804,6 +832,34 @@ export default function AssinaturaDocumentoPage() {
           {registro.status === "assinado" ? "Assinado" : "Pendente"}
         </span>
       </div>
+
+      {exibirInfosFormulario && (
+        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 text-xs text-slate-600 shadow-sm shadow-slate-200">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Informacoes do formulario
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {tipoLaudo && (
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500">
+                  Tipo de laudo
+                </p>
+                <p className="text-sm font-semibold text-slate-800">
+                  {tipoLaudo}
+                </p>
+              </div>
+            )}
+            {observacoes && (
+              <div className="sm:col-span-2">
+                <p className="text-[11px] font-semibold text-slate-500">
+                  Observacoes
+                </p>
+                <p className="text-sm text-slate-600">{observacoes}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {batchActive && (
         <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 text-xs text-slate-600 shadow-sm shadow-slate-200">

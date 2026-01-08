@@ -21,6 +21,81 @@ type DashboardCard = {
   border: string;
 };
 
+const STATUS_LABEL_MAP: Record<string, string> = {
+  pendente: "Pendente",
+  em_analise: "Em análise",
+  assinado: "Assinado",
+};
+
+const TIPO_LABEL: Record<string, string> = {
+  retencao_trabalhista: "Retenção Trabalhista",
+  registro_laudos: "Registro e Laudos",
+  notas_fiscais: "Notas Fiscais",
+};
+
+const STORAGE_BUCKET = "formularios";
+const SIGNED_URL_EXPIRES_IN = 60 * 30;
+
+const BASE_CARDS: DashboardCard[] = [
+  {
+    slug: "retencao-trabalhista",
+    tipo: "retencao_trabalhista",
+    title: "Retenção Trabalhista",
+    description:
+      "Envio de documentos relacionados à retenção de tributos trabalhistas.",
+    href: "/formulario/retencao-trabalhista",
+    icon: BriefcaseBusiness,
+    accent: "from-sky-100 via-sky-50 to-transparent",
+    border: "border-sky-200",
+  },
+  {
+    slug: "registro-laudos",
+    tipo: "registro_laudos",
+    title: "Registro e Laudos",
+    description: "Formulários para registros técnicos e laudos emitidos.",
+    href: "/formulario/registro-laudos",
+    icon: FileBadge,
+    accent: "from-sky-100 via-sky-50 to-transparent",
+    border: "border-sky-200",
+  },
+  {
+    slug: "notas-fiscais",
+    tipo: "notas_fiscais",
+    title: "Notas Fiscais",
+    description: "Upload e controle de notas fiscais emitidas.",
+    href: "/formulario/notas-fiscais",
+    icon: ReceiptText,
+    accent: "from-sky-100 via-sky-50 to-transparent",
+    border: "border-sky-200",
+  },
+];
+
+const formatData = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "--";
+  }
+  return date.toLocaleString("pt-BR");
+};
+
+const formatStatus = (status: string) =>
+  STATUS_LABEL_MAP[status] ?? status.replace(/_/g, " ");
+
+const formatTipo = (tipo: string) => TIPO_LABEL[tipo] ?? tipo;
+
+const getLocalDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getLocalDateLabel = (date: Date) => {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}/${month}`;
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading, error: authError } = useAuth();
@@ -49,6 +124,7 @@ export default function DashboardPage() {
   const [historicoStatusFilter, setHistoricoStatusFilter] = useState("todos");
   const [historicoPeriodoFilter, setHistoricoPeriodoFilter] =
     useState("ultimos_30_dias");
+  const [historicoVisibleCount, setHistoricoVisibleCount] = useState(20);
   const [regras, setRegras] = useState<PrestadorRegra[]>([]);
   const [regrasLoading, setRegrasLoading] = useState(true);
   const [regrasErro, setRegrasErro] = useState<string | null>(null);
@@ -70,69 +146,7 @@ export default function DashboardPage() {
     );
   }
 
-  const baseCards: DashboardCard[] = useMemo(
-    () => [
-      {
-        slug: "retencao-trabalhista",
-        tipo: "retencao_trabalhista",
-        title: "Retenção Trabalhista",
-        description:
-          "Envio de documentos relacionados à retenção de tributos trabalhistas.",
-        href: "/formulario/retencao-trabalhista",
-        icon: BriefcaseBusiness,
-        accent: "from-sky-100 via-sky-50 to-transparent",
-        border: "border-sky-200",
-      },
-      {
-        slug: "registro-laudos",
-        tipo: "registro_laudos",
-        title: "Registro e Laudos",
-        description: "Formulários para registros técnicos e laudos emitidos.",
-        href: "/formulario/registro-laudos",
-        icon: FileBadge,
-        accent: "from-sky-100 via-sky-50 to-transparent",
-        border: "border-sky-200",
-      },
-      {
-        slug: "notas-fiscais",
-        tipo: "notas_fiscais",
-        title: "Notas Fiscais",
-        description: "Upload e controle de notas fiscais emitidas.",
-        href: "/formulario/notas-fiscais",
-        icon: ReceiptText,
-        accent: "from-sky-100 via-sky-50 to-transparent",
-        border: "border-sky-200",
-      },
-    ],
-    [],
-  );
-  const formatData = (value: string) => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return "--";
-    }
-    return date.toLocaleString("pt-BR");
-  };
-
-  const statusLabelMap: Record<string, string> = {
-    pendente: "Pendente",
-    em_analise: "Em análise",
-    assinado: "Assinado",
-  };
-
-  const formatStatus = (status: string) =>
-    statusLabelMap[status] ?? status.replace(/_/g, " ");
-
-  const tipoLabel: Record<string, string> = {
-    retencao_trabalhista: "Retenção Trabalhista",
-    registro_laudos: "Registro e Laudos",
-    notas_fiscais: "Notas Fiscais",
-  };
-
-  const formatTipo = (tipo: string) => tipoLabel[tipo] ?? tipo;
-
-  const STORAGE_BUCKET = "formularios";
-  const SIGNED_URL_EXPIRES_IN = 60 * 30;
+  const baseCards = BASE_CARDS;
 
   const resolveSignedPdfPath = (path?: string | null) => {
     if (!path) {
@@ -187,7 +201,7 @@ export default function DashboardPage() {
     }
   };
 
-  const carregarHistorico = useCallback(async () => {
+  const carregarHistorico = useCallback(async (signal?: AbortSignal) => {
     if (!user) {
       return;
     }
@@ -216,6 +230,7 @@ export default function DashboardPage() {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal,
       });
       const payload = (await response.json()) as {
         registros?: {
@@ -235,18 +250,26 @@ export default function DashboardPage() {
           payload.error ?? "Não foi possível carregar o histórico.",
         );
       }
+      if (signal?.aborted) {
+        return;
+      }
       setHistorico(payload.registros ?? []);
     } catch (err) {
+      if (signal?.aborted) {
+        return;
+      }
       console.error("Erro ao carregar histórico:", err);
       setHistoricoErro(
         err instanceof Error ? err.message : "Não foi possível carregar o histórico.",
       );
     } finally {
-      setHistoricoLoading(false);
+      if (!signal?.aborted) {
+        setHistoricoLoading(false);
+      }
     }
   }, [user, prestadoresDoUsuario]);
 
-  const carregarRegras = useCallback(async () => {
+  const carregarRegras = useCallback(async (signal?: AbortSignal) => {
     if (!user) {
       return;
     }
@@ -265,7 +288,7 @@ export default function DashboardPage() {
       }
       const token = data.session?.access_token;
       if (!token) {
-        throw new Error("Sessao expirada. Faca login novamente.");
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
       const params = new URLSearchParams();
       prestadoresDoUsuario.forEach((prestador) =>
@@ -279,44 +302,59 @@ export default function DashboardPage() {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal,
       });
       const payload = (await response.json()) as {
         regras?: PrestadorRegra[];
         error?: string;
       };
       if (!response.ok) {
-        throw new Error(payload.error ?? "Nao foi possivel carregar as regras.");
+        throw new Error(payload.error ?? "Não foi possível carregar as regras.");
+      }
+      if (signal?.aborted) {
+        return;
       }
       setRegras(payload.regras ?? []);
     } catch (err) {
+      if (signal?.aborted) {
+        return;
+      }
       console.error("Erro ao carregar regras:", err);
       setRegrasErro(
-        err instanceof Error ? err.message : "Nao foi possivel carregar as regras.",
+        err instanceof Error ? err.message : "Não foi possível carregar as regras.",
       );
     } finally {
-      setRegrasLoading(false);
+      if (!signal?.aborted) {
+        setRegrasLoading(false);
+      }
     }
   }, [prestadoresDoUsuario, user]);
 
   useEffect(() => {
     if (user && !prestadoresLoading) {
-      void carregarHistorico();
+      const controller = new AbortController();
+      void carregarHistorico(controller.signal);
+      return () => controller.abort();
     }
+    return undefined;
   }, [user, prestadoresLoading, carregarHistorico]);
 
   useEffect(() => {
     if (user && !prestadoresLoading) {
-      void carregarRegras();
+      const controller = new AbortController();
+      void carregarRegras(controller.signal);
+      return () => controller.abort();
     }
+    return undefined;
   }, [user, prestadoresLoading, carregarRegras]);
 
   const historicoTipoOptions = useMemo(() => {
     const extras = Array.from(new Set(historico.map((item) => item.tipo)))
-      .filter((tipo) => !(tipo in tipoLabel))
+      .filter((tipo) => !(tipo in TIPO_LABEL))
       .sort();
     return [
       { value: "todos", label: "Todos os tipos" },
-      ...Object.entries(tipoLabel).map(([value, label]) => ({
+      ...Object.entries(TIPO_LABEL).map(([value, label]) => ({
         value,
         label,
       })),
@@ -346,11 +384,6 @@ export default function DashboardPage() {
     });
   }, [historico]);
 
-  const prestadoresFiltrados = useMemo(
-    () => prestadoresDoUsuario,
-    [prestadoresDoUsuario],
-  );
-
   const isDentroPeriodoGlobal = useCallback(
     (dateValue: string) => {
       if (historicoPeriodoFilter === "todos") {
@@ -373,8 +406,11 @@ export default function DashboardPage() {
       const dias =
         historicoPeriodoFilter === "ultimos_90_dias" ? 90 : 30;
       const start = new Date(now);
-      start.setDate(now.getDate() - dias);
-      return date >= start && date <= now;
+      start.setHours(0, 0, 0, 0);
+      start.setDate(start.getDate() - dias);
+      const end = new Date(now);
+      end.setHours(23, 59, 59, 999);
+      return date >= start && date <= end;
     },
     [historicoPeriodoFilter],
   );
@@ -399,30 +435,19 @@ export default function DashboardPage() {
     isDentroPeriodoGlobal,
   ]);
 
-  const historicoRecentes = useMemo(
-    () => historicoFiltrado,
-    [historicoFiltrado],
-  );
-
-  const historicoParaMetas = useMemo(() => {
-    return historico.filter((item) => {
-      if (historicoTipoFilter !== "todos" && item.tipo !== historicoTipoFilter) {
-        return false;
-      }
-      if (
-        historicoStatusFilter !== "todos" &&
-        item.status !== historicoStatusFilter
-      ) {
-        return false;
-      }
-      return isDentroPeriodoGlobal(item.created_at);
-    });
+  useEffect(() => {
+    setHistoricoVisibleCount(20);
   }, [
-    historico,
     historicoTipoFilter,
     historicoStatusFilter,
-    isDentroPeriodoGlobal,
+    historicoPeriodoFilter,
+    historico.length,
   ]);
+
+  const historicoVisiveis = useMemo(
+    () => historicoFiltrado.slice(0, historicoVisibleCount),
+    [historicoFiltrado, historicoVisibleCount],
+  );
 
   const resumoPorTipo = useMemo(() => {
     return historicoFiltrado.reduce<
@@ -472,7 +497,7 @@ export default function DashboardPage() {
   }, [historicoFiltrado]);
 
   const prestadorResumo = useMemo(() => {
-    const base = prestadoresFiltrados.reduce<Record<string, number>>(
+    const base = prestadoresDoUsuario.reduce<Record<string, number>>(
       (acc, prestador) => {
         acc[prestador.id] = 0;
         return acc;
@@ -486,7 +511,7 @@ export default function DashboardPage() {
       acc[item.prestador_id] = (acc[item.prestador_id] ?? 0) + 1;
       return acc;
     }, base);
-  }, [historicoFiltrado, prestadoresFiltrados]);
+  }, [historicoFiltrado, prestadoresDoUsuario]);
 
   const enviosUltimos30Dias = useMemo(() => {
     const today = new Date();
@@ -494,14 +519,9 @@ export default function DashboardPage() {
     for (let offset = 29; offset >= 0; offset -= 1) {
       const day = new Date(today);
       day.setDate(today.getDate() - offset);
-      const key = day.toISOString().slice(0, 10);
       days.push({
-        key,
-        label: `${day.getDate().toString().padStart(2, "0")}/${(
-          day.getMonth() + 1
-        )
-          .toString()
-          .padStart(2, "0")}`,
+        key: getLocalDateKey(day),
+        label: getLocalDateLabel(day),
         count: 0,
       });
     }
@@ -516,7 +536,7 @@ export default function DashboardPage() {
       if (Number.isNaN(date.getTime())) {
         return;
       }
-      const key = date.toISOString().slice(0, 10);
+      const key = getLocalDateKey(date);
       const index = indexByKey[key];
       if (index === undefined) {
         return;
@@ -551,7 +571,7 @@ export default function DashboardPage() {
   );
 
   const prestadorOrdenado = useMemo(() => {
-    return prestadoresFiltrados
+    return prestadoresDoUsuario
       .map((prestador) => ({
         id: prestador.id,
         nome: prestador.nome,
@@ -559,7 +579,7 @@ export default function DashboardPage() {
         total: prestadorResumo[prestador.id] ?? 0,
       }))
       .sort((a, b) => b.total - a.total);
-  }, [prestadoresFiltrados, prestadorResumo]);
+  }, [prestadoresDoUsuario, prestadorResumo]);
 
   const regrasPorPrestador = useMemo(() => {
     return regras.reduce<Record<string, PrestadorRegra[]>>((acc, regra) => {
@@ -573,10 +593,10 @@ export default function DashboardPage() {
 
   const prestadoresProgresso = useMemo(() => {
     const now = new Date();
-    return prestadoresFiltrados.map((prestador) => {
+    return prestadoresDoUsuario.map((prestador) => {
       const regrasDoPrestador = regrasPorPrestador[prestador.id] ?? [];
       const progresso = regrasDoPrestador.map((regra) => {
-        const enviados = historicoParaMetas.filter((item) => {
+        const enviados = historicoFiltrado.filter((item) => {
           if (item.prestador_id !== prestador.id) {
             return false;
           }
@@ -600,7 +620,7 @@ export default function DashboardPage() {
         progresso,
       };
     });
-  }, [historicoParaMetas, prestadoresFiltrados, regrasPorPrestador]);
+  }, [historicoFiltrado, prestadoresDoUsuario, regrasPorPrestador]);
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6">
@@ -631,7 +651,7 @@ export default function DashboardPage() {
                 : "text-slate-500 hover:text-slate-700"
             }`}
           >
-            Formularios
+            Formulários
           </button>
           <button
             type="button"
@@ -933,7 +953,7 @@ export default function DashboardPage() {
             </span>
           </div>
           <span className="text-[11px] text-slate-400">
-            Mostrando {historicoRecentes.length} registro(s) após filtros
+            Mostrando {historicoFiltrado.length} registro(s) após filtros
           </span>
         </div>
 
@@ -945,67 +965,82 @@ export default function DashboardPage() {
           <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
             {historicoErro}
           </p>
-        ) : historicoRecentes.length === 0 ? (
+        ) : historicoFiltrado.length === 0 ? (
           <p className="mt-4 text-xs text-slate-500">
             Ainda não há envios registrados para o seu acesso.
           </p>
         ) : (
-          <ul className="mt-4 space-y-3 text-xs text-slate-600">
-            {historicoRecentes.map((registro) => {
-              const pathParaVisualizar =
-                resolveSignedPdfPath(registro.arquivo_assinado_path) ??
-                registro.arquivo_assinado_path ??
-                registro.arquivo_path;
-              const podeVisualizar = Boolean(pathParaVisualizar);
+          <>
+            <ul className="mt-4 space-y-3 text-xs text-slate-600">
+              {historicoVisiveis.map((registro) => {
+                const pathParaVisualizar =
+                  resolveSignedPdfPath(registro.arquivo_assinado_path) ??
+                  registro.arquivo_assinado_path ??
+                  registro.arquivo_path;
+                const podeVisualizar = Boolean(pathParaVisualizar);
 
-              return (
-                <li
-                  key={registro.id}
-                  className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
+                return (
+                  <li
+                    key={registro.id}
+                    className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">
+                          {formatTipo(registro.tipo)}
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Enviado em {formatData(registro.created_at)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void abrirDocumento(registro)}
+                          disabled={!podeVisualizar}
+                          className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          title="Visualizar documento"
+                          aria-label="Visualizar documento"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <span
+                          className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                            registro.status === "assinado"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : registro.status === "em_analise"
+                                ? "bg-amber-50 text-amber-700"
+                                : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {formatStatus(registro.status)}
+                        </span>
+                      </div>
+                    </div>
+                    {registro.dados &&
+                      typeof registro.dados.numero_pedido === "string" && (
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          Pedido: {registro.dados.numero_pedido}
+                        </p>
+                      )}
+                  </li>
+                );
+              })}
+            </ul>
+            {historicoFiltrado.length > historicoVisiveis.length && (
+              <div className="mt-4 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setHistoricoVisibleCount((count) => count + 20)
+                  }
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">
-                        {formatTipo(registro.tipo)}
-                      </p>
-                      <p className="text-[11px] text-slate-500">
-                        Enviado em {formatData(registro.created_at)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void abrirDocumento(registro)}
-                        disabled={!podeVisualizar}
-                        className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        title="Visualizar documento"
-                        aria-label="Visualizar documento"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <span
-                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                          registro.status === "assinado"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : registro.status === "em_analise"
-                              ? "bg-amber-50 text-amber-700"
-                              : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {formatStatus(registro.status)}
-                      </span>
-                    </div>
-                  </div>
-                  {registro.dados &&
-                    typeof registro.dados.numero_pedido === "string" && (
-                      <p className="mt-1 text-[11px] text-slate-500">
-                        Pedido: {registro.dados.numero_pedido}
-                      </p>
-                    )}
-                </li>
-              );
-            })}
-          </ul>
+                  Carregar mais
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
         </>
@@ -1068,7 +1103,7 @@ export default function DashboardPage() {
                       const label =
                         regra.label?.trim() ||
                         (regra.tipo_regra === "formulario"
-                          ? tipoLabel[regra.alvo] ?? regra.alvo
+                          ? TIPO_LABEL[regra.alvo] ?? regra.alvo
                           : regra.alvo);
                       const faltam = Math.max(regra.quantidade - enviados, 0);
 
