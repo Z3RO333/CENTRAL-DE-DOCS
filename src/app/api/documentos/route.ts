@@ -168,6 +168,20 @@ export async function GET(request: Request) {
       .getAll("prestadorId")
       .map((value) => value.trim())
       .filter(Boolean);
+    const tipoFilter = searchParams.get("tipo");
+    const statusFilter = searchParams.get("status");
+    const anoFilter = searchParams.get("ano");
+    const mesFilter = searchParams.get("mes");
+    const identificacaoFilter = searchParams.get("identificacao")?.trim() ?? "";
+    const somenteAssinados = searchParams.get("somenteAssinados") === "true";
+    const somenteDisponiveisLote =
+      searchParams.get("somenteDisponiveisLote") === "true";
+    const limitParam = Number(searchParams.get("limit"));
+    const offsetParam = Number(searchParams.get("offset"));
+    const limit = Number.isFinite(limitParam)
+      ? Math.min(Math.max(limitParam, 1), 200)
+      : null;
+    const offset = Number.isFinite(offsetParam) ? Math.max(offsetParam, 0) : 0;
     let prestadoresPermitidos = filterPrestadores;
     let userFilter = filterUserId;
 
@@ -193,6 +207,7 @@ export async function GET(request: Request) {
       .from("formularios")
       .select(
         "id,tipo,status,arquivo_path,arquivo_assinado_path,created_at,dados,assinado_por,user_id,prestador_id",
+        { count: "exact" },
       )
       .order("created_at", { ascending: false });
 
@@ -206,13 +221,71 @@ export async function GET(request: Request) {
       query = query.in("prestador_id", prestadoresPermitidos);
     }
 
-    const { data, error } = await query;
+    if (tipoFilter && tipoFilter !== "todos") {
+      query = query.eq("tipo", tipoFilter);
+    }
+
+    if (statusFilter && statusFilter !== "todos") {
+      query = query.eq("status", statusFilter);
+    }
+
+    if (somenteAssinados) {
+      query = query.eq("status", "assinado");
+    }
+
+    if (somenteDisponiveisLote) {
+      query = query.eq("tipo", "registro_laudos").neq("status", "assinado");
+    }
+
+    if (anoFilter && anoFilter !== "todos") {
+      const ano = Number(anoFilter);
+      if (!Number.isNaN(ano)) {
+        if (mesFilter && mesFilter !== "todos") {
+          const mes = Number(mesFilter);
+          if (!Number.isNaN(mes) && mes >= 1 && mes <= 12) {
+            const start = new Date(ano, mes - 1, 1);
+            const end = new Date(ano, mes, 1);
+            query = query
+              .gte("created_at", start.toISOString())
+              .lt("created_at", end.toISOString());
+          }
+        } else {
+          const start = new Date(ano, 0, 1);
+          const end = new Date(ano + 1, 0, 1);
+          query = query
+            .gte("created_at", start.toISOString())
+            .lt("created_at", end.toISOString());
+        }
+      }
+    }
+
+    if (identificacaoFilter) {
+      const sanitized = identificacaoFilter.replace(/,/g, " ").trim();
+      if (sanitized) {
+        const pattern = `%${sanitized}%`;
+        query = query.or(
+          [
+            `dados->>empresa.ilike.${pattern}`,
+            `dados->>prestador.ilike.${pattern}`,
+            `dados->>responsavel.ilike.${pattern}`,
+            `dados->>numero_pedido.ilike.${pattern}`,
+          ].join(","),
+        );
+      }
+    }
+
+    if (limit !== null) {
+      query = query.range(offset, offset + limit - 1);
+    }
+
+    const { data, error, count } = await query;
     if (error) {
       throw error;
     }
 
     return NextResponse.json({
       registros: mapRows((data as FormularioRow[]) ?? []),
+      total: count ?? 0,
     });
   } catch (err) {
     console.error("Erro ao buscar documentos:", err);

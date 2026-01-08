@@ -83,6 +83,8 @@ type DocumentosListState = {
   somenteDisponiveisLote: boolean;
   viewMode: "tabela" | "cards";
   scrollY: number;
+  page: number;
+  pageSize: number;
 };
 
 const normalizeRegistroStatus = (registro: FormularioRecord) => {
@@ -275,6 +277,9 @@ export default function DocumentosPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [startingBatch, setStartingBatch] = useState(false);
   const [viewMode, setViewMode] = useState<"tabela" | "cards">("tabela");
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingBatch, setDeletingBatch] = useState(false);
   const [hasRestoredState, setHasRestoredState] = useState(false);
@@ -359,6 +364,9 @@ export default function DocumentosPage() {
         if (parsed.viewMode === "tabela" || parsed.viewMode === "cards") {
           setViewMode(parsed.viewMode);
         }
+        if (typeof parsed.page === "number" && parsed.page > 0) {
+          setPage(parsed.page);
+        }
         if (typeof parsed.scrollY === "number") {
           window.requestAnimationFrame(() => {
             window.scrollTo(0, parsed.scrollY ?? 0);
@@ -374,6 +382,8 @@ export default function DocumentosPage() {
           somenteDisponiveisLote: parsed.somenteDisponiveisLote ?? false,
           viewMode: parsed.viewMode === "cards" ? "cards" : "tabela",
           scrollY: parsed.scrollY ?? 0,
+          page: parsed.page && parsed.page > 0 ? parsed.page : 1,
+          pageSize: parsed.pageSize && parsed.pageSize > 0 ? parsed.pageSize : pageSize,
         };
       } catch {
         window.sessionStorage.removeItem(LIST_STATE_STORAGE_KEY);
@@ -393,10 +403,19 @@ export default function DocumentosPage() {
       try {
         const parsed = JSON.parse(raw) as {
           registros?: FormularioRecord[];
+          totalCount?: number;
+          page?: number;
+          pageSize?: number;
         };
         if (Array.isArray(parsed.registros)) {
           setRegistros(parsed.registros);
           setLoading(false);
+        }
+        if (typeof parsed.totalCount === "number") {
+          setTotalCount(parsed.totalCount);
+        }
+        if (typeof parsed.page === "number" && parsed.page > 0) {
+          setPage(parsed.page);
         }
       } catch {
         window.sessionStorage.removeItem(LIST_CACHE_STORAGE_KEY);
@@ -413,9 +432,9 @@ export default function DocumentosPage() {
 
     window.sessionStorage.setItem(
       LIST_CACHE_STORAGE_KEY,
-      JSON.stringify({ registros }),
+      JSON.stringify({ registros, totalCount, page, pageSize }),
     );
-  }, [hasRestoredCache, registros]);
+  }, [hasRestoredCache, registros, totalCount, page, pageSize]);
 
   useEffect(() => {
     if (!hasRestoredState || typeof window === "undefined") {
@@ -432,6 +451,8 @@ export default function DocumentosPage() {
       somenteDisponiveisLote,
       viewMode,
       scrollY: listStateRef.current?.scrollY ?? window.scrollY,
+      page,
+      pageSize,
     };
 
     listStateRef.current = next;
@@ -449,6 +470,8 @@ export default function DocumentosPage() {
     somenteAssinados,
     somenteDisponiveisLote,
     viewMode,
+    page,
+    pageSize,
   ]);
 
   useEffect(() => {
@@ -472,6 +495,24 @@ export default function DocumentosPage() {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, [hasRestoredState]);
+
+  useEffect(() => {
+    if (anoFilter === "todos" && mesFilter !== "todos") {
+      setMesFilter("todos");
+    }
+  }, [anoFilter, mesFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [
+    tipoFilter,
+    statusFilter,
+    identificacaoFilter,
+    anoFilter,
+    mesFilter,
+    somenteAssinados,
+    somenteDisponiveisLote,
+  ]);
 
   useEffect(() => {
     if (authLoading || accessLoading) {
@@ -510,6 +551,29 @@ export default function DocumentosPage() {
             params.set("userId", user.id);
           }
         }
+        params.set("limit", pageSize.toString());
+        params.set("offset", ((page - 1) * pageSize).toString());
+        if (tipoFilter !== "todos") {
+          params.set("tipo", tipoFilter);
+        }
+        if (statusFilter !== "todos") {
+          params.set("status", statusFilter);
+        }
+        if (anoFilter !== "todos") {
+          params.set("ano", anoFilter);
+        }
+        if (mesFilter !== "todos") {
+          params.set("mes", mesFilter);
+        }
+        if (identificacaoFilter.trim()) {
+          params.set("identificacao", identificacaoFilter.trim());
+        }
+        if (somenteAssinados) {
+          params.set("somenteAssinados", "true");
+        }
+        if (somenteDisponiveisLote) {
+          params.set("somenteDisponiveisLote", "true");
+        }
 
         const url =
           params.size > 0 ? `/api/documentos?${params.toString()}` : "/api/documentos";
@@ -520,6 +584,7 @@ export default function DocumentosPage() {
         });
         const payload = (await response.json()) as {
           registros?: FormularioRecord[];
+          total?: number;
           error?: string;
         };
 
@@ -534,6 +599,7 @@ export default function DocumentosPage() {
           setRegistros(
             parsed.map((registro) => normalizeRegistroStatus(registro)),
           );
+          setTotalCount(payload.total ?? parsed.length);
         }
       } catch (err) {
         if (active) {
@@ -543,6 +609,7 @@ export default function DocumentosPage() {
               : "Não foi possível carregar os documentos.",
           );
           setRegistros([]);
+          setTotalCount(0);
         }
       } finally {
         if (active) {
@@ -566,6 +633,15 @@ export default function DocumentosPage() {
     getAccessToken,
     prestadoresUsuarioLoading,
     prestadoresDoUsuario,
+    page,
+    pageSize,
+    tipoFilter,
+    statusFilter,
+    anoFilter,
+    mesFilter,
+    identificacaoFilter,
+    somenteAssinados,
+    somenteDisponiveisLote,
   ]);
 
   const getPathParaVisualizacao = (registro: FormularioRecord) =>
@@ -734,69 +810,7 @@ export default function DocumentosPage() {
     [registros],
   );
 
-  const registrosFiltrados = useMemo(
-    () =>
-      registros.filter((registro) => {
-        if (tipoFilter !== "todos" && registro.tipo !== tipoFilter) {
-          return false;
-        }
-
-        if (statusFilter !== "todos" && registro.status !== statusFilter) {
-          return false;
-        }
-
-        const dataReg = new Date(registro.created_at);
-        if (anoFilter !== "todos") {
-          const anoRegistro = dataReg.getFullYear().toString();
-          if (anoRegistro !== anoFilter) {
-            return false;
-          }
-        }
-
-        if (mesFilter !== "todos") {
-          const mesRegistro = String(dataReg.getMonth() + 1).padStart(2, "0");
-          if (mesRegistro !== mesFilter) {
-            return false;
-          }
-        }
-
-        if (identificacaoFilter.trim()) {
-          const query = identificacaoFilter.toLowerCase();
-          const identificacaoValor = getIdentificacaoValor(registro);
-          if (
-            !identificacaoValor ||
-            !identificacaoValor.toLowerCase().includes(query)
-          ) {
-            return false;
-          }
-        }
-
-        if (somenteAssinados && registro.status !== "assinado") {
-          return false;
-        }
-
-        if (somenteDisponiveisLote) {
-          if (
-            registro.tipo !== TIPO_ASSINAVEL ||
-            registro.status === "assinado"
-          ) {
-            return false;
-          }
-        }
-
-        return true;
-      }),
-    [
-      registros,
-      tipoFilter,
-      statusFilter,
-      anoFilter,
-      mesFilter,
-      identificacaoFilter,
-      somenteAssinados,
-      somenteDisponiveisLote,
-    ],
-  );
+  const registrosFiltrados = useMemo(() => registros, [registros]);
 
   const assinaturasPendentes = useMemo(
     () =>
@@ -944,7 +958,16 @@ export default function DocumentosPage() {
   const assinaturasSelecionadasCount = selectedIds.filter((id) =>
     assinaturasPendentes.includes(id),
   ).length;
-  const totalResultados = registrosFiltrados.length;
+  const totalResultados = totalCount;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const canPrevPage = page > 1;
+  const canNextPage = page < totalPages;
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   if (authLoading || accessLoading || (loading && registros.length === 0)) {
     return (
@@ -1412,6 +1435,32 @@ export default function DocumentosPage() {
           </div>
         </div>
       </div>
+
+      {totalResultados > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-500 shadow-sm shadow-slate-200">
+          <span>
+            {totalResultados} resultado(s) · Página {page} de {totalPages}
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+              disabled={!canPrevPage}
+              className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={!canNextPage}
+              className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Próxima
+            </button>
+          </div>
+        </div>
+      )}
 
       {totalResultados === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm shadow-slate-200">
