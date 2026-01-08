@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -71,6 +71,7 @@ const TIPO_ASSINAVEL = "registro_laudos";
 const STORAGE_BUCKET = "formularios";
 const SIGNED_URL_EXPIRES_IN = 60 * 30;
 const LIST_STATE_STORAGE_KEY = "documentos:list-state";
+const LIST_CACHE_STORAGE_KEY = "documentos:list-cache";
 
 type DocumentosListState = {
   tipoFilter: string;
@@ -277,6 +278,7 @@ export default function DocumentosPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingBatch, setDeletingBatch] = useState(false);
   const [hasRestoredState, setHasRestoredState] = useState(false);
+  const [hasRestoredCache, setHasRestoredCache] = useState(false);
   const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const listStateRef = useRef<DocumentosListState | null>(null);
@@ -380,6 +382,40 @@ export default function DocumentosPage() {
 
     setHasRestoredState(true);
   }, [hasRestoredState]);
+
+  useEffect(() => {
+    if (hasRestoredCache || typeof window === "undefined") {
+      return;
+    }
+
+    const raw = window.sessionStorage.getItem(LIST_CACHE_STORAGE_KEY);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as {
+          registros?: FormularioRecord[];
+        };
+        if (Array.isArray(parsed.registros)) {
+          setRegistros(parsed.registros);
+          setLoading(false);
+        }
+      } catch {
+        window.sessionStorage.removeItem(LIST_CACHE_STORAGE_KEY);
+      }
+    }
+
+    setHasRestoredCache(true);
+  }, [hasRestoredCache]);
+
+  useEffect(() => {
+    if (!hasRestoredCache || typeof window === "undefined") {
+      return;
+    }
+
+    window.sessionStorage.setItem(
+      LIST_CACHE_STORAGE_KEY,
+      JSON.stringify({ registros }),
+    );
+  }, [hasRestoredCache, registros]);
 
   useEffect(() => {
     if (!hasRestoredState || typeof window === "undefined") {
@@ -910,7 +946,7 @@ export default function DocumentosPage() {
   ).length;
   const totalResultados = registrosFiltrados.length;
 
-  if (authLoading || accessLoading || loading) {
+  if (authLoading || accessLoading || (loading && registros.length === 0)) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
         Carregando documentos...
@@ -1419,12 +1455,18 @@ export default function DocumentosPage() {
                   <th className="px-4 py-3 text-left">Documento</th>
                   <th className="px-4 py-3 text-left">Identificação</th>
                   <th className="px-4 py-3 text-left">Tipo</th>
-                  <th className="px-4 py-3 text-left">Tipo de laudo</th>
-                  <th className="px-4 py-3 text-left">ObservaÇõÇæes</th>
+                  <th className="hidden px-4 py-3 text-left lg:table-cell">
+                    Tipo de laudo
+                  </th>
+                  <th className="hidden px-4 py-3 text-left xl:table-cell">
+                    Observações
+                  </th>
                   <th className="px-4 py-3 text-left">Status</th>
-                  <th className="px-4 py-3 text-left">Enviado em</th>
+                  <th className="hidden px-4 py-3 text-left md:table-cell">
+                    Enviado em
+                  </th>
                   <th className="px-4 py-3 text-right">Ações</th>
-                </tr>
+</tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
                 {registrosFiltrados.map((registro) => {
@@ -1479,12 +1521,12 @@ export default function DocumentosPage() {
                       <td className="px-4 py-3 text-sm text-slate-600">
                         {getTipoDescricao(registro.tipo)}
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-500">
+                      <td className="hidden px-4 py-3 text-xs text-slate-500 lg:table-cell">
                         {registro.tipo === TIPO_ASSINAVEL && tipoLaudo
                           ? tipoLaudo
                           : "-"}
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-500">
+                      <td className="hidden px-4 py-3 text-xs text-slate-500 xl:table-cell">
                         {registro.tipo === TIPO_ASSINAVEL && observacoes
                           ? observacoes
                           : "-"}
@@ -1500,7 +1542,7 @@ export default function DocumentosPage() {
                           {formatStatusLabel(registro.status)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-500">
+                      <td className="hidden px-4 py-3 text-xs text-slate-500 md:table-cell">
                         {formatDateTime(registro.created_at)}
                       </td>
                       <td className="px-4 py-3">
@@ -1620,7 +1662,7 @@ export default function DocumentosPage() {
                   {registro.tipo === TIPO_ASSINAVEL && observacoes && (
                     <div>
                       <p className="text-xs font-semibold text-slate-500">
-                        ObservaÇõÇæes
+                        Observações
                       </p>
                       <p className="text-xs text-slate-500">{observacoes}</p>
                     </div>
