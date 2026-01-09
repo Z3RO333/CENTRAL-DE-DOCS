@@ -1256,7 +1256,7 @@ export default function DocumentosPage() {
             />
           </label>
           <label className="text-xs font-semibold text-slate-600">
-            Tipo de formulario
+            Tipo de formulário
             <select
               value={tipoFilter}
               onChange={(event) => setTipoFilter(event.target.value)}

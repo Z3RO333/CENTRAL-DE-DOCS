@@ -837,7 +837,7 @@ export default function AssinaturaDocumentoPage() {
       {exibirInfosFormulario && (
         <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 text-xs text-slate-600 shadow-sm shadow-slate-200">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Informacoes do formulario
+            Informações do formulário
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {tipoLaudo && (

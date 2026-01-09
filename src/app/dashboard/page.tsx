@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -627,10 +627,10 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-            Formulários
+            {"Formul\u00e1rios"}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Escolha um tipo de formulário para iniciar o envio de documentos.
+            {"Escolha um tipo de formul\u00e1rio para iniciar o envio de documentos."}
           </p>
         </div>
         <Link
@@ -672,14 +672,12 @@ export default function DashboardPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Filtros globais
             </p>
-            <span className="text-[11px] text-slate-500">
-              Ajuste os filtros para todas as visualizações do dashboard.
-            </span>
+            <span className="text-[11px] text-slate-500">{"Ajuste os filtros para todas as visualiza\\u00e7\\u00f5es do dashboard."}</span>
           </div>
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="text-xs font-semibold text-slate-600">
-            Período
+            {"Per\u00edodo"}
             <select
               value={historicoPeriodoFilter}
               onChange={(event) => setHistoricoPeriodoFilter(event.target.value)}
@@ -797,9 +795,7 @@ export default function DashboardPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Visão rápida
             </p>
-            <span className="text-[11px] text-slate-500">
-              Indicadores gerais dos envios do seu grupo.
-            </span>
+            <span className="text-[11px] text-slate-500">{"Indicadores gerais dos envios do seu grupo."}</span>
           </div>
           <span className="text-[11px] text-slate-400">
             Total: {historicoFiltrado.length} envio(s)
@@ -948,9 +944,7 @@ export default function DashboardPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Histórico de envios
             </p>
-            <span className="text-[11px] text-slate-500">
-              Consulte rapidamente os formulários enviados pelo seu grupo.
-            </span>
+            <span className="text-[11px] text-slate-500">{"Consulte rapidamente os formul\\u00e1rios enviados pelo seu grupo."}</span>
           </div>
           <span className="text-[11px] text-slate-400">
             Mostrando {historicoFiltrado.length} registro(s) após filtros
@@ -1052,7 +1046,9 @@ export default function DashboardPage() {
               Progresso por prestador
             </p>
             <span className="text-[11px] text-slate-500">
-              Monitoramento de envios no período da regra (mensal/anual).
+              {
+                "Monitoramento de envios no per\u00edodo da regra (mensal/anual)."
+              }
             </span>
           </div>
           <span className="text-[11px] text-slate-400">
@@ -1143,3 +1139,9 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+
+
+
+
+

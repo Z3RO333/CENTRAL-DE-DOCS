@@ -155,7 +155,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error:
-              "UsuÇ­rio nÇœo encontrado no Supabase. Informe o ID ou solicite que o usuÇ­rio faÇõa login pelo menos uma vez.",
+              "Usuário não encontrado no Supabase. Informe o ID ou solicite que o usuário faça login pelo menos uma vez.",
           },
           { status: 400 },
         );
