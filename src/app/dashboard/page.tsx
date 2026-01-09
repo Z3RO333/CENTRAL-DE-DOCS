@@ -22,6 +22,18 @@ type DashboardCard = {
   border: string;
 };
 
+type IaRegistro = {
+  id: string;
+  tipo: string;
+  status: string;
+  created_at: string;
+  empresa?: string | null;
+  prestador?: string | null;
+  responsavel?: string | null;
+  numero_pedido?: string | null;
+  tipo_laudo?: string | null;
+};
+
 const STATUS_LABEL_MAP: Record<string, string> = {
   pendente: "Pendente",
   em_analise: "Em análise",
@@ -135,6 +147,11 @@ export default function DashboardPage() {
   const [dashboardTab, setDashboardTab] = useState<"formularios" | "monitoramento">(
     "formularios",
   );
+  const [iaPergunta, setIaPergunta] = useState("");
+  const [iaResposta, setIaResposta] = useState<string | null>(null);
+  const [iaRegistros, setIaRegistros] = useState<IaRegistro[]>([]);
+  const [iaLoading, setIaLoading] = useState(false);
+  const [iaErro, setIaErro] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -202,6 +219,55 @@ export default function DashboardPage() {
     } catch (err) {
       console.error("Erro ao abrir documento:", err);
       setHistoricoErro("Não foi possível abrir o documento. Tente novamente.");
+    }
+  };
+
+  const consultarIa = async () => {
+    const pergunta = iaPergunta.trim();
+    if (!pergunta) {
+      setIaErro("Digite uma pergunta para consultar.");
+      return;
+    }
+    setIaLoading(true);
+    setIaErro(null);
+    setIaResposta(null);
+    setIaRegistros([]);
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        throw sessionError;
+      }
+      const token = data.session?.access_token;
+      if (!token) {
+        throw new Error("Sessao expirada. Faca login novamente.");
+      }
+      const response = await fetch("/api/consulta-ia", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question: pergunta }),
+      });
+      const payload = (await response.json()) as {
+        answer?: string;
+        registros?: IaRegistro[];
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Nao foi possivel consultar a IA.");
+      }
+      setIaResposta(payload.answer ?? "");
+      setIaRegistros(payload.registros ?? []);
+    } catch (err) {
+      console.error("Erro ao consultar IA:", err);
+      setIaErro(
+        err instanceof Error
+          ? err.message
+          : "Nao foi possivel consultar a IA.",
+      );
+    } finally {
+      setIaLoading(false);
     }
   };
 
@@ -646,6 +712,66 @@ export default function DashboardPage() {
           Ver documentos enviados
         </Link>
       </div>
+      <section className="rounded-3xl border border-slate-200 bg-white/80 p-4 shadow-sm shadow-slate-100/80">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Consulta por IA
+            </p>
+            <span className="text-[11px] text-slate-500">
+              Pergunte sobre empresas, prestadores, pedidos ou tipos de laudo.
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-400">
+            {iaRegistros.length} documento(s) sugerido(s)
+          </span>
+        </div>
+        <div className="mt-3 flex flex-col gap-2 md:flex-row">
+          <input
+            value={iaPergunta}
+            onChange={(event) => setIaPergunta(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void consultarIa();
+              }
+            }}
+            placeholder="Ex.: documentos da empresa X, laudos de eletrica, pedido 1234"
+            className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+          />
+          <button
+            type="button"
+            onClick={() => void consultarIa()}
+            disabled={iaLoading}
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {iaLoading ? "Consultando..." : "Consultar"}
+          </button>
+        </div>
+        {iaErro && (
+          <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {iaErro}
+          </p>
+        )}
+        {iaResposta && (
+          <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-2 text-xs text-slate-600">
+            {iaResposta}
+          </div>
+        )}
+        {iaRegistros.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
+            {iaRegistros.map((registro) => (
+              <Link
+                key={registro.id}
+                href={`/documentos/${registro.id}`}
+                className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                {registro.id}
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 text-xs font-semibold text-slate-500">
           <button
