@@ -99,13 +99,13 @@ export default function LoginPage() {
       <div className="relative mx-auto flex w-full max-w-md flex-col items-center gap-6 sm:gap-8">
         <div className="flex flex-col items-center gap-3 text-center">
           <Image
-            src="/bemol-logo.png"
+            src="/Letra _b_ em azul vibrante.png"
             alt="Logo da Bemol"
-            width={160}
-            height={160}
+            width={220}
+            height={220}
             priority
-            sizes="(max-width: 640px) 96px, 112px"
-            className="h-24 w-24 object-contain drop-shadow-[0_12px_32px_rgba(14,116,144,0.25)] sm:h-28 sm:w-28"
+            sizes="(max-width: 640px) 80px, (max-width: 1024px) 96px, 112px"
+            className="h-20 w-auto object-contain drop-shadow-[0_12px_32px_rgba(14,116,144,0.25)] sm:h-24 md:h-28"
           />
           <h1 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
             {"Formul\u00e1rio Bemol"}
