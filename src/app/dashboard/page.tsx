@@ -638,6 +638,33 @@ export default function DashboardPage() {
           Ver documentos enviados
         </Link>
       </div>
+      <section className="rounded-3xl border border-slate-200 bg-white/80 p-4 shadow-sm shadow-slate-100/80">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Agente (mockup)
+            </p>
+            <span className="text-[11px] text-slate-500">
+              Interface de consulta em breve.
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-400">Somente visual</span>
+        </div>
+        <div className="mt-3 flex flex-col gap-2 md:flex-row">
+          <input
+            disabled
+            placeholder="Ex.: documentos da empresa X, pedidos 1234"
+            className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition"
+          />
+          <button
+            type="button"
+            disabled
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 opacity-60"
+          >
+            Consultar
+          </button>
+        </div>
+      </section>
 <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 text-xs font-semibold text-slate-500">
           <button
