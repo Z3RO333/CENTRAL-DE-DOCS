@@ -299,6 +299,10 @@ async function generateAnswer(
 
 export async function POST(request: Request) {
   try {
+    return NextResponse.json(
+      { error: "Consulta por IA em manutencao." },
+      { status: 503 },
+    );
     const { question } = (await request.json()) as ConsultaBody;
     if (!question || !question.trim()) {
       throw new HttpError(400, "Question is required.");

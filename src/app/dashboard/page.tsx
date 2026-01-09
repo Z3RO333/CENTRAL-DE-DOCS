@@ -83,6 +83,8 @@ const BASE_CARDS: DashboardCard[] = [
   },
 ];
 
+const IA_MAINTENANCE = true;
+
 const formatData = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -726,6 +728,11 @@ export default function DashboardPage() {
             {iaRegistros.length} documento(s) sugerido(s)
           </span>
         </div>
+        {IA_MAINTENANCE && (
+          <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            Consulta por IA em manutenção no momento.
+          </p>
+        )}
         <div className="mt-3 flex flex-col gap-2 md:flex-row">
           <input
             value={iaPergunta}
@@ -738,11 +745,12 @@ export default function DashboardPage() {
             }}
             placeholder="Ex.: documentos da empresa X, laudos de eletrica, pedido 1234"
             className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+            disabled={IA_MAINTENANCE || iaLoading}
           />
           <button
             type="button"
             onClick={() => void consultarIa()}
-            disabled={iaLoading}
+            disabled={IA_MAINTENANCE || iaLoading}
             className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {iaLoading ? "Consultando..." : "Consultar"}
