@@ -617,7 +617,7 @@ export default function DashboardPage() {
     <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
       {authError ?? "Carregando formularios..."}
     </div>
-  ) : (\n
+  ) : (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -1161,6 +1161,7 @@ export default function DashboardPage() {
     </div>
   );
 }
+
 
 
 
