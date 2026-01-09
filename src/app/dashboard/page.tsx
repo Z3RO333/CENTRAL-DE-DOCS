@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { BriefcaseBusiness, Eye, FileBadge, ReceiptText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { supabase } from "@/lib/supabaseClient";
 import { isInPeriodo, type PrestadorRegra } from "@/lib/prestadorRegras";
@@ -99,12 +100,15 @@ const getLocalDateLabel = (date: Date) => {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading, error: authError } = useAuth();
+  const { modules: modulesAccess, loading: accessLoading } =
+    useDocumentsAccess();
+  const canViewAllDocuments = modulesAccess.dashboards;
   const {
     prestadores: prestadoresDoUsuario,
     loading: prestadoresLoading,
   } = usePrestadores({
     assignedOnly: true,
-    enabled: Boolean(user),
+    enabled: Boolean(user) && !accessLoading,
   });
   const [historico, setHistorico] = useState<
     {
@@ -138,7 +142,7 @@ export default function DashboardPage() {
     }
   }, [isLoading, user, router]);
 
-  if (isLoading || !user) {
+  if (isLoading || accessLoading || !user) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
         {authError ?? "Carregando formulários..."}
@@ -217,12 +221,14 @@ export default function DashboardPage() {
         throw new Error("Sessão expirada. Faça login novamente.");
       }
       const params = new URLSearchParams();
-      if (prestadoresDoUsuario.length > 0) {
-        prestadoresDoUsuario.forEach((prestador) =>
-          params.append("prestadorId", prestador.id),
-        );
-      } else {
-        params.set("userId", user.id);
+      if (!canViewAllDocuments) {
+        if (prestadoresDoUsuario.length > 0) {
+          prestadoresDoUsuario.forEach((prestador) =>
+            params.append("prestadorId", prestador.id),
+          );
+        } else {
+          params.set("userId", user.id);
+        }
       }
       const url =
         params.size > 0 ? `/api/documentos?${params.toString()}` : "/api/documentos";
@@ -267,7 +273,7 @@ export default function DashboardPage() {
         setHistoricoLoading(false);
       }
     }
-  }, [user, prestadoresDoUsuario]);
+  }, [user, prestadoresDoUsuario, canViewAllDocuments]);
 
   const carregarRegras = useCallback(async (signal?: AbortSignal) => {
     if (!user) {
@@ -331,22 +337,22 @@ export default function DashboardPage() {
   }, [prestadoresDoUsuario, user]);
 
   useEffect(() => {
-    if (user && !prestadoresLoading) {
+    if (user && !prestadoresLoading && !accessLoading) {
       const controller = new AbortController();
       void carregarHistorico(controller.signal);
       return () => controller.abort();
     }
     return undefined;
-  }, [user, prestadoresLoading, carregarHistorico]);
+  }, [user, prestadoresLoading, accessLoading, carregarHistorico]);
 
   useEffect(() => {
-    if (user && !prestadoresLoading) {
+    if (user && !prestadoresLoading && !accessLoading) {
       const controller = new AbortController();
       void carregarRegras(controller.signal);
       return () => controller.abort();
     }
     return undefined;
-  }, [user, prestadoresLoading, carregarRegras]);
+  }, [user, prestadoresLoading, accessLoading, carregarRegras]);
 
   const historicoTipoOptions = useMemo(() => {
     const extras = Array.from(new Set(historico.map((item) => item.tipo)))
