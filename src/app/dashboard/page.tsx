@@ -137,14 +137,7 @@ export default function DashboardPage() {
       router.replace("/login");
     }
   }, [isLoading, user, router]);
-  if (isLoading || !user) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
-        {authError ?? "Carregando formularios..."}
-      </div>
-    );
-  }
-
+  const isBlocked = isLoading || !user;
   const baseCards = BASE_CARDS;
 
   const resolveSignedPdfPath = (path?: string | null) => {
@@ -620,7 +613,11 @@ export default function DashboardPage() {
       };
     });
   }, [historicoFiltrado, prestadoresDoUsuario, regrasPorPrestador]);
-  return (\n
+  return isBlocked ? (
+    <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
+      {authError ?? "Carregando formularios..."}
+    </div>
+  ) : (\n
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -1164,6 +1161,8 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+
 
 
 
