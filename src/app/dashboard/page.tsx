@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { BriefcaseBusiness, Eye, FileBadge, ReceiptText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { supabase } from "@/lib/supabaseClient";
 import { isInPeriodo, type PrestadorRegra } from "@/lib/prestadorRegras";
@@ -20,18 +19,6 @@ type DashboardCard = {
   icon: LucideIcon;
   accent: string;
   border: string;
-};
-
-type IaRegistro = {
-  id: string;
-  tipo: string;
-  status: string;
-  created_at: string;
-  empresa?: string | null;
-  prestador?: string | null;
-  responsavel?: string | null;
-  numero_pedido?: string | null;
-  tipo_laudo?: string | null;
 };
 
 const STATUS_LABEL_MAP: Record<string, string> = {
@@ -83,8 +70,6 @@ const BASE_CARDS: DashboardCard[] = [
   },
 ];
 
-const IA_MAINTENANCE = true;
-
 const formatData = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -114,15 +99,12 @@ const getLocalDateLabel = (date: Date) => {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading, error: authError } = useAuth();
-  const { modules: modulesAccess, loading: accessLoading } =
-    useDocumentsAccess();
-  const canViewAllDocuments = modulesAccess.dashboards;
   const {
     prestadores: prestadoresDoUsuario,
     loading: prestadoresLoading,
   } = usePrestadores({
     assignedOnly: true,
-    enabled: Boolean(user) && !accessLoading,
+    enabled: Boolean(user),
   });
   const [historico, setHistorico] = useState<
     {
@@ -149,18 +131,20 @@ export default function DashboardPage() {
   const [dashboardTab, setDashboardTab] = useState<"formularios" | "monitoramento">(
     "formularios",
   );
-  const [iaPergunta, setIaPergunta] = useState("");
-  const [iaResposta, setIaResposta] = useState<string | null>(null);
-  const [iaRegistros, setIaRegistros] = useState<IaRegistro[]>([]);
-  const [iaLoading, setIaLoading] = useState(false);
-  const [iaErro, setIaErro] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.replace("/login");
     }
   }, [isLoading, user, router]);
-  const isBlocked = isLoading || accessLoading || !user;
+  if (isLoading || !user) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
+        {authError ?? "Carregando formularios..."}
+      </div>
+    );
+  }
+
   const baseCards = BASE_CARDS;
 
   const resolveSignedPdfPath = (path?: string | null) => {
@@ -216,55 +200,6 @@ export default function DashboardPage() {
     }
   };
 
-  const consultarIa = async () => {
-    const pergunta = iaPergunta.trim();
-    if (!pergunta) {
-      setIaErro("Digite uma pergunta para consultar.");
-      return;
-    }
-    setIaLoading(true);
-    setIaErro(null);
-    setIaResposta(null);
-    setIaRegistros([]);
-    try {
-      const { data, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        throw sessionError;
-      }
-      const token = data.session?.access_token;
-      if (!token) {
-        throw new Error("Sessao expirada. Faca login novamente.");
-      }
-      const response = await fetch("/api/consulta-ia", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ question: pergunta }),
-      });
-      const payload = (await response.json()) as {
-        answer?: string;
-        registros?: IaRegistro[];
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Nao foi possivel consultar a IA.");
-      }
-      setIaResposta(payload.answer ?? "");
-      setIaRegistros(payload.registros ?? []);
-    } catch (err) {
-      console.error("Erro ao consultar IA:", err);
-      setIaErro(
-        err instanceof Error
-          ? err.message
-          : "Nao foi possivel consultar a IA.",
-      );
-    } finally {
-      setIaLoading(false);
-    }
-  };
-
   const carregarHistorico = useCallback(async (signal?: AbortSignal) => {
     if (!user) {
       return;
@@ -281,14 +216,12 @@ export default function DashboardPage() {
         throw new Error("Sess�o expirada. Fa�a login novamente.");
       }
       const params = new URLSearchParams();
-      if (!canViewAllDocuments) {
-        if (prestadoresDoUsuario.length > 0) {
-          prestadoresDoUsuario.forEach((prestador) =>
-            params.append("prestadorId", prestador.id),
-          );
-        } else {
-          params.set("userId", user.id);
-        }
+      if (prestadoresDoUsuario.length > 0) {
+        prestadoresDoUsuario.forEach((prestador) =>
+          params.append("prestadorId", prestador.id),
+        );
+      } else {
+        params.set("userId", user.id);
       }
       const url =
         params.size > 0 ? `/api/documentos?${params.toString()}` : "/api/documentos";
@@ -333,7 +266,7 @@ export default function DashboardPage() {
         setHistoricoLoading(false);
       }
     }
-  }, [user, prestadoresDoUsuario, canViewAllDocuments]);
+  }, [user, prestadoresDoUsuario]);
 
   const carregarRegras = useCallback(async (signal?: AbortSignal) => {
     if (!user) {
@@ -397,22 +330,22 @@ export default function DashboardPage() {
   }, [prestadoresDoUsuario, user]);
 
   useEffect(() => {
-    if (user && !prestadoresLoading && !accessLoading) {
+    if (user && !prestadoresLoading) {
       const controller = new AbortController();
       void carregarHistorico(controller.signal);
       return () => controller.abort();
     }
     return undefined;
-  }, [user, prestadoresLoading, accessLoading, carregarHistorico]);
+  }, [user, prestadoresLoading, carregarHistorico]);
 
   useEffect(() => {
-    if (user && !prestadoresLoading && !accessLoading) {
+    if (user && !prestadoresLoading) {
       const controller = new AbortController();
       void carregarRegras(controller.signal);
       return () => controller.abort();
     }
     return undefined;
-  }, [user, prestadoresLoading, accessLoading, carregarRegras]);
+  }, [user, prestadoresLoading, carregarRegras]);
 
   const historicoTipoOptions = useMemo(() => {
     const extras = Array.from(new Set(historico.map((item) => item.tipo)))
@@ -687,12 +620,7 @@ export default function DashboardPage() {
       };
     });
   }, [historicoFiltrado, prestadoresDoUsuario, regrasPorPrestador]);
-
-  return isBlocked ? (
-    <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
-      {authError ?? "Carregando formularios..."}
-    </div>
-  ) : (
+  return (\n
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -710,73 +638,7 @@ export default function DashboardPage() {
           Ver documentos enviados
         </Link>
       </div>
-      <section className="rounded-3xl border border-slate-200 bg-white/80 p-4 shadow-sm shadow-slate-100/80">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Consulta por IA
-            </p>
-            <span className="text-[11px] text-slate-500">
-              Pergunte sobre empresas, prestadores, pedidos ou tipos de laudo.
-            </span>
-          </div>
-          <span className="text-[11px] text-slate-400">
-            {iaRegistros.length} documento(s) sugerido(s)
-          </span>
-        </div>
-        {IA_MAINTENANCE && (
-          <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            Consulta por IA em manuten��o no momento.
-          </p>
-        )}
-        <div className="mt-3 flex flex-col gap-2 md:flex-row">
-          <input
-            value={iaPergunta}
-            onChange={(event) => setIaPergunta(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                void consultarIa();
-              }
-            }}
-            placeholder="Ex.: documentos da empresa X, laudos de eletrica, pedido 1234"
-            className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            disabled={IA_MAINTENANCE || iaLoading}
-          />
-          <button
-            type="button"
-            onClick={() => void consultarIa()}
-            disabled={IA_MAINTENANCE || iaLoading}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {iaLoading ? "Consultando..." : "Consultar"}
-          </button>
-        </div>
-        {iaErro && (
-          <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-            {iaErro}
-          </p>
-        )}
-        {iaResposta && (
-          <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-2 text-xs text-slate-600">
-            {iaResposta}
-          </div>
-        )}
-        {iaRegistros.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
-            {iaRegistros.map((registro) => (
-              <Link
-                key={registro.id}
-                href={`/documentos/${registro.id}`}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
-              >
-                {registro.id}
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
-      <div className="flex flex-wrap items-center gap-2">
+<div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 text-xs font-semibold text-slate-500">
           <button
             type="button"
@@ -1275,6 +1137,8 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+
 
 
 
