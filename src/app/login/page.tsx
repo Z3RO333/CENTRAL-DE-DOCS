@@ -1,17 +1,10 @@
 ﻿"use client";
 
 import Image from "next/image";
-import { Poppins } from "next/font/google";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
-
-const poppins = Poppins({
-  subsets: ["latin"],
-  weight: ["600"],
-  variable: "--font-poppins",
-});
 
 export default function LoginPage() {
   const router = useRouter();
@@ -76,17 +69,14 @@ export default function LoginPage() {
 
   if (loadingSession && user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm text-slate-100">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">
         Redirecionando...
       </div>
     );
   }
 
   return (
-    <div
-      className={`${poppins.variable} relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-slate-50 px-4 py-12 text-slate-900 lg:py-16`}
-      style={{ fontFamily: "var(--font-poppins)" }}
-    >
+    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-slate-50 px-4 py-12 text-slate-900 lg:py-16">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(30,64,175,0.12),transparent_45%)]" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(14,116,144,0.12),transparent_50%)]" />
       <div className="pointer-events-none absolute inset-0 opacity-40">
@@ -199,11 +189,6 @@ export default function LoginPage() {
                 : "J\u00e1 tem conta? Fazer login"}
             </button>
 
-            <p className="mt-5 text-center text-[11px] text-slate-500">
-              {
-                "Autentica\u00e7\u00e3o gerenciada via Supabase Auth. Utilize um e-mail v\u00e1lido e confirme o cadastro pelo link enviado."
-              }
-            </p>
           </div>
         </div>
       </div>

@@ -56,25 +56,21 @@ export default function AppShell({
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.25),transparent_45%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(16,185,129,0.2),transparent_40%)]" />
+    <div className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(30,64,175,0.12),transparent_45%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(14,116,144,0.12),transparent_50%)]" />
       <div className="pointer-events-none absolute inset-0 opacity-40">
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:140px_140px]" />
-        <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:140px_140px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.06)_1px,transparent_1px)] bg-[size:160px_160px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(15,23,42,0.06)_1px,transparent_1px)] bg-[size:160px_160px]" />
       </div>
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-0 top-1/4 h-44 w-44 -translate-x-1/2 rounded-full bg-sky-500/30 blur-3xl" />
-        <div className="absolute right-0 bottom-1/4 h-52 w-52 translate-x-1/2 rounded-full bg-emerald-400/25 blur-3xl" />
-        <div className="absolute left-10 top-12 h-16 w-16 animate-ping rounded-full border border-white/20" />
-        <div className="absolute right-16 bottom-16 h-12 w-12 animate-pulse rounded-2xl border border-white/20" />
-      </div>
-      <header className="relative z-10 border-b border-white/10 bg-white/80 text-slate-900 backdrop-blur">
+      <div className="pointer-events-none absolute -left-24 top-12 h-56 w-56 rounded-full bg-sky-200/70 blur-3xl" />
+      <div className="pointer-events-none absolute -right-20 bottom-10 h-64 w-64 rounded-full bg-cyan-200/70 blur-3xl" />
+      <header className="relative z-10 border-b border-slate-200/80 bg-white/80 text-slate-900 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <Link href="/dashboard" className="flex items-center gap-2">
             <div className="flex flex-col leading-tight">
               <span className="text-sm font-semibold tracking-tight text-slate-900">
-                Formulário Central
+                {"Formul\u00e1rio Central"}
               </span>
               <span className="text-xs text-slate-500">
                 Plataforma de documentos
@@ -86,20 +82,20 @@ export default function AppShell({
               href="/dashboard"
               className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
                 pathname === "/dashboard"
-                  ? "bg-slate-900 text-slate-50 shadow-sm shadow-slate-400/40"
-                  : "text-slate-600 hover:bg-slate-100"
+                  ? "bg-sky-500 text-white shadow-md shadow-sky-300/60"
+                  : "text-slate-600 hover:bg-sky-50 hover:text-sky-700"
               }`}
             >
               <LayoutDashboard className="h-4 w-4" />
-              Formulário
+              {"Formul\u00e1rio"}
             </Link>
             {canAccessDocuments && (
               <Link
                 href="/documentos"
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
                   pathname?.startsWith("/documentos")
-                    ? "bg-slate-900 text-slate-50 shadow-sm shadow-slate-400/40"
-                    : "text-slate-600 hover:bg-slate-100"
+                    ? "bg-sky-500 text-white shadow-md shadow-sky-300/60"
+                    : "text-slate-600 hover:bg-sky-50 hover:text-sky-700"
                 }`}
               >
                 <FileText className="h-4 w-4" />
@@ -111,8 +107,8 @@ export default function AppShell({
                 href="/prestadores"
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
                   pathname?.startsWith("/prestadores")
-                    ? "bg-slate-900 text-slate-50 shadow-sm shadow-slate-400/40"
-                    : "text-slate-600 hover:bg-slate-100"
+                    ? "bg-sky-500 text-white shadow-md shadow-sky-300/60"
+                    : "text-slate-600 hover:bg-sky-50 hover:text-sky-700"
                 }`}
               >
                 <Building2 className="h-4 w-4" />
@@ -124,8 +120,8 @@ export default function AppShell({
                 href="/dashboard/analises"
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
                   pathname?.startsWith("/dashboard/analises")
-                    ? "bg-slate-900 text-slate-50 shadow-sm shadow-slate-400/40"
-                    : "text-slate-600 hover:bg-slate-100"
+                    ? "bg-sky-500 text-white shadow-md shadow-sky-300/60"
+                    : "text-slate-600 hover:bg-sky-50 hover:text-sky-700"
                 }`}
               >
                 <BarChart3 className="h-4 w-4" />
@@ -137,8 +133,8 @@ export default function AppShell({
                 href="/perfil"
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
                   pathname?.startsWith("/perfil")
-                    ? "bg-slate-900 text-slate-50 shadow-sm shadow-slate-400/40"
-                    : "text-slate-600 hover:bg-slate-100"
+                    ? "bg-sky-500 text-white shadow-md shadow-sky-300/60"
+                    : "text-slate-600 hover:bg-sky-50 hover:text-sky-700"
                 }`}
               >
                 <UserRound className="h-4 w-4" />
@@ -150,12 +146,12 @@ export default function AppShell({
                 href="/dashboard/permissoes"
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
                   pathname?.startsWith("/dashboard/permissoes")
-                    ? "bg-slate-900 text-slate-50 shadow-sm shadow-slate-400/40"
-                    : "text-slate-600 hover:bg-slate-100"
+                    ? "bg-sky-500 text-white shadow-md shadow-sky-300/60"
+                    : "text-slate-600 hover:bg-sky-50 hover:text-sky-700"
                 }`}
               >
                 <ShieldCheck className="h-4 w-4" />
-                Permissões
+                {"Permiss\u00f5es"}
               </Link>
             )}
             <button
@@ -182,12 +178,12 @@ export default function AppShell({
       </header>
 
       <main className="relative z-10 mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-5xl px-4 py-10">
-        <div className="pointer-events-none absolute inset-4 rounded-[32px] border border-white/5" />
+        <div className="pointer-events-none absolute inset-4 rounded-[32px] border border-slate-200/70" />
         <div className="pointer-events-none absolute inset-0 opacity-50">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.1),transparent_55%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(45,212,191,0.12),transparent_50%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.08),transparent_55%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(45,212,191,0.1),transparent_50%)]" />
         </div>
-        <div className="relative flex w-full flex-col rounded-[32px] border border-white/15 bg-white/95 p-8 text-slate-900 shadow-[0_30px_120px_rgba(15,23,42,0.45)] backdrop-blur">
+        <div className="relative flex w-full flex-col rounded-[32px] border border-slate-200 bg-white/95 p-8 text-slate-900 shadow-[0_30px_80px_rgba(15,23,42,0.12)] backdrop-blur">
           {authError && (
             <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
               <p className="font-medium">{authError}</p>
@@ -248,9 +244,7 @@ export default function AppShell({
             </div>
             <div className="mt-4 grid gap-4 text-sm text-slate-600 lg:grid-cols-2">
               <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Formulário
-                </p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{"Formul\u00e1rio"}</p>
                 <ul className="mt-2 space-y-1">
                   <li>Escolha o tipo de formulário e envie os documentos.</li>
                   <li>Use o prestador correto ao preencher as informações.</li>
@@ -289,8 +283,7 @@ export default function AppShell({
               </div>
               <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Permissões
-                </p>
+                  {"Permiss\u00f5es"}</p>
                 <ul className="mt-2 space-y-1">
                   <li>Conceda acesso por módulo e e-mail.</li>
                   <li>Revise permissões periodicamente.</li>
@@ -322,3 +315,4 @@ export default function AppShell({
     </div>
   );
 }
+
