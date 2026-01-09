@@ -66,17 +66,13 @@ const MESES = [
   { value: "12", label: "Dezembro" },
 ];
 
-const getUltimosMeses = (qtd = 6, anoRef?: number, mesRef?: number) => {
-  const base = new Date();
-  base.setDate(1);
-  if (typeof anoRef === "number" && typeof mesRef === "number") {
-    base.setFullYear(anoRef);
-    base.setMonth(mesRef);
-  }
-  base.setDate(1);
-  return Array.from({ length: qtd }).map((_, index) => {
-    const date = new Date(base);
-    date.setMonth(base.getMonth() - (qtd - index - 1));
+const getMesesDoAno = (ano: number, mesFinal?: number) => {
+  const limite =
+    typeof mesFinal === "number"
+      ? Math.min(Math.max(mesFinal, 0), 11)
+      : 11;
+  return Array.from({ length: limite + 1 }).map((_, index) => {
+    const date = new Date(ano, index, 1);
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
     return { key, label: formatMesCurto(date) };
   });
@@ -350,12 +346,17 @@ export default function DashboardAnalisesPage() {
       {},
     );
 
+    const now = new Date();
     const anoBase =
-      anoFilter === "todos" ? new Date().getFullYear() : Number(anoFilter);
-    const mesBase =
-      mesFilter === "todos" ? new Date().getMonth() : Number(mesFilter) - 1;
+      anoFilter === "todos" ? now.getFullYear() : Number(anoFilter);
+    const mesFinal =
+      mesFilter !== "todos"
+        ? Number(mesFilter) - 1
+        : anoBase === now.getFullYear()
+          ? now.getMonth()
+          : 11;
 
-    const base = getUltimosMeses(6, anoBase, mesBase);
+    const base = getMesesDoAno(anoBase, mesFinal);
     return base.map((item) => ({
       ...item,
       total: agrupado[item.key] ?? 0,
@@ -485,10 +486,10 @@ export default function DashboardAnalisesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Volume mensal (últimos 6 meses)
+                Volume mensal (ano atual)
               </p>
               <p className="text-[11px] text-slate-500">
-                Considera a data de envio de cada documento.
+                Considera os envios a partir de janeiro do ano atual.
               </p>
             </div>
             <BarChart3 className="h-5 w-5 text-slate-400" />
@@ -747,3 +748,4 @@ export default function DashboardAnalisesPage() {
     </div>
   );
 }
+

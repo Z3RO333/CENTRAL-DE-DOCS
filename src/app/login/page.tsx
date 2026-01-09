@@ -149,7 +149,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-sky-400/40 placeholder:text-slate-400 focus:border-sky-400 focus:ring"
-                  placeholder="M\u00ednimo 6 caracteres"
+                  placeholder="Mínimo 6 caracteres"
                   disabled={isProcessing}
                 />
               </div>
