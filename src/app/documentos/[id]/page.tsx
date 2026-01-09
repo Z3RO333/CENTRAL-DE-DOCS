@@ -574,37 +574,38 @@ export default function AssinaturaDocumentoPage() {
         : await pdfDoc.embedJpg(assinaturaBytes);
 
       const paginas = pdfDoc.getPages();
-      const paginaAlvo = paginas[paginas.length - 1];
-      const { width } = paginaAlvo.getSize();
       const margem = 40;
-      const larguraMaxima = Math.min(width - margem * 2, 320);
-      const escala =
-        assinaturaImagem.width > larguraMaxima
-          ? larguraMaxima / assinaturaImagem.width
-          : 1;
-      const larguraAssinatura = assinaturaImagem.width * escala;
-      const alturaAssinatura = assinaturaImagem.height * escala;
-      const posicaoX = (width - larguraAssinatura) / 2;
-      const posicaoY = margem;
-
-      paginaAlvo.drawImage(assinaturaImagem, {
-        x: posicaoX,
-        y: posicaoY,
-        width: larguraAssinatura,
-        height: alturaAssinatura,
-      });
-
       const fonte = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const textoAssinatura = `Assinado digitalmente por ${
         user.email ?? "usuário"
       } em ${new Date().toLocaleString("pt-BR")}`;
 
-      paginaAlvo.drawText(textoAssinatura, {
-        x: margem,
-        y: posicaoY + alturaAssinatura + 12,
-        size: 10,
-        font: fonte,
-        color: rgb(0.2, 0.2, 0.2),
+      paginas.forEach((paginaAlvo) => {
+        const { width } = paginaAlvo.getSize();
+        const larguraMaxima = Math.min(width - margem * 2, 320);
+        const escala =
+          assinaturaImagem.width > larguraMaxima
+            ? larguraMaxima / assinaturaImagem.width
+            : 1;
+        const larguraAssinatura = assinaturaImagem.width * escala;
+        const alturaAssinatura = assinaturaImagem.height * escala;
+        const posicaoX = (width - larguraAssinatura) / 2;
+        const posicaoY = margem;
+
+        paginaAlvo.drawImage(assinaturaImagem, {
+          x: posicaoX,
+          y: posicaoY,
+          width: larguraAssinatura,
+          height: alturaAssinatura,
+        });
+
+        paginaAlvo.drawText(textoAssinatura, {
+          x: margem,
+          y: posicaoY + alturaAssinatura + 12,
+          size: 10,
+          font: fonte,
+          color: rgb(0.2, 0.2, 0.2),
+        });
       });
 
       const pdfBytes = await pdfDoc.save();
@@ -1177,5 +1178,8 @@ export default function AssinaturaDocumentoPage() {
     </div>
   );
 }
+
+
+
 
 
