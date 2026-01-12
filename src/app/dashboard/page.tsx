@@ -811,7 +811,9 @@ export default function DashboardPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Histórico de envios
             </p>
-            <span className="text-[11px] text-slate-500">{"Consulte rapidamente os formul\\u00e1rios enviados pelo seu grupo."}</span>
+            <span className="text-[11px] text-slate-500">
+              Consulte rapidamente os formulários enviados pelo seu grupo.
+            </span>
           </div>
           <span className="text-[11px] text-slate-400">
             Mostrando {historicoFiltrado.length} registro(s) após filtros
