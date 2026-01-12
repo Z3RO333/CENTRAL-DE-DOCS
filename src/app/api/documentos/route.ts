@@ -179,7 +179,8 @@ export async function GET(request: Request) {
     const somenteAssinados = searchParams.get("somenteAssinados") === "true";
     const somenteDisponiveisLote =
       searchParams.get("somenteDisponiveisLote") === "true";
-    const limitParam = Number(searchParams.get("limit"));
+    const limitParamRaw = searchParams.get("limit");
+    const limitParam = limitParamRaw ? Number(limitParamRaw) : Number.NaN;
     const offsetParam = Number(searchParams.get("offset"));
     const limit = Number.isFinite(limitParam)
       ? Math.min(Math.max(limitParam, 1), 200)
