@@ -410,7 +410,14 @@ export default function FormularioPage() {
   const formatStatus = (status: string) =>
     statusLabelMap[status] ?? status.replace(/_/g, " ");
 
-  const formatTipo = (tipo: string) => tipoLabel[tipo] ?? tipo;
+
+  const formatData = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "--";
+    }
+    return date.toLocaleString("pt-BR");
+  };
 
 
   const resolveSignedPdfPath = (path?: string | null) => {
@@ -928,6 +935,7 @@ export default function FormularioPage() {
     </div>
   );
 }
+
 
 
 
