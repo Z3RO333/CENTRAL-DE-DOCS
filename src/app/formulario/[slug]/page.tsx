@@ -39,9 +39,9 @@ const FORM_CONFIGS: FormConfig[] = [
   {
     slug: "retencao-trabalhista",
     tipo: "retencao_trabalhista",
-    title: "RetenÃ§Ã£o Trabalhista",
+    title: "Retenção Trabalhista",
     description:
-      "Informe os dados necessÃ¡rios para anÃ¡lise e controle de retenÃ§Ãµes trabalhistas.",
+      "Informe os dados necessários para análise e controle de retenções trabalhistas.",
     defaultStatus: "em_analise",
     fields: [
       {
@@ -52,7 +52,7 @@ const FORM_CONFIGS: FormConfig[] = [
 
       {
         name: "competencia",
-        label: "CompetÃªncia",
+        label: "Competência",
         type: "text",
         placeholder: "MM/AAAA",
       },
@@ -60,13 +60,13 @@ const FORM_CONFIGS: FormConfig[] = [
         name: "prestador",
         label: "Prestador",
         type: "text",
-        placeholder: "Nome do prestador responsÃ¡vel pelo documento",
+        placeholder: "Nome do prestador responsável pelo documento",
       },
       {
         name: "observacoes",
-        label: "ObservaÃ§Ãµes",
+        label: "Observações",
         type: "textarea",
-        placeholder: "Detalhes adicionais sobre a retenÃ§Ã£o",
+        placeholder: "Detalhes adicionais sobre a retenção",
       },
     ],
   },
@@ -75,7 +75,7 @@ const FORM_CONFIGS: FormConfig[] = [
     tipo: "registro_laudos",
     title: "Registro e Laudos",
     description:
-      "Envie laudos e registros tÃ©cnicos para armazenamento e controle interno.",
+      "Envie laudos e registros técnicos para armazenamento e controle interno.",
     fields: [
       {
         name: "loja_id",
@@ -86,31 +86,31 @@ const FORM_CONFIGS: FormConfig[] = [
         name: "prestador",
         label: "Prestador",
         type: "text",
-        placeholder: "Nome do prestador responsÃ¡vel pelo documento",
+        placeholder: "Nome do prestador responsável pelo documento",
       },
       {
         name: "tipo_laudo",
         label: "Tipo de laudo",
         type: "text",
-        placeholder: "Ex.: Laudo TÃ©cnico, PPRA, LTCAT, etc.",
+        placeholder: "Ex.: Laudo Técnico, PPRA, LTCAT, etc.",
         options: ["Corretiva", "Preventiva"],
       },
       {
         name: "responsavel",
-        label: "ResponsÃ¡vel",
+        label: "Responsável",
         type: "text",
-        placeholder: "Nome do responsÃ¡vel tÃ©cnico",
+        placeholder: "Nome do responsável técnico",
       },
       {
         name: "data_emissao",
-        label: "Data de emissÃ£o",
+        label: "Data de emissão",
         type: "date",
       },
       {
         name: "observacoes",
-        label: "ObservaÃ§Ãµes",
+        label: "Observações",
         type: "textarea",
-        placeholder: "InformaÃ§Ãµes adicionais importantes",
+        placeholder: "Informações adicionais importantes",
       },
     ],
   },
@@ -131,19 +131,19 @@ const FORM_CONFIGS: FormConfig[] = [
         name: "prestador",
         label: "Prestador",
         type: "text",
-        placeholder: "Nome do prestador responsÃ¡vel pelo documento",
+        placeholder: "Nome do prestador responsável pelo documento",
       },
       {
         name: "numero_pedido",
-        label: "NÃºmero do pedido",
+        label: "Número do pedido",
         type: "text",
         placeholder: "Ex.: 12345",
       },
       {
         name: "numero_nf",
-        label: "NÃºmero da nota",
+        label: "Número da nota",
         type: "text",
-        placeholder: "NÃºmero completo da nota fiscal",
+        placeholder: "Número completo da nota fiscal",
       },
       {
         name: "valor",
@@ -153,9 +153,9 @@ const FORM_CONFIGS: FormConfig[] = [
       },
       {
         name: "descricao",
-        label: "DescriÃ§Ã£o / HistÃ³rico",
+        label: "Descrição / Histórico",
         type: "textarea",
-        placeholder: "DescriÃ§Ã£o dos serviÃ§os/produtos",
+        placeholder: "Descrição dos serviços/produtos",
       },
     ],
   },
@@ -292,7 +292,7 @@ export default function FormularioPage() {
       }
       const token = data.session?.access_token;
       if (!token) {
-        throw new Error("SessÃ£o expirada. FaÃ§a login novamente.");
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
       const params = new URLSearchParams();
       if (prestadoresDisponiveis.length > 0) {
@@ -315,16 +315,16 @@ export default function FormularioPage() {
       };
       if (!response.ok) {
         throw new Error(
-          payload.error ?? "NÃ£o foi possÃ­vel carregar o histÃ³rico de envios.",
+          payload.error ?? "Não foi possível carregar o histórico de envios.",
         );
       }
       setHistorico(payload.registros ?? []);
     } catch (err) {
-      console.error("Erro ao carregar histÃ³rico:", err);
+      console.error("Erro ao carregar histórico:", err);
       setHistoricoErro(
         err instanceof Error
           ? err.message
-          : "NÃ£o foi possÃ­vel carregar o histÃ³rico.",
+          : "Não foi possível carregar o histórico.",
       );
     } finally {
       setHistoricoLoading(false);
@@ -348,7 +348,7 @@ export default function FormularioPage() {
   if (!config) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center text-sm text-slate-300">
-        <p>FormulÃ¡rio nÃ£o encontrado.</p>
+        <p>Formulário não encontrado.</p>
       </div>
     );
   }
@@ -356,7 +356,7 @@ export default function FormularioPage() {
   if (authLoading || !user) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
-        Carregando formulÃ¡rio...
+        Carregando formulário...
       </div>
     );
   }
@@ -408,7 +408,7 @@ export default function FormularioPage() {
 
   const statusLabelMap: Record<string, string> = {
     pendente: "Pendente",
-    em_analise: "Em anÃ¡lise",
+    em_analise: "Em análise",
     assinado: "Assinado",
   };
 
@@ -473,7 +473,7 @@ export default function FormularioPage() {
       registro.arquivo_path;
 
     if (!path) {
-      setError("Arquivo indisponÃ­vel no momento.");
+      setError("Arquivo indisponível no momento.");
       return;
     }
 
@@ -488,7 +488,7 @@ export default function FormularioPage() {
       document.body.removeChild(anchor);
     } catch (err) {
       console.error("Erro ao abrir documento:", err);
-      setError("NÃ£o foi possÃ­vel abrir o documento. Tente novamente.");
+      setError("Não foi possível abrir o documento. Tente novamente.");
     }
   };
 
@@ -561,7 +561,7 @@ export default function FormularioPage() {
       }
 
       if (!user) {
-        setError("SessÃ£o expirada. FaÃ§a login novamente.");
+        setError("Sessão expirada. Faça login novamente.");
         router.push("/login");
         return;
       }
@@ -637,16 +637,16 @@ export default function FormularioPage() {
       setSuccess(
         uploadResults.length > 1
           ? `${uploadResults.length} documentos enviados separadamente!`
-          : "FormulÃ¡rio enviado com sucesso!",
+          : "Formulário enviado com sucesso!",
       );
       completeFormProgress();
       setFiles([]);
       setValues(getInitialValues());
       setSelectedPrestadorId("");
     } catch (err) {
-      console.error("Erro ao enviar formulÃ¡rio:", err);
+      console.error("Erro ao enviar formulário:", err);
       resetFormProgress();
-      setError("NÃ£o foi possÃ­vel enviar o formulÃ¡rio. Tente novamente.");
+      setError("Não foi possível enviar o formulário. Tente novamente.");
     } finally {
       setSubmitting(false);
     }
@@ -675,7 +675,7 @@ export default function FormularioPage() {
         <div className="rounded-2xl bg-sky-50/80 p-4 text-xs text-slate-600 shadow-sm shadow-sky-100">
           <div className="flex items-center justify-between">
             <p className="font-semibold text-slate-600">
-              Enviando formulÃ¡rio
+              Enviando formulário
             </p>
             <span className="text-[11px] font-semibold text-sky-700">
               {Math.min(formProgress, 100).toFixed(0)}%
@@ -719,7 +719,7 @@ export default function FormularioPage() {
                     {prestadoresLoading
                       ? "Carregando prestadores..."
                       : prestadoresDisponiveis.length === 0
-                        ? "Nenhum prestador disponÃ­vel"
+                        ? "Nenhum prestador disponível"
                         : "Selecione um prestador"}
                   </option>
                   {prestadoresDisponiveis.map((prestador) => (
@@ -783,16 +783,16 @@ export default function FormularioPage() {
               {enablePrestadorDropdown && field.name === "prestador" && (
                 <p className="text-[11px] text-slate-500">
                   {prestadoresLoading
-                    ? "Buscando prestadores vinculados ao seu usuÃ¡rio..."
+                    ? "Buscando prestadores vinculados ao seu usuário..."
                     : prestadoresDisponiveis.length === 0
-                      ? "Nenhum prestador foi associado Ã  sua conta. PeÃ§a ao administrador para adicionar seu e-mail ao grupo correto."
+                      ? "Nenhum prestador foi associado à sua conta. Peça ao administrador para adicionar seu e-mail ao grupo correto."
                       : "Escolha um prestador cadastrado pelo administrador para vincular o envio."}
                 </p>
               )}
               {field.name === "loja_id" && (
                 <p className="text-[11px] text-slate-500">
                   {lojasLoading
-                    ? "Carregando lojas disponÃ­veis..."
+                    ? "Carregando lojas disponíveis..."
                     : lojas.length === 0
                       ? "Cadastre uma loja antes de enviar documentos."
                       : "Selecione a loja para vincular o envio."}
@@ -844,7 +844,7 @@ export default function FormularioPage() {
             disabled={submitting}
             className="inline-flex items-center rounded-lg bg-sky-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-sky-300/70 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {submitting ? "Enviando..." : "Enviar formulÃ¡rio"}
+            {submitting ? "Enviando..." : "Enviar formulário"}
           </button>
         </div>
       </form>
@@ -853,10 +853,10 @@ export default function FormularioPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              HistÃ³rico de envios
+              Histórico de envios
             </p>
             <span className="text-[11px] text-slate-500">
-              Consulte rapidamente os formulÃ¡rios enviados pelo seu grupo.
+              Consulte rapidamente os formulários enviados pelo seu grupo.
             </span>
           </div>
           <span className="text-[11px] text-slate-400">
@@ -866,7 +866,7 @@ export default function FormularioPage() {
 
         {historicoLoading ? (
           <p className="mt-4 text-xs text-slate-500">
-            Carregando histÃ³rico de envios...
+            Carregando histórico de envios...
           </p>
         ) : historicoErro ? (
           <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -874,7 +874,7 @@ export default function FormularioPage() {
           </p>
         ) : historicoRecentes.length === 0 ? (
           <p className="mt-4 text-xs text-slate-500">
-            Ainda nÃ£o hÃ¡ envios registrados para o seu acesso.
+            Ainda não há envios registrados para o seu acesso.
           </p>
         ) : (
           <ul className="mt-4 space-y-3 text-xs text-slate-600">
@@ -938,6 +938,8 @@ export default function FormularioPage() {
     </div>
   );
 }
+
+
 
 
 
