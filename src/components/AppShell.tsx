@@ -60,7 +60,7 @@ export default function AppShell({
   const navItems = [
     {
       href: "/dashboard",
-      label: "Formulários",
+      label: "Formularios",
       icon: LayoutDashboard,
       isActive: pathname === "/dashboard",
       isVisible: true,
@@ -88,7 +88,7 @@ export default function AppShell({
     },
     {
       href: "/dashboard/permissoes",
-      label: "Permissões",
+      label: "Permissoes",
       icon: ShieldCheck,
       isActive: pathname?.startsWith("/dashboard/permissoes"),
       isVisible: canAccessDocuments,
@@ -112,7 +112,7 @@ export default function AppShell({
 
       <div className="relative z-10 flex min-h-screen">
         <div
-          className={`fixed inset-0 z-30 bg-slate-900/40 transition md:hidden ${
+          className={`fixed inset-0 z-30 bg-amber-100/70 transition md:hidden ${
             isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
           onClick={() => setIsSidebarOpen(false)}
@@ -120,7 +120,7 @@ export default function AppShell({
         />
 
         <aside
-          className={`fixed left-0 top-0 z-40 flex h-full w-72 flex-col bg-slate-950/95 text-slate-100 shadow-2xl shadow-slate-900/40 backdrop-blur transition-transform md:relative md:translate-x-0 ${
+          className={`fixed left-0 top-0 z-40 flex h-full w-72 flex-col bg-[#fff7ed]/95 text-slate-700 shadow-2xl shadow-amber-200/60 backdrop-blur transition-transform md:relative md:translate-x-0 ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -130,21 +130,21 @@ export default function AppShell({
               className="flex items-center gap-3 text-left"
               onClick={() => setIsSidebarOpen(false)}
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300 via-orange-300 to-rose-300 text-slate-900 shadow-lg shadow-amber-200/40">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300 via-orange-300 to-rose-300 text-slate-700 shadow-lg shadow-amber-200/40">
                 <LayoutDashboard className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-200">
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-700">
                   Central
                 </p>
-                <p className="text-[11px] text-slate-300">
+                <p className="text-[11px] text-slate-500">
                   Fluxo de documentos
                 </p>
               </div>
             </Link>
             <button
               type="button"
-              className="rounded-full bg-white/10 p-2 text-slate-100 hover:bg-white/20 md:hidden"
+              className="rounded-full bg-amber-200/60 p-2 text-amber-800 hover:bg-amber-200 md:hidden"
               onClick={() => setIsSidebarOpen(false)}
               aria-label="Fechar menu"
             >
@@ -164,15 +164,15 @@ export default function AppShell({
                     onClick={() => setIsSidebarOpen(false)}
                     className={`group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
                       item.isActive
-                        ? "bg-white text-slate-900 shadow-lg shadow-black/20"
-                        : "text-slate-200 hover:bg-white/10 hover:text-white"
+                        ? "bg-white text-slate-900 shadow-lg shadow-amber-200/60"
+                        : "text-slate-600 hover:bg-white hover:text-slate-900"
                     }`}
                   >
                     <span
                       className={`flex h-9 w-9 items-center justify-center rounded-xl ${
                         item.isActive
-                          ? "bg-slate-900 text-amber-200"
-                          : "bg-white/10 text-slate-200 group-hover:text-amber-200"
+                          ? "bg-amber-200 text-amber-800"
+                          : "bg-amber-100/60 text-slate-600 group-hover:text-amber-700"
                       }`}
                     >
                       <Icon className="h-4 w-4" />
@@ -184,9 +184,9 @@ export default function AppShell({
           </nav>
 
           <div className="px-4 pb-6 pt-4">
-            <div className="rounded-2xl bg-white/10 px-4 py-3 text-xs text-slate-200">
-              <p className="font-semibold text-amber-200">Sessão ativa</p>
-              <p className="mt-1 truncate text-[11px] text-slate-300">
+            <div className="rounded-2xl bg-amber-100/70 px-4 py-3 text-xs text-slate-600">
+              <p className="font-semibold text-amber-700">Sessao ativa</p>
+              <p className="mt-1 truncate text-[11px] text-slate-500">
                 {user?.email ?? "Visitante"}
               </p>
             </div>
@@ -194,19 +194,19 @@ export default function AppShell({
               <button
                 type="button"
                 onClick={() => setIsHelpOpen(true)}
-                className="inline-flex items-center justify-between rounded-2xl bg-white/10 px-4 py-2 text-xs font-semibold text-slate-100 transition hover:bg-white/20"
+                className="inline-flex items-center justify-between rounded-2xl bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-amber-50"
               >
-                Ajuda rápida
-                <HelpCircle className="h-4 w-4 text-amber-200" />
+                Ajuda rapida
+                <HelpCircle className="h-4 w-4 text-amber-600" />
               </button>
               {isAuthenticated && (
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="inline-flex items-center justify-between rounded-2xl bg-white/10 px-4 py-2 text-xs font-semibold text-slate-100 transition hover:bg-white/20"
+                  className="inline-flex items-center justify-between rounded-2xl bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-amber-50"
                 >
                   Sair
-                  <LogOut className="h-4 w-4 text-amber-200" />
+                  <LogOut className="h-4 w-4 text-amber-600" />
                 </button>
               )}
             </div>
@@ -218,19 +218,19 @@ export default function AppShell({
             <button
               type="button"
               onClick={() => setIsSidebarOpen(true)}
-              className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-slate-900/30"
+              className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-amber-200/60"
             >
               <Menu className="h-4 w-4" />
               Menu
             </button>
             <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Formulário Central
+              Formulario Central
             </span>
           </header>
 
           <main className="relative flex-1 px-4 pb-10 pt-6 md:px-8">
             <div className="mx-auto flex w-full max-w-6xl flex-1">
-              <div className="relative w-full rounded-[28px] bg-white/90 p-6 shadow-[0_28px_70px_rgba(15,23,42,0.16)]">
+              <div className="relative w-full rounded-[28px] bg-white/90 p-6 shadow-[0_28px_70px_rgba(148,163,184,0.35)]">
                 {authError && (
                   <div className="mb-4 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-900">
                     <p className="font-medium">{authError}</p>
@@ -245,15 +245,15 @@ export default function AppShell({
                 )}
                 {isLoading ? (
                   <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
-                    Carregando sessão...
+                    Carregando sessao...
                   </div>
                 ) : resolvedWithoutUser ? (
                   <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-slate-500">
-                    <p>Sessão expirada. Faça login novamente para continuar.</p>
+                    <p>Sessao expirada. Faca login novamente para continuar.</p>
                     <button
                       type="button"
                       onClick={() => router.push("/login")}
-                      className="rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white shadow-md shadow-slate-900/30 transition hover:bg-slate-800"
+                      className="rounded-full bg-amber-500 px-4 py-1.5 text-xs font-semibold text-white shadow-md shadow-amber-200/60 transition hover:bg-amber-400"
                     >
                       Ir para login
                     </button>
@@ -269,7 +269,7 @@ export default function AppShell({
 
       {isHelpOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-amber-100/70 px-4 py-6"
           role="dialog"
           aria-modal="true"
         >
@@ -286,7 +286,7 @@ export default function AppShell({
               <button
                 type="button"
                 onClick={() => setIsHelpOpen(false)}
-                className="rounded-full bg-slate-900/10 p-2 text-slate-600 transition hover:bg-slate-900/20"
+                className="rounded-full bg-amber-100 p-2 text-amber-700 transition hover:bg-amber-200"
                 aria-label="Fechar ajuda"
               >
                 <X className="h-4 w-4" />
@@ -295,12 +295,12 @@ export default function AppShell({
             <div className="mt-4 grid gap-4 text-sm text-slate-600 lg:grid-cols-2">
               <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {"Formulário"}
+                  {"Formulario"}
                 </p>
                 <ul className="mt-2 space-y-1">
-                  <li>Escolha o tipo de formulário e envie os documentos.</li>
-                  <li>Use o prestador correto ao preencher as informações.</li>
-                  <li>Consulte o histórico de envios do seu grupo.</li>
+                  <li>Escolha o tipo de formulario e envie os documentos.</li>
+                  <li>Use o prestador correto ao preencher as informacoes.</li>
+                  <li>Consulte o historico de envios do seu grupo.</li>
                 </ul>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">
@@ -309,8 +309,8 @@ export default function AppShell({
                 </p>
                 <ul className="mt-2 space-y-1">
                   <li>Veja documentos enviados e seus status.</li>
-                  <li>Filtre por tipo, período e prestador.</li>
-                  <li>Abra, baixe ou assine quando aplicável.</li>
+                  <li>Filtre por tipo, periodo e prestador.</li>
+                  <li>Abra, baixe ou assine quando aplicavel.</li>
                 </ul>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">
@@ -320,7 +320,7 @@ export default function AppShell({
                 <ul className="mt-2 space-y-1">
                   <li>Cadastre prestadores com nome, tipo e CNPJ.</li>
                   <li>Adicione e-mails autorizados por prestador.</li>
-                  <li>Crie regras de monitoramento por período.</li>
+                  <li>Crie regras de monitoramento por periodo.</li>
                 </ul>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">
@@ -329,18 +329,18 @@ export default function AppShell({
                 </p>
                 <ul className="mt-2 space-y-1">
                   <li>Acompanhe volume de envios e metas.</li>
-                  <li>Analise por mês, ano e tipo de serviço.</li>
-                  <li>Use os gráficos para identificar tendências.</li>
+                  <li>Analise por mes, ano e tipo de servico.</li>
+                  <li>Use os graficos para identificar tendencias.</li>
                 </ul>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {"Permissões"}
+                  {"Permissoes"}
                 </p>
                 <ul className="mt-2 space-y-1">
-                  <li>Conceda acesso por módulo e e-mail.</li>
-                  <li>Revise permissões periodicamente.</li>
-                  <li>Remova acessos quando necessário.</li>
+                  <li>Conceda acesso por modulo e e-mail.</li>
+                  <li>Revise permissoes periodicamente.</li>
+                  <li>Remova acessos quando necessario.</li>
                 </ul>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">
@@ -349,7 +349,7 @@ export default function AppShell({
                 </p>
                 <ul className="mt-2 space-y-1">
                   <li>Gerencie assinatura e dados pessoais.</li>
-                  <li>Atualize suas preferências quando precisar.</li>
+                  <li>Atualize suas preferencias quando precisar.</li>
                 </ul>
               </div>
             </div>
@@ -357,7 +357,7 @@ export default function AppShell({
               <button
                 type="button"
                 onClick={() => setIsHelpOpen(false)}
-                className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
+                className="rounded-full bg-amber-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-amber-400"
               >
                 Fechar
               </button>
