@@ -165,10 +165,15 @@ const FORM_TIPO_ASSINAVEL = "registro_laudos";
 const STORAGE_BUCKET = "formularios";
 const SIGNED_URL_EXPIRES_IN = 60 * 30;
 
-const tipoLabel: Record<string, string> = {
-  retencao_trabalhista: "RetenÃ§Ã£o Trabalhista",
-  registro_laudos: "Registro e Laudos",
-  notas_fiscais: "Notas Fiscais",
+
+const formatTipo = (tipo: string) => tipoLabel[tipo] ?? tipo;
+
+const formatData = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "--";
+  }
+  return date.toLocaleString("pt-BR");
 };
 
 type DocumentoHistorico = {
@@ -411,13 +416,6 @@ export default function FormularioPage() {
     statusLabelMap[status] ?? status.replace(/_/g, " ");
 
 
-  const formatData = (value: string) => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return "--";
-    }
-    return date.toLocaleString("pt-BR");
-  };
 
 
   const resolveSignedPdfPath = (path?: string | null) => {
@@ -935,6 +933,8 @@ export default function FormularioPage() {
     </div>
   );
 }
+
+
 
 
 
