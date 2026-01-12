@@ -326,7 +326,7 @@ export default function AssinaturaDocumentoPage() {
           .single();
 
         if (fetchError || !data) {
-          throw new Error("Documento n?o encontrado.");
+          throw new Error("Documento não encontrado.");
         }
 
         const record: FormularioRecord = {
@@ -368,7 +368,7 @@ export default function AssinaturaDocumentoPage() {
           setError(
             err instanceof Error
               ? err.message
-              : "N?o foi poss?vel carregar o documento.",
+              : "Não foi possível carregar o documento.",
           );
           setRegistro(null);
         }
@@ -852,7 +852,7 @@ export default function AssinaturaDocumentoPage() {
             {observacoes && (
               <div className="sm:col-span-2">
                 <p className="text-[11px] font-semibold text-slate-500">
-                  Observacoes
+                  Observações
                 </p>
                 <p className="text-sm text-slate-600">{observacoes}</p>
               </div>
@@ -948,7 +948,7 @@ export default function AssinaturaDocumentoPage() {
             />
           </div>
           <p className="mt-2 text-[11px] text-slate-500">
-            Mantemos o documento aberto para revisao enquanto aplicamos sua
+            Mantemos o documento aberto para revisão enquanto aplicamos sua
             assinatura.
           </p>
         </div>

@@ -29,11 +29,11 @@ const normalizeText = (value: string | null) =>
 
 const getNameFromEmail = (email: string | null) => {
   if (!email) {
-    return "Usuario";
+    return "Usuário";
   }
   const handle = email.split("@")[0] ?? "";
   if (!handle) {
-    return "Usuario";
+    return "Usuário";
   }
   return handle
     .split(/[._-]+/)
@@ -112,7 +112,7 @@ export default function UsuariosPage() {
       }
       const token = sessionData.session?.access_token;
       if (!token) {
-        throw new Error("Sessao expirada. Faca login novamente.");
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
       const response = await fetch("/api/admin/users", {
         headers: {
@@ -124,13 +124,13 @@ export default function UsuariosPage() {
         error?: string;
       };
       if (!response.ok) {
-        throw new Error(payload.error ?? "Falha ao carregar usuarios.");
+        throw new Error(payload.error ?? "Falha ao carregar usuários.");
       }
       setUsers(payload.users ?? []);
     } catch (err) {
       setUsers([]);
       setUsersError(
-        err instanceof Error ? err.message : "Falha ao carregar usuarios.",
+        err instanceof Error ? err.message : "Falha ao carregar usuários.",
       );
     } finally {
       setUsersLoading(false);
@@ -204,10 +204,10 @@ export default function UsuariosPage() {
       }
       await refreshPermissions();
       setEditingUser(null);
-      setFeedback("Funcao atualizada com sucesso.");
+      setFeedback("Função atualizada com sucesso.");
     } catch (err) {
       setFeedback(
-        err instanceof Error ? err.message : "Falha ao atualizar a funcao.",
+        err instanceof Error ? err.message : "Falha ao atualizar a função.",
       );
     } finally {
       setSavingRole(false);
@@ -225,7 +225,7 @@ export default function UsuariosPage() {
   if (authLoading || accessLoading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
-        Carregando usuarios...
+        Carregando usuários...
       </div>
     );
   }
@@ -243,16 +243,16 @@ export default function UsuariosPage() {
       <div className="flex items-center gap-2 text-xs text-slate-500">
         <span className="font-medium">Home</span>
         <ChevronRight className="h-3.5 w-3.5" />
-        <span className="font-semibold text-slate-700">Usuarios</span>
+        <span className="font-semibold text-slate-700">Usuários</span>
       </div>
 
       <header>
         <h1 className="text-2xl font-semibold text-slate-900">
-          Gerenciamento de usuarios
+          Gerenciamento de usuários
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Aqui voce pode gerenciar os usuarios da aplicacao. Altere as funcoes
-          e permissoes de cada usuario.
+          Aqui você pode gerenciar os usuários da aplicação. Altere as funções
+          e permissões de cada usuário.
         </p>
       </header>
 
@@ -301,7 +301,7 @@ export default function UsuariosPage() {
               <tr>
                 <th className="px-5 py-3 text-left">Nome</th>
                 <th className="px-5 py-3 text-left">E-mail</th>
-                <th className="px-5 py-3 text-left">Funcao</th>
+                <th className="px-5 py-3 text-left">Função</th>
                 <th className="px-5 py-3 text-left">Status</th>
                 <th className="px-5 py-3 text-right"></th>
               </tr>
@@ -310,13 +310,13 @@ export default function UsuariosPage() {
               {usersLoading || permissionsLoading ? (
                 <tr>
                   <td className="px-5 py-6 text-center text-slate-500" colSpan={5}>
-                    Carregando usuarios...
+                    Carregando usuários...
                   </td>
                 </tr>
               ) : visibleUsers.length === 0 ? (
                 <tr>
                   <td className="px-5 py-6 text-center text-slate-500" colSpan={5}>
-                    Nenhum usuario encontrado.
+                    Nenhum usuário encontrado.
                   </td>
                 </tr>
               ) : (
@@ -347,7 +347,7 @@ export default function UsuariosPage() {
                           onClick={() => openEditor(entry)}
                           disabled={!entry.email}
                           className="rounded-full border border-slate-200 p-2 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          aria-label="Editar usuario"
+                          aria-label="Editar usuário"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
@@ -366,7 +366,7 @@ export default function UsuariosPage() {
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Editar usuario
+                Editar usuário
               </p>
               <p className="mt-1 text-lg font-semibold text-slate-900">
                 {getDisplayName(editingUser)}
@@ -375,7 +375,7 @@ export default function UsuariosPage() {
             </div>
             <div className="mt-4">
               <label className="text-xs font-semibold text-slate-600">
-                Funcao
+                Função
                 <select
                   value={editingRole}
                   onChange={(event) =>
@@ -389,7 +389,7 @@ export default function UsuariosPage() {
               </label>
               <p className="mt-2 text-[11px] text-slate-500">
                 Administradores veem todas as telas. Colaboradores veem apenas os
-                documentos do grupo vinculado ao email.
+                documentos do grupo vinculado ao e-mail.
               </p>
             </div>
             <div className="mt-6 flex justify-end gap-2 text-xs">

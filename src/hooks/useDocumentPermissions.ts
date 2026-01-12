@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -52,7 +52,7 @@ export function useDocumentPermissions(
     }
     const token = sessionData.session?.access_token;
     if (!token) {
-      throw new Error("Sessao expirou. Faca login novamente.");
+      throw new Error("Sessão expirou. Faça login novamente.");
     }
     return token;
   }, []);

@@ -57,7 +57,7 @@ export default function AppShell({
   const navItems = [
     {
       href: "/dashboard",
-      label: "Formularios",
+      label: "Formulários",
       icon: LayoutDashboard,
       isActive: pathname === "/dashboard",
       isVisible: isAdmin,
@@ -85,7 +85,7 @@ export default function AppShell({
     },
     {
       href: "/usuarios",
-      label: "Usuarios",
+      label: "Usuários",
       icon: ShieldCheck,
       isActive: pathname?.startsWith("/usuarios"),
       isVisible: isAdmin,
@@ -182,7 +182,7 @@ export default function AppShell({
 
           <div className="px-4 pb-6 pt-4">
             <div className="rounded-2xl bg-slate-100/80 px-4 py-3 text-xs text-slate-600">
-              <p className="font-semibold text-slate-700">Sessao ativa</p>
+              <p className="font-semibold text-slate-700">Sessão ativa</p>
               <p className="mt-1 truncate text-[11px] text-slate-500">
                 {user?.email ?? "Visitante"}
               </p>
@@ -193,7 +193,7 @@ export default function AppShell({
                 onClick={() => setIsHelpOpen(true)}
                 className="inline-flex items-center justify-between rounded-2xl bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
               >
-                Ajuda rapida
+                Ajuda rápida
                 <HelpCircle className="h-4 w-4 text-sky-600" />
               </button>
               {isAuthenticated && (
@@ -221,7 +221,7 @@ export default function AppShell({
               Menu
             </button>
             <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Formulario Central
+              Formulário Central
             </span>
           </header>
 
@@ -242,11 +242,11 @@ export default function AppShell({
                 )}
                 {isLoading ? (
                   <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
-                    Carregando sessao...
+                    Carregando sessão...
                   </div>
                 ) : resolvedWithoutUser ? (
                   <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-slate-500">
-                    <p>Sessao expirada. Faca login novamente para continuar.</p>
+                    <p>Sessão expirada. Faça login novamente para continuar.</p>
                     <button
                       type="button"
                       onClick={() => router.push("/login")}
@@ -292,12 +292,12 @@ export default function AppShell({
             <div className="mt-4 grid gap-4 text-sm text-slate-600 lg:grid-cols-2">
               <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {"Formulario"}
+                  {"Formulário"}
                 </p>
                 <ul className="mt-2 space-y-1">
-                  <li>Escolha o tipo de formulario e envie os documentos.</li>
-                  <li>Use o prestador correto ao preencher as informacoes.</li>
-                  <li>Consulte o historico de envios do seu grupo.</li>
+                  <li>Escolha o tipo de formulário e envie os documentos.</li>
+                  <li>Use o prestador correto ao preencher as informações.</li>
+                  <li>Consulte o histórico de envios do seu grupo.</li>
                 </ul>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">
@@ -306,8 +306,8 @@ export default function AppShell({
                 </p>
                 <ul className="mt-2 space-y-1">
                   <li>Veja documentos enviados e seus status.</li>
-                  <li>Filtre por tipo, periodo e prestador.</li>
-                  <li>Abra, baixe ou assine quando aplicavel.</li>
+                  <li>Filtre por tipo, período e prestador.</li>
+                  <li>Abra, baixe ou assine quando aplicável.</li>
                 </ul>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">
@@ -317,7 +317,7 @@ export default function AppShell({
                 <ul className="mt-2 space-y-1">
                   <li>Cadastre prestadores com nome, tipo e CNPJ.</li>
                   <li>Adicione e-mails autorizados por prestador.</li>
-                  <li>Crie regras de monitoramento por periodo.</li>
+                  <li>Crie regras de monitoramento por período.</li>
                 </ul>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">
@@ -326,18 +326,18 @@ export default function AppShell({
                 </p>
                 <ul className="mt-2 space-y-1">
                   <li>Acompanhe volume de envios e metas.</li>
-                  <li>Analise por mes, ano e tipo de servico.</li>
-                  <li>Use os graficos para identificar tendencias.</li>
+                  <li>Analise por mês, ano e tipo de serviço.</li>
+                  <li>Use os gráficos para identificar tendências.</li>
                 </ul>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Usuarios
+                  Usuários
                 </p>
                 <ul className="mt-2 space-y-1">
-                  <li>Defina quem e administrador ou colaborador.</li>
-                  <li>Edite funcoes para liberar acessos.</li>
-                  <li>Revise usuarios periodicamente.</li>
+                  <li>Defina quem é administrador ou colaborador.</li>
+                  <li>Edite funções para liberar acessos.</li>
+                  <li>Revise usuários periodicamente.</li>
                 </ul>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">
@@ -346,7 +346,7 @@ export default function AppShell({
                 </p>
                 <ul className="mt-2 space-y-1">
                   <li>Gerencie assinatura e dados pessoais.</li>
-                  <li>Atualize suas preferencias quando precisar.</li>
+                  <li>Atualize suas preferências quando precisar.</li>
                 </ul>
               </div>
             </div>

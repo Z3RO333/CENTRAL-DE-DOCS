@@ -155,7 +155,7 @@ const defaultIdentificacaoConfig = {
 const MESES = [
   { value: "01", label: "Janeiro" },
   { value: "02", label: "Fevereiro" },
-  { value: "03", label: "Marco" },
+  { value: "03", label: "Março" },
   { value: "04", label: "Abril" },
   { value: "05", label: "Maio" },
   { value: "06", label: "Junho" },
@@ -656,7 +656,7 @@ export default function DocumentosPage() {
   const abrirDocumento = async (registro: FormularioRecord) => {
     const path = getPathParaVisualizacao(registro);
     if (!path) {
-      setError("Arquivo indisponivel no momento.");
+      setError("Arquivo indisponível no momento.");
       return;
     }
 
@@ -675,7 +675,7 @@ export default function DocumentosPage() {
   const baixarDocumento = async (registro: FormularioRecord) => {
     const path = getPathParaDownload(registro);
     if (!path) {
-      setError("Arquivo indisponivel no momento.");
+      setError("Arquivo indisponível no momento.");
       return;
     }
 
@@ -1373,7 +1373,7 @@ export default function DocumentosPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Assinaturas disponiveis
+                Assinaturas disponíveis
               </p>
               <p className="text-sm text-slate-600">
                 {assinaturasPendentes.length > 0 ? (
@@ -1397,7 +1397,7 @@ export default function DocumentosPage() {
                         type="button"
                         onClick={() => toggleSelecionar(id)}
                         className="text-[10px] font-semibold text-slate-500 transition hover:text-slate-800"
-                        title="Remover da selecao"
+                        title="Remover da seleção"
                       >
                         x
                       </button>
@@ -1428,7 +1428,7 @@ export default function DocumentosPage() {
                 disabled={!hasSelection}
                 className="rounded-full border border-slate-200 px-4 py-1.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Limpar selecao
+                Limpar seleção
               </button>
               <button
                 type="button"
