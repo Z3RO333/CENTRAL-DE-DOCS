@@ -420,17 +420,16 @@ export default function FormularioPage() {
     return date.toLocaleString("pt-BR");
   };
 
-  const resolveSignedPdfPath = (path?: string | null) => {
-    if (!path) {
-      return null;
+
+  const getSignedFileUrl = async (path: string) => {
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(path, SIGNED_URL_EXPIRES_IN);
+
+    if (error || !data?.signedUrl) {
+      throw error ?? new Error("Não foi possível gerar o link do arquivo.");
     }
-    if (path.endsWith("-view.html")) {
-      return path.replace(/-view\.html$/, ".pdf");
-    }
-    if (path.endsWith(".html")) {
-      return path.replace(/\.html$/, ".pdf");
-    }
-    return path;
+    return data.signedUrl;
   };
 
   
@@ -923,6 +922,7 @@ export default function FormularioPage() {
     </div>
   );
 }
+
 
 
 
