@@ -128,7 +128,7 @@ export default function AppShell({
               className="flex items-center gap-3 text-left"
               onClick={() => setIsSidebarOpen(false)}
             >
-              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg shadow-slate-200/60">
+              <div className="flex h-10 w-10 items-center justify-center">
                 <Image
                   src="/Letra _b_ em azul vibrante.png"
                   alt="Logo da Bemol"
@@ -173,14 +173,8 @@ export default function AppShell({
                         : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                     }`}
                   >
-                    <span
-                      className={`flex h-9 w-9 items-center justify-center rounded-xl ${
-                        item.isActive
-                          ? "bg-sky-100 text-sky-700"
-                          : "bg-slate-100 text-slate-600 group-hover:text-sky-700"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
+                    <span className="flex h-9 w-9 items-center justify-center text-slate-600 group-hover:text-sky-700">
+                      <Icon className="h-5 w-5" />
                     </span>
                     {item.label}
                   </Link>
