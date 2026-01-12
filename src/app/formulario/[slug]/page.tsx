@@ -161,10 +161,12 @@ const FORM_CONFIGS: FormConfig[] = [
   },
 ];
 
-const FORM_TIPO_ASSINAVEL = "registro_laudos";
-const STORAGE_BUCKET = "formularios";
-const SIGNED_URL_EXPIRES_IN = 60 * 30;
 
+const tipoLabel: Record<string, string> = {
+  retencao_trabalhista: "Retenção Trabalhista",
+  registro_laudos: "Registro e Laudos",
+  notas_fiscais: "Notas Fiscais",
+};
 
 const formatTipo = (tipo: string) => tipoLabel[tipo] ?? tipo;
 
@@ -933,6 +935,8 @@ export default function FormularioPage() {
     </div>
   );
 }
+
+
 
 
 
