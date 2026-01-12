@@ -161,6 +161,9 @@ const FORM_CONFIGS: FormConfig[] = [
   },
 ];
 
+const FORM_TIPO_ASSINAVEL = "registro_laudos";
+const STORAGE_BUCKET = "formularios";
+const SIGNED_URL_EXPIRES_IN = 60 * 30;
 
 const tipoLabel: Record<string, string> = {
   retencao_trabalhista: "Retenção Trabalhista",
@@ -935,6 +938,7 @@ export default function FormularioPage() {
     </div>
   );
 }
+
 
 
 
