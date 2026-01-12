@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 
@@ -40,7 +40,7 @@ class HttpError extends Error {
 async function getSessionUser(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    throw new HttpError(401, "Requisição não autorizada.");
+    throw new HttpError(401, "RequisiÃ§Ã£o nÃ£o autorizada.");
   }
 
   const accessToken = authHeader.slice("Bearer ".length).trim();
@@ -49,7 +49,7 @@ async function getSessionUser(request: Request) {
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
-      "Configuração incompleta. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      "ConfiguraÃ§Ã£o incompleta. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
     );
   }
 
@@ -62,7 +62,7 @@ async function getSessionUser(request: Request) {
 
   const { data, error } = await supabaseSession.auth.getUser(accessToken);
   if (error || !data?.user) {
-    throw new HttpError(401, "Sessão inválida ou expirada.");
+    throw new HttpError(401, "SessÃ£o invÃ¡lida ou expirada.");
   }
 
   return data.user;
@@ -73,11 +73,12 @@ async function hasDocumentosAccess(
   email: string | null,
   supabaseAdmin = createSupabaseAdminClient(),
 ) {
+  const adminModules = ["admin", "documentos", "dashboards", "perfil"];
   const { data, error } = await supabaseAdmin
     .from("documentos_acesso")
     .select("id")
     .eq("user_id", userId)
-    .in("modulo", ["documentos", "dashboards"])
+    .in("modulo", adminModules)
     .maybeSingle();
 
   if (error) {
@@ -99,7 +100,7 @@ async function hasDocumentosAccess(
     .from("documentos_acesso")
     .select("id")
     .eq("email", email)
-    .in("modulo", ["documentos", "dashboards"])
+    .in("modulo", adminModules)
     .maybeSingle();
 
   if (emailError) {
@@ -186,21 +187,10 @@ export async function GET(request: Request) {
     let userFilter = filterUserId;
 
     if (!canAccess) {
-      if (prestadoresPermitidos.length > 0) {
-        prestadoresPermitidos = prestadoresPermitidos.filter((id) =>
-          allowedPrestadores.includes(id),
-        );
-        if (prestadoresPermitidos.length === 0) {
-          throw new HttpError(
-            403,
-            "Você não possui permissão para consultar documentos.",
-          );
-        }
-      } else if (allowedPrestadores.length > 0) {
-        prestadoresPermitidos = allowedPrestadores;
-      } else {
-        userFilter = user.id;
-      }
+      throw new HttpError(
+        403,
+        "Voce nao possui permissao para remover este documento.",
+      );
     }
 
     let query = supabaseAdmin
@@ -295,7 +285,7 @@ export async function GET(request: Request) {
     const message =
       err instanceof Error
         ? err.message
-        : "Não foi possível carregar os documentos.";
+        : "NÃ£o foi possÃ­vel carregar os documentos.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -333,23 +323,14 @@ export async function DELETE(request: Request) {
       throw recordError;
     }
     if (!registros || registros.length !== idsToRemove.length) {
-      throw new HttpError(404, "Documento não encontrado.");
+      throw new HttpError(404, "Documento nÃ£o encontrado.");
     }
 
     if (!canAccess) {
-      const isAuthorized = registros.every((registro) => {
-        const prestadorId = registro.prestador_id as string | null;
-        const hasPrestadorAccess =
-          prestadorId && allowedPrestadores.includes(prestadorId);
-        const isOwner = registro.user_id === user.id;
-        return hasPrestadorAccess || isOwner;
-      });
-      if (!isAuthorized) {
-        throw new HttpError(
-          403,
-          "Você não possui permissão para remover este documento.",
-        );
-      }
+      throw new HttpError(
+        403,
+        "Voce nao possui permissao para remover este documento.",
+      );
     }
 
     const { error: deleteError } = await supabaseAdmin
@@ -384,7 +365,9 @@ export async function DELETE(request: Request) {
     const message =
       err instanceof Error
         ? err.message
-        : "Não foi possível remover o documento.";
+        : "NÃ£o foi possÃ­vel remover o documento.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+

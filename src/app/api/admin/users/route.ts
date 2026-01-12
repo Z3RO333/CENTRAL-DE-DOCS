@@ -5,6 +5,7 @@ import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 type SafeUser = {
   id: string;
   email: string | null;
+  name: string | null;
   created_at: string;
   last_sign_in_at: string | null;
   phone: string | null;
@@ -54,12 +55,13 @@ export async function GET(request: Request) {
     const requesterId = userData.user.id;
     const requesterEmail = userData.user.email?.toLowerCase().trim() ?? null;
 
+    const adminModules = ["admin", "documentos", "dashboards", "perfil"];
     const { data: permissionById, error: permissionByIdError } =
       await supabaseAdmin
         .from("documentos_acesso")
         .select("id")
         .eq("user_id", requesterId)
-        .eq("modulo", "documentos")
+        .in("modulo", adminModules)
         .maybeSingle();
 
     if (permissionByIdError) {
@@ -73,7 +75,7 @@ export async function GET(request: Request) {
           .from("documentos_acesso")
           .select("id")
           .eq("email", requesterEmail)
-          .eq("modulo", "documentos")
+          .in("modulo", adminModules)
           .maybeSingle();
 
       if (permissionByEmailError) {
@@ -113,6 +115,10 @@ export async function GET(request: Request) {
         ...currentUsers.map((user) => ({
           id: user.id,
           email: user.email ?? null,
+          name:
+            (user.user_metadata?.name as string | undefined) ??
+            (user.user_metadata?.full_name as string | undefined) ??
+            null,
           created_at: user.created_at ?? "",
           last_sign_in_at: user.last_sign_in_at ?? null,
           phone: user.phone ?? null,

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
-export type PermissionModule = "documentos" | "dashboards" | "perfil";
+export type PermissionModule = "admin" | "documentos" | "dashboards" | "perfil";
 
 export type DocumentPermission = {
   id: string;
@@ -12,6 +12,13 @@ export type DocumentPermission = {
   module: PermissionModule;
   created_at: string;
 };
+
+const ADMIN_MODULES = new Set<string>([
+  "admin",
+  "documentos",
+  "dashboards",
+  "perfil",
+]);
 
 type UseDocumentPermissionsOptions = {
   enabled?: boolean;
@@ -93,7 +100,7 @@ export function useDocumentPermissions(
               id: item.id as string,
               user_id: item.user_id as string | null,
               email: item.email as string | null,
-              module: "documentos",
+              module: "admin",
               created_at: item.created_at as string,
             })) ?? [],
           );
@@ -108,7 +115,7 @@ export function useDocumentPermissions(
           id: item.id as string,
           user_id: item.user_id as string | null,
           email: item.email as string | null,
-          module: (item.modulo as PermissionModule | null) ?? "documentos",
+          module: (item.modulo as PermissionModule | null) ?? "admin",
           created_at: item.created_at as string,
         })) ?? [],
       );
@@ -149,12 +156,18 @@ export function useDocumentPermissions(
         throw new Error("Informe o e-mail do usuário.");
       }
 
-      const exists = normalizedPermissions.find(
-        (permission) =>
-          (permission.email === normalizedEmail ||
-            (userId && permission.user_id === userId)) &&
-          permission.module === module,
-      );
+      const exists = normalizedPermissions.find((permission) => {
+        const sameIdentity =
+          permission.email === normalizedEmail ||
+          (userId && permission.user_id === userId);
+        if (!sameIdentity) {
+          return false;
+        }
+        if (module === "admin") {
+          return ADMIN_MODULES.has(permission.module);
+        }
+        return permission.module === module;
+      });
       if (exists) {
         throw new Error("Esse usuário já possui essa permissão.");
       }

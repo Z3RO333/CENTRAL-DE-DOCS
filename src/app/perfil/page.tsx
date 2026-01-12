@@ -23,9 +23,8 @@ type StatusBanner = {
 export default function PerfilPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
-  const { modules: modulesAccess, loading: accessLoading } =
-    useDocumentsAccess();
-  const canAccessPerfil = modulesAccess.perfil;
+  const { isAdmin, loading: accessLoading } = useDocumentsAccess();
+  const canAccessPerfil = isAdmin;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
@@ -47,7 +46,7 @@ export default function PerfilPage() {
     }
 
     if (!canAccessPerfil) {
-      router.replace("/dashboard");
+      router.replace("/documentos");
     }
   }, [authLoading, accessLoading, user, canAccessPerfil, router]);
 

@@ -86,9 +86,8 @@ export default function AssinaturaDocumentoPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
-  const { modules: modulesAccess, loading: accessLoading } =
-    useDocumentsAccess();
-  const canAccessDocumentos = modulesAccess.documentos;
+  const { isAdmin, loading: accessLoading } = useDocumentsAccess();
+  const canAccessDocumentos = isAdmin;
   const searchParams = useSearchParams();
   const [registro, setRegistro] = useState<FormularioRecord | null>(null);
   const [publicUrl, setPublicUrl] = useState<string | null>(null);
@@ -307,7 +306,7 @@ export default function AssinaturaDocumentoPage() {
     }
 
     if (!canAccessDocumentos) {
-      router.replace("/dashboard");
+      router.replace("/documentos");
       return;
     }
 

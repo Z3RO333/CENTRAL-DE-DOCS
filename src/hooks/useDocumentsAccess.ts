@@ -8,13 +8,20 @@ type ModuleKey = "documentos" | "dashboards" | "perfil";
 
 type ModulesAccess = Record<ModuleKey, boolean>;
 
+type AccessRole = "admin" | "colaborador";
+
 type UseDocumentsAccessResult = {
   hasAccess: boolean;
+  isAdmin: boolean;
+  role: AccessRole;
   modules: ModulesAccess;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
 };
+
+const ADMIN_MODULES = ["admin", "documentos", "dashboards", "perfil"] as const;
+const ADMIN_MODULE_SET = new Set<string>(ADMIN_MODULES);
 
 export function useDocumentsAccess(): UseDocumentsAccessResult {
   const { user, isLoading: authLoading } = useAuth();
@@ -27,10 +34,14 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
     dashboards: false,
     perfil: false,
   });
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState<AccessRole>("colaborador");
 
   const fetchAccess = useCallback(async () => {
     if (!user) {
       setHasAccess(false);
+      setIsAdmin(false);
+      setRole("colaborador");
       setLoading(false);
       setError(null);
       setModules({
@@ -64,16 +75,21 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
       };
 
       const baseModules: ModulesAccess = {
-        documentos: false,
+        documentos: true,
         dashboards: false,
         perfil: false,
       };
+      let resolvedIsAdmin = false;
 
       const applyRecords = (records: { modulo?: string | null }[] | null) => {
         records?.forEach((item) => {
-          const modulo = (item.modulo ?? "documentos") as ModuleKey;
-          if (modulo in baseModules) {
-            baseModules[modulo] = true;
+          const modulo = item.modulo ?? "documentos";
+          if (ADMIN_MODULE_SET.has(modulo)) {
+            resolvedIsAdmin = true;
+          }
+          const typed = modulo as ModuleKey;
+          if (typed in baseModules) {
+            baseModules[typed] = true;
           }
         });
       };
@@ -120,16 +136,21 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         applyRecords(emailData ?? null);
       }
 
+      if (resolvedIsAdmin) {
+        baseModules.documentos = true;
+        baseModules.dashboards = true;
+        baseModules.perfil = true;
+      }
       setModules(baseModules);
-      setHasAccess(
-        baseModules.documentos ||
-          baseModules.dashboards ||
-          baseModules.perfil,
-      );
+      setIsAdmin(resolvedIsAdmin);
+      setRole(resolvedIsAdmin ? "admin" : "colaborador");
+      setHasAccess(Boolean(user));
       setError(null);
     } catch (err) {
       console.error("Erro ao verificar permissões de documentos:", err);
       setHasAccess(false);
+      setIsAdmin(false);
+      setRole("colaborador");
       setModules({
         documentos: false,
         dashboards: false,
@@ -153,6 +174,8 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
 
   return {
     hasAccess,
+    isAdmin,
+    role,
     modules,
     loading: authLoading || loading,
     error,

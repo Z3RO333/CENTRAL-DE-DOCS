@@ -27,18 +27,15 @@ export default function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const { user, isLoading, error: authError, refresh } = useAuth();
-  const {
-    modules: modulesAccess,
-    loading: documentsAccessLoading,
-  } = useDocumentsAccess();
+  const { isAdmin, modules: modulesAccess, loading: documentsAccessLoading } =
+    useDocumentsAccess();
   const showNav = pathname !== "/login";
 
   const isAuthenticated = !!user;
   const canAccessDocuments =
     modulesAccess.documentos && !documentsAccessLoading;
-  const canAccessDashboards =
-    modulesAccess.dashboards && !documentsAccessLoading;
-  const canAccessPerfil = modulesAccess.perfil && !documentsAccessLoading;
+  const canAccessDashboards = isAdmin && !documentsAccessLoading;
+  const canAccessPerfil = isAdmin && !documentsAccessLoading;
   const resolvedWithoutUser = !isLoading && !isAuthenticated;
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -63,7 +60,7 @@ export default function AppShell({
       label: "Formularios",
       icon: LayoutDashboard,
       isActive: pathname === "/dashboard",
-      isVisible: true,
+      isVisible: isAdmin,
     },
     {
       href: "/documentos",
@@ -87,11 +84,11 @@ export default function AppShell({
       isVisible: canAccessDashboards,
     },
     {
-      href: "/dashboard/permissoes",
-      label: "Permissoes",
+      href: "/usuarios",
+      label: "Usuarios",
       icon: ShieldCheck,
-      isActive: pathname?.startsWith("/dashboard/permissoes"),
-      isVisible: canAccessDocuments,
+      isActive: pathname?.startsWith("/usuarios"),
+      isVisible: isAdmin,
     },
     {
       href: "/perfil",
@@ -335,12 +332,12 @@ export default function AppShell({
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {"Permissoes"}
+                  Usuarios
                 </p>
                 <ul className="mt-2 space-y-1">
-                  <li>Conceda acesso por modulo e e-mail.</li>
-                  <li>Revise permissoes periodicamente.</li>
-                  <li>Remova acessos quando necessario.</li>
+                  <li>Defina quem e administrador ou colaborador.</li>
+                  <li>Edite funcoes para liberar acessos.</li>
+                  <li>Revise usuarios periodicamente.</li>
                 </ul>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">

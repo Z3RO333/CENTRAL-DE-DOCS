@@ -100,9 +100,8 @@ const getLocalDateLabel = (date: Date) => {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading, error: authError } = useAuth();
-  const { modules: modulesAccess, loading: accessLoading } =
-    useDocumentsAccess();
-  const canViewAllDocuments = modulesAccess.dashboards;
+  const { isAdmin, loading: accessLoading } = useDocumentsAccess();
+  const canViewAllDocuments = isAdmin;
   const {
     prestadores: prestadoresDoUsuario,
     loading: prestadoresLoading,
@@ -139,8 +138,12 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!isLoading && !user) {
       router.replace("/login");
+      return;
     }
-  }, [isLoading, user, router]);
+    if (!isLoading && user && !accessLoading && !isAdmin) {
+      router.replace("/documentos");
+    }
+  }, [isLoading, user, router, accessLoading, isAdmin]);
   const isBlocked = isLoading || !user;
   const baseCards = BASE_CARDS;
 

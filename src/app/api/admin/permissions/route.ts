@@ -15,11 +15,8 @@ type Payload =
       permissionId: string;
     };
 
-const MODULE_WHITELIST: PermissionModule[] = [
-  "documentos",
-  "dashboards",
-  "perfil",
-];
+const MODULE_WHITELIST: PermissionModule[] = ["admin"];
+const ADMIN_MODULES = ["admin", "documentos", "dashboards", "perfil"];
 
 async function getAuthorizedAdmin(accessToken: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -54,7 +51,7 @@ async function getAuthorizedAdmin(accessToken: string) {
       .from("documentos_acesso")
       .select("id")
       .eq("user_id", requesterId)
-      .eq("modulo", "documentos")
+      .in("modulo", ADMIN_MODULES)
       .maybeSingle();
 
   if (permissionByIdError) {
@@ -64,12 +61,12 @@ async function getAuthorizedAdmin(accessToken: string) {
   let hasPermission = Boolean(permissionById);
   if (!hasPermission && requesterEmail) {
     const { data: permissionByEmail, error: permissionByEmailError } =
-      await supabaseAdmin
-        .from("documentos_acesso")
-        .select("id")
-        .eq("email", requesterEmail)
-        .eq("modulo", "documentos")
-        .maybeSingle();
+        await supabaseAdmin
+          .from("documentos_acesso")
+          .select("id")
+          .eq("email", requesterEmail)
+          .in("modulo", ADMIN_MODULES)
+          .maybeSingle();
 
     if (permissionByEmailError) {
       throw permissionByEmailError;

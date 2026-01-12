@@ -81,9 +81,8 @@ const getMesesDoAno = (ano: number, mesFinal?: number) => {
 export default function DashboardAnalisesPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
-  const { modules: modulesAccess, loading: accessLoading } =
-    useDocumentsAccess();
-  const canAccessDashboards = modulesAccess.dashboards;
+  const { isAdmin, loading: accessLoading } = useDocumentsAccess();
+  const canAccessDashboards = isAdmin;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [registros, setRegistros] = useState<Registro[]>([]);

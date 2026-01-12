@@ -57,11 +57,12 @@ async function hasDocumentosAccess(
   email: string | null,
   supabaseAdmin = createSupabaseAdminClient(),
 ) {
+  const adminModules = ["admin", "documentos", "dashboards", "perfil"];
   const { data, error } = await supabaseAdmin
     .from("documentos_acesso")
     .select("id")
     .eq("user_id", userId)
-    .eq("modulo", "documentos")
+    .in("modulo", adminModules)
     .maybeSingle();
 
   if (error) {
@@ -83,7 +84,7 @@ async function hasDocumentosAccess(
     .from("documentos_acesso")
     .select("id")
     .eq("email", email)
-    .eq("modulo", "documentos")
+    .in("modulo", adminModules)
     .maybeSingle();
 
   if (emailError) {

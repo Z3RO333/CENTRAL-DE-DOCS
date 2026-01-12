@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { Eye, FilePlus2 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
+import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { resolveServicoOficial } from "@/lib/servicosVocab";
 
@@ -183,6 +184,7 @@ export default function FormularioPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading: authLoading } = useAuth();
+  const { isAdmin, loading: accessLoading } = useDocumentsAccess();
 
   const config = useMemo(
     () => FORM_CONFIGS.find((f) => f.slug === params.slug),
@@ -232,14 +234,19 @@ export default function FormularioPage() {
   const [historicoErro, setHistoricoErro] = useState<string | null>(null);
 
   useEffect(() => {
-    if (authLoading) {
+    if (authLoading || accessLoading) {
       return;
     }
 
     if (!user) {
       router.replace("/login");
+      return;
     }
-  }, [authLoading, user, router]);
+
+    if (!isAdmin) {
+      router.replace("/documentos");
+    }
+  }, [authLoading, accessLoading, user, router, isAdmin]);
 
   useEffect(() => {
     if (config) {

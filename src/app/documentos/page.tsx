@@ -250,19 +250,16 @@ const anoAtual = new Date().getFullYear().toString();
 export default function DocumentosPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
-  const {
-    modules: modulesAccess,
-    loading: accessLoading,
-    error: accessError,
-  } = useDocumentsAccess();
-  const canAccessDocumentos = modulesAccess.documentos;
-  const canViewAllDocuments = modulesAccess.dashboards;
+  const { isAdmin, loading: accessLoading, error: accessError } =
+    useDocumentsAccess();
+  const canViewAllDocuments = isAdmin;
+  const canManageDocuments = isAdmin;
   const {
     prestadores: prestadoresDoUsuario,
     loading: prestadoresUsuarioLoading,
   } = usePrestadores({
     assignedOnly: true,
-    enabled: canAccessDocumentos && !canViewAllDocuments,
+    enabled: Boolean(user) && !canViewAllDocuments,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -524,8 +521,8 @@ export default function DocumentosPage() {
       return;
     }
 
-    if (!canAccessDocumentos) {
-      router.replace("/dashboard");
+    if (!user) {
+      router.replace("/login");
       return;
     }
 
@@ -627,7 +624,6 @@ export default function DocumentosPage() {
     authLoading,
     accessLoading,
     user,
-    canAccessDocumentos,
     router,
     canViewAllDocuments,
     getAccessToken,
@@ -698,6 +694,10 @@ export default function DocumentosPage() {
   };
 
   const removerDocumento = async (registro: FormularioRecord) => {
+    if (!canManageDocuments) {
+      setError("Ação restrita para administradores.");
+      return;
+    }
     setConfirmDialog({ type: "single", registro });
   };
 
@@ -752,6 +752,10 @@ export default function DocumentosPage() {
   };
 
   const removerSelecionados = () => {
+    if (!canManageDocuments) {
+      setError("Ação restrita para administradores.");
+      return;
+    }
     if (selectedIds.length === 0) {
       return;
     }
@@ -759,6 +763,11 @@ export default function DocumentosPage() {
   };
 
   const executarRemocaoEmLote = async () => {
+    if (!canManageDocuments) {
+      setConfirmDialog(null);
+      setError("Ação restrita para administradores.");
+      return;
+    }
     if (selectedIds.length === 0) {
       setConfirmDialog(null);
       return;
@@ -853,6 +862,9 @@ export default function DocumentosPage() {
   }, [registrosFiltrados]);
 
   const toggleSelecionar = (id: string) => {
+    if (!canManageDocuments) {
+      return;
+    }
     const registro = registrosFiltrados.find((item) => item.id === id);
     if (!registro) {
       return;
@@ -863,6 +875,9 @@ export default function DocumentosPage() {
   };
 
   const selecionarTodos = () => {
+    if (!canManageDocuments) {
+      return;
+    }
     const todosIds = registrosFiltrados.map((item) => item.id);
     if (todosIds.length === 0) {
       return;
@@ -872,6 +887,10 @@ export default function DocumentosPage() {
   };
 
   const iniciarAssinaturaEmLote = () => {
+    if (!canManageDocuments) {
+      setError("Ação restrita para administradores.");
+      return;
+    }
     const assinaturasSelecionadas = selectedIds.filter((id) =>
       assinaturasPendentes.includes(id),
     );
@@ -1137,6 +1156,7 @@ export default function DocumentosPage() {
         </div>
       )}
 
+      {canManageDocuments && (
       <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
@@ -1365,7 +1385,7 @@ export default function DocumentosPage() {
                 <>Nenhum documento pendente para assinatura em lote.</>
               )}
             </p>
-            {hasSelection && (
+            {canManageDocuments && hasSelection && (
               <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
                 {selectedIds.slice(0, 4).map((id) => (
                   <span
@@ -1391,7 +1411,8 @@ export default function DocumentosPage() {
               </div>
             )}
           </div>
-          <div className="flex flex-wrap gap-2 text-[11px]">
+          {canManageDocuments && (
+            <div className="flex flex-wrap gap-2 text-[11px]">
             <button
               type="button"
               onClick={selecionarTodos}
@@ -1431,8 +1452,10 @@ export default function DocumentosPage() {
                   : "Assinar selecionados"}
             </button>
           </div>
+          )}
         </div>
       </div>
+      )}
 
       {totalResultados > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-white p-3 text-xs text-slate-500 shadow-sm shadow-slate-200">
@@ -1484,21 +1507,23 @@ export default function DocumentosPage() {
             <table className="min-w-full divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-4 py-3 text-left">
-                    <input
-                      type="checkbox"
-                      onChange={selecionarTodos}
-                      checked={
-                        registrosFiltrados.length > 0 &&
-                        registrosFiltrados.every((item) =>
-                          selectedIds.includes(item.id),
-                        )
-                      }
-                      disabled={registrosFiltrados.length === 0}
-                      className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
-                      aria-label="Selecionar todos"
-                    />
-                  </th>
+                  {canManageDocuments && (
+                    <th className="px-4 py-3 text-left">
+                      <input
+                        type="checkbox"
+                        onChange={selecionarTodos}
+                        checked={
+                          registrosFiltrados.length > 0 &&
+                          registrosFiltrados.every((item) =>
+                            selectedIds.includes(item.id),
+                          )
+                        }
+                        disabled={registrosFiltrados.length === 0}
+                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
+                        aria-label="Selecionar todos"
+                      />
+                    </th>
+                  )}
                   <th className="px-4 py-3 text-left">Documento</th>
                   <th className="px-4 py-3 text-left">Identificação</th>
                   <th className="px-4 py-3 text-left">Tipo</th>
@@ -1535,15 +1560,17 @@ export default function DocumentosPage() {
 
                   return (
                     <tr key={registro.id} className="align-top">
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={isMarcado}
-                          onChange={() => toggleSelecionar(registro.id)}
-                          className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
-                          aria-label="Selecionar documento para assinatura"
-                        />
-                      </td>
+                      {canManageDocuments && (
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={isMarcado}
+                            onChange={() => toggleSelecionar(registro.id)}
+                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
+                            aria-label="Selecionar documento para assinatura"
+                          />
+                        </td>
+                      )}
                       <td className="px-4 py-3">
                         <p
                           className="text-sm font-semibold text-slate-900"
@@ -1608,15 +1635,19 @@ export default function DocumentosPage() {
                           >
                             Baixar
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => void removerDocumento(registro)}
-                            disabled={deletingId === registro.id}
-                            className="rounded-full border border-red-200 px-3 py-1 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {deletingId === registro.id ? "Removendo..." : "Remover"}
-                          </button>
-                          {isSelecionavel && (
+                          {canManageDocuments && (
+                            <button
+                              type="button"
+                              onClick={() => void removerDocumento(registro)}
+                              disabled={deletingId === registro.id}
+                              className="rounded-full border border-red-200 px-3 py-1 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {deletingId === registro.id
+                                ? "Removendo..."
+                                : "Remover"}
+                            </button>
+                          )}
+                          {canManageDocuments && isSelecionavel && (
                             <button
                               type="button"
                               onClick={() => router.push(`/documentos/${registro.id}`)}
@@ -1668,15 +1699,17 @@ export default function DocumentosPage() {
                       {nomeDocumento}
                     </p>
                   </div>
-                  <label className="flex items-center gap-2 text-xs text-slate-500">
-                    <input
-                      type="checkbox"
-                      checked={isMarcado}
-                      onChange={() => toggleSelecionar(registro.id)}
-                      className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
-                    />
-                    Selecionar
-                  </label>
+                  {canManageDocuments && (
+                    <label className="flex items-center gap-2 text-xs text-slate-500">
+                      <input
+                        type="checkbox"
+                        checked={isMarcado}
+                        onChange={() => toggleSelecionar(registro.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
+                      />
+                      Selecionar
+                    </label>
+                  )}
                 </div>
                 <div className="mt-3 space-y-2 text-sm text-slate-600">
                   <div>
@@ -1744,15 +1777,17 @@ export default function DocumentosPage() {
                   >
                     Baixar
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void removerDocumento(registro)}
-                    disabled={deletingId === registro.id}
-                    className="rounded-full border border-red-200 px-3 py-1 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {deletingId === registro.id ? "Removendo..." : "Remover"}
-                  </button>
-                  {isSelecionavel && (
+                  {canManageDocuments && (
+                    <button
+                      type="button"
+                      onClick={() => void removerDocumento(registro)}
+                      disabled={deletingId === registro.id}
+                      className="rounded-full border border-red-200 px-3 py-1 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {deletingId === registro.id ? "Removendo..." : "Remover"}
+                    </button>
+                  )}
+                  {canManageDocuments && isSelecionavel && (
                     <button
                       type="button"
                       onClick={() => router.push(`/documentos/${registro.id}`)}

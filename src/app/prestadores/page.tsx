@@ -14,8 +14,8 @@ import { type PrestadorRegra } from "@/lib/prestadorRegras";
 export default function PrestadoresPage() {
   const router = useRouter();
   const { user, isLoading, error: authError } = useAuth();
-  const { modules: modulesAccess } = useDocumentsAccess();
-  const canManagePrestadores = modulesAccess.documentos;
+  const { isAdmin, loading: accessLoading } = useDocumentsAccess();
+  const canManagePrestadores = isAdmin;
   const {
     prestadores,
     loading: prestadoresLoading,
@@ -57,8 +57,12 @@ export default function PrestadoresPage() {
   useEffect(() => {
     if (!isLoading && !user) {
       router.replace("/login");
+      return;
     }
-  }, [isLoading, user, router]);
+    if (!isLoading && !accessLoading && user && !canManagePrestadores) {
+      router.replace("/documentos");
+    }
+  }, [isLoading, accessLoading, user, router, canManagePrestadores]);
 
   useEffect(() => {
     if (
