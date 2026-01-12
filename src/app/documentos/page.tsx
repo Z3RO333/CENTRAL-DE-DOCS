@@ -1677,7 +1677,8 @@ export default function DocumentosPage() {
                   const identificacaoConfig = getIdentificacaoConfig(
                     registro.tipo,
                   );
-                  const nomeDocumento = getDocumentoNome(registro);\r\n            const pageCount = getPageCount(registro);
+                  const nomeDocumento = getDocumentoNome(registro);
+                  const pageCount = getPageCount(registro);
                   const identificacaoValor =
                     getIdentificacaoValor(registro) ??
                     `${identificacaoConfig.label} não informado`;
@@ -1822,7 +1823,8 @@ export default function DocumentosPage() {
         <div className="grid gap-4 md:grid-cols-2">
           {registrosFiltrados.map((registro) => {
             const identificacaoConfig = getIdentificacaoConfig(registro.tipo);
-            const nomeDocumento = getDocumentoNome(registro);\r\n            const pageCount = getPageCount(registro);
+            const nomeDocumento = getDocumentoNome(registro);
+                  const pageCount = getPageCount(registro);
             const identificacaoValor =
               getIdentificacaoValor(registro) ??
               `${identificacaoConfig.label} não informado`;
@@ -1979,6 +1981,14 @@ export default function DocumentosPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
 
 
 
