@@ -23,12 +23,12 @@ type DashboardCard = {
 
 const STATUS_LABEL_MAP: Record<string, string> = {
   pendente: "Pendente",
-  em_analise: "Em an�lise",
+  em_analise: "Em análise",
   assinado: "Assinado",
 };
 
 const TIPO_LABEL: Record<string, string> = {
-  retencao_trabalhista: "Reten��o Trabalhista",
+  retencao_trabalhista: "Retenção Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
 };
@@ -40,9 +40,9 @@ const BASE_CARDS: DashboardCard[] = [
   {
     slug: "retencao-trabalhista",
     tipo: "retencao_trabalhista",
-    title: "Reten��o Trabalhista",
+    title: "Retenção Trabalhista",
     description:
-      "Envio de documentos relacionados � reten��o de tributos trabalhistas.",
+      "Envio de documentos relacionados à retenção de tributos trabalhistas.",
     href: "/formulario/retencao-trabalhista",
     icon: BriefcaseBusiness,
     accent: "from-sky-100 via-sky-50 to-transparent",
@@ -52,7 +52,7 @@ const BASE_CARDS: DashboardCard[] = [
     slug: "registro-laudos",
     tipo: "registro_laudos",
     title: "Registro e Laudos",
-    description: "Formul�rios para registros t�cnicos e laudos emitidos.",
+    description: "Formulários para registros técnicos e laudos emitidos.",
     href: "/formulario/registro-laudos",
     icon: FileBadge,
     accent: "from-sky-100 via-sky-50 to-transparent",
@@ -159,7 +159,7 @@ export default function DashboardPage() {
       .createSignedUrl(path, SIGNED_URL_EXPIRES_IN);
 
     if (error || !data?.signedUrl) {
-      throw error ?? new Error("N�o foi poss�vel gerar o link do arquivo.");
+      throw error ?? new Error("Não foi possível gerar o link do arquivo.");
     }
     return data.signedUrl;
   };
@@ -174,7 +174,7 @@ export default function DashboardPage() {
       registro.arquivo_path;
 
     if (!path) {
-      setHistoricoErro("Arquivo indispon�vel no momento.");
+      setHistoricoErro("Arquivo indisponível no momento.");
       return;
     }
 
@@ -189,7 +189,7 @@ export default function DashboardPage() {
       document.body.removeChild(anchor);
     } catch (err) {
       console.error("Erro ao abrir documento:", err);
-      setHistoricoErro("N�o foi poss�vel abrir o documento. Tente novamente.");
+      setHistoricoErro("Não foi possível abrir o documento. Tente novamente.");
     }
   };
 
@@ -206,7 +206,7 @@ export default function DashboardPage() {
       }
       const token = data.session?.access_token;
       if (!token) {
-        throw new Error("Sess�o expirada. Fa�a login novamente.");
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
       const params = new URLSearchParams();
       if (prestadoresDoUsuario.length > 0) {
@@ -239,7 +239,7 @@ export default function DashboardPage() {
       };
       if (!response.ok) {
         throw new Error(
-          payload.error ?? "N�o foi poss�vel carregar o hist�rico.",
+          payload.error ?? "Não foi possível carregar o histórico.",
         );
       }
       if (signal?.aborted) {
@@ -250,9 +250,9 @@ export default function DashboardPage() {
       if (signal?.aborted) {
         return;
       }
-      console.error("Erro ao carregar hist�rico:", err);
+      console.error("Erro ao carregar histórico:", err);
       setHistoricoErro(
-        err instanceof Error ? err.message : "N�o foi poss�vel carregar o hist�rico.",
+        err instanceof Error ? err.message : "Não foi possível carregar o histórico.",
       );
     } finally {
       if (!signal?.aborted) {
@@ -280,7 +280,7 @@ export default function DashboardPage() {
       }
       const token = data.session?.access_token;
       if (!token) {
-        throw new Error("Sess�o expirada. Fa�a login novamente.");
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
       const params = new URLSearchParams();
       prestadoresDoUsuario.forEach((prestador) =>
@@ -301,7 +301,7 @@ export default function DashboardPage() {
         error?: string;
       };
       if (!response.ok) {
-        throw new Error(payload.error ?? "N�o foi poss�vel carregar as regras.");
+        throw new Error(payload.error ?? "Não foi possível carregar as regras.");
       }
       if (signal?.aborted) {
         return;
@@ -313,7 +313,7 @@ export default function DashboardPage() {
       }
       console.error("Erro ao carregar regras:", err);
       setRegrasErro(
-        err instanceof Error ? err.message : "N�o foi poss�vel carregar as regras.",
+        err instanceof Error ? err.message : "Não foi possível carregar as regras.",
       );
     } finally {
       if (!signal?.aborted) {
@@ -673,7 +673,7 @@ export default function DashboardPage() {
                 : "text-slate-500 hover:text-slate-700"
             }`}
           >
-            Formul�rios
+            Formulários
           </button>
           <button
             type="button"
@@ -705,11 +705,11 @@ export default function DashboardPage() {
               onChange={(event) => setHistoricoPeriodoFilter(event.target.value)}
               className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             >
-              <option value="ultimos_30_dias">�ltimos 30 dias</option>
-              <option value="ultimos_90_dias">�ltimos 90 dias</option>
-              <option value="mes_atual">M�s atual</option>
+              <option value="ultimos_30_dias">Últimos 30 dias</option>
+              <option value="ultimos_90_dias">Últimos 90 dias</option>
+              <option value="mes_atual">Mês atual</option>
               <option value="ano_atual">Ano atual</option>
-              <option value="todos">Todos os per�odos</option>
+              <option value="todos">Todos os períodos</option>
             </select>
           </label>
           <label className="text-xs font-semibold text-slate-600">
@@ -779,7 +779,7 @@ export default function DashboardPage() {
                   </span>
                   {resumo?.ultimo && (
                     <span className="rounded-full bg-slate-100 px-2 py-1">
-                      �ltimo envio: {formatData(resumo.ultimo.created_at)}
+                      Último envio: {formatData(resumo.ultimo.created_at)}
                     </span>
                   )}
                 </div>
@@ -800,7 +800,7 @@ export default function DashboardPage() {
                   </div>
                 )}
                 <span className="mt-1 inline-flex items-center text-sm font-semibold text-emerald-700">
-                  Abrir formul�rio
+                  Abrir formulário
                   <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-700">
                     &gt;
                   </span>
@@ -815,7 +815,7 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Vis�o r�pida
+              Visão rápida
             </p>
             <span className="text-[11px] text-slate-500">{"Indicadores gerais dos envios do seu grupo."}</span>
           </div>
@@ -895,7 +895,7 @@ export default function DashboardPage() {
 
           <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Envios nos �ltimos 30 dias
+              Envios nos últimos 30 dias
             </p>
             <div className="mt-3 flex h-24 items-end gap-1">
               {enviosUltimos30Dias.map((item) => {
@@ -964,18 +964,18 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Hist�rico de envios
+              Histórico de envios
             </p>
             <span className="text-[11px] text-slate-500">{"Consulte rapidamente os formul\\u00e1rios enviados pelo seu grupo."}</span>
           </div>
           <span className="text-[11px] text-slate-400">
-            Mostrando {historicoFiltrado.length} registro(s) ap�s filtros
+            Mostrando {historicoFiltrado.length} registro(s) após filtros
           </span>
         </div>
 
         {historicoLoading ? (
           <p className="mt-4 text-xs text-slate-500">
-            Carregando hist�rico de envios...
+            Carregando histórico de envios...
           </p>
         ) : historicoErro ? (
           <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -983,7 +983,7 @@ export default function DashboardPage() {
           </p>
         ) : historicoFiltrado.length === 0 ? (
           <p className="mt-4 text-xs text-slate-500">
-            Ainda n�o h� envios registrados para o seu acesso.
+            Ainda não há envios registrados para o seu acesso.
           </p>
         ) : (
           <>
@@ -1088,7 +1088,7 @@ export default function DashboardPage() {
           </p>
         ) : prestadoresProgresso.length === 0 ? (
           <p className="mt-4 text-xs text-slate-500">
-            Nenhum prestador vinculado ao seu usu�rio.
+            Nenhum prestador vinculado ao seu usuário.
           </p>
         ) : (
           <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -1145,7 +1145,7 @@ export default function DashboardPage() {
                             Faltam {faltam} envio(s)
                           </p>
                           <p className="text-[11px] text-slate-500">
-                            {Math.round(percentual)}% no {regra.periodo === "mensal" ? "m�s" : "ano"} atual
+                            {Math.round(percentual)}% no {regra.periodo === "mensal" ? "mês" : "ano"} atual
                           </p>
                         </div>
                       );
