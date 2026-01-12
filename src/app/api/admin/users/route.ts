@@ -62,6 +62,7 @@ export async function GET(request: Request) {
         .select("id")
         .eq("user_id", requesterId)
         .in("modulo", adminModules)
+        .limit(1)
         .maybeSingle();
 
     if (permissionByIdError) {
@@ -76,6 +77,7 @@ export async function GET(request: Request) {
           .select("id")
           .eq("email", requesterEmail)
           .in("modulo", adminModules)
+          .limit(1)
           .maybeSingle();
 
       if (permissionByEmailError) {

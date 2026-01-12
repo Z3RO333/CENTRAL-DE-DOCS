@@ -52,6 +52,7 @@ async function getAuthorizedAdmin(accessToken: string) {
       .select("id")
       .eq("user_id", requesterId)
       .in("modulo", ADMIN_MODULES)
+      .limit(1)
       .maybeSingle();
 
   if (permissionByIdError) {
@@ -65,8 +66,9 @@ async function getAuthorizedAdmin(accessToken: string) {
           .from("documentos_acesso")
           .select("id")
           .eq("email", requesterEmail)
-          .in("modulo", ADMIN_MODULES)
-          .maybeSingle();
+        .in("modulo", ADMIN_MODULES)
+        .limit(1)
+        .maybeSingle();
 
     if (permissionByEmailError) {
       throw permissionByEmailError;

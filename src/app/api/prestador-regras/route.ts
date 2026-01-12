@@ -66,6 +66,7 @@ async function hasDocumentosAccess(
     .select("id")
     .eq("user_id", userId)
     .in("modulo", adminModules)
+    .limit(1)
     .maybeSingle();
 
   if (error) {
@@ -88,6 +89,7 @@ async function hasDocumentosAccess(
     .select("id")
     .eq("email", email)
     .in("modulo", adminModules)
+    .limit(1)
     .maybeSingle();
 
   if (emailError) {
