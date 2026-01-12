@@ -60,7 +60,7 @@ export default function UsuariosPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
   const { isAdmin, loading: accessLoading } = useDocumentsAccess();
-  const { lojas } = useLojas({ enabled: isAdmin });
+  const { lojas, updateLoja } = useLojas({ enabled: isAdmin });
   const {
     permissions,
     loading: permissionsLoading,
@@ -75,9 +75,10 @@ export default function UsuariosPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
-  const [editingRole, setEditingRole] = useState<"admin" | "colaborador">(
-    "colaborador",
-  );
+  const [editingRole, setEditingRole] = useState<
+    "admin" | "colaborador" | "gerente_loja"
+  >("colaborador");
+  const [editingLojaId, setEditingLojaId] = useState<string>("");
   const [savingRole, setSavingRole] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -218,11 +219,21 @@ export default function UsuariosPage() {
   const openEditor = useCallback(
     (target: AppUser) => {
       const admin = isUserAdmin(target);
+      const gerente = isUserGerente(target);
+      const gerenteLoja =
+        gerente && target.email
+          ? lojas.find((loja) =>
+              loja.usuarios
+                .map((email) => email.toLowerCase())
+                .includes(target.email!.toLowerCase()),
+            ) ?? null
+          : null;
       setEditingUser(target);
-      setEditingRole(admin ? "admin" : "colaborador");
+      setEditingRole(admin ? "admin" : gerente ? "gerente_loja" : "colaborador");
+      setEditingLojaId(gerenteLoja?.id ?? "");
       setFeedback(null);
     },
-    [isUserAdmin],
+    [isUserAdmin, isUserGerente, lojas],
   );
 
   const handleSaveRole = useCallback(async () => {
@@ -232,6 +243,13 @@ export default function UsuariosPage() {
     setSavingRole(true);
     setFeedback(null);
     try {
+      const normalizedEmail = editingUser.email?.toLowerCase().trim() ?? "";
+      if (editingRole === "gerente_loja" && !editingLojaId) {
+        throw new Error("Selecione a loja do gerente.");
+      }
+      if (editingRole === "gerente_loja" && !normalizedEmail) {
+        throw new Error("Informe o e-mail do usuÃ¡rio para virar gerente.");
+      }
       const admin = isUserAdmin(editingUser);
       if (editingRole === "admin" && !admin) {
         await grantPermission({
@@ -240,16 +258,62 @@ export default function UsuariosPage() {
           module: "admin",
         });
       }
-      if (editingRole === "colaborador" && admin) {
+      if (editingRole !== "admin" && admin) {
         const entries = getAdminEntriesForUser(editingUser);
         await Promise.all(entries.map((entry) => revokePermission(entry.id)));
       }
+
+      if (normalizedEmail) {
+        if (editingRole === "gerente_loja") {
+          await Promise.all(
+            lojas.map((loja) => {
+              const hasEmail = loja.usuarios
+                .map((email) => email.toLowerCase())
+                .includes(normalizedEmail);
+              if (loja.id === editingLojaId && !hasEmail) {
+                return updateLoja({
+                  id: loja.id,
+                  usuarios: [...loja.usuarios, normalizedEmail],
+                });
+              }
+              if (loja.id !== editingLojaId && hasEmail) {
+                return updateLoja({
+                  id: loja.id,
+                  usuarios: loja.usuarios.filter(
+                    (email) => email.toLowerCase() !== normalizedEmail,
+                  ),
+                });
+              }
+              return Promise.resolve(null);
+            }),
+          );
+        } else {
+          await Promise.all(
+            lojas.map((loja) => {
+              if (
+                loja.usuarios
+                  .map((email) => email.toLowerCase())
+                  .includes(normalizedEmail)
+              ) {
+                return updateLoja({
+                  id: loja.id,
+                  usuarios: loja.usuarios.filter(
+                    (email) => email.toLowerCase() !== normalizedEmail,
+                  ),
+                });
+              }
+              return Promise.resolve(null);
+            }),
+          );
+        }
+      }
+
       await refreshPermissions();
       setEditingUser(null);
-      setFeedback("Função atualizada com sucesso.");
+      setFeedback("FunÃ§Ã£o atualizada com sucesso.");
     } catch (err) {
       setFeedback(
-        err instanceof Error ? err.message : "Falha ao atualizar a função.",
+        err instanceof Error ? err.message : "Falha ao atualizar a funÃ§Ã£o.",
       );
     } finally {
       setSavingRole(false);
@@ -257,11 +321,14 @@ export default function UsuariosPage() {
   }, [
     editingUser,
     editingRole,
+    editingLojaId,
     getAdminEntriesForUser,
     grantPermission,
     isUserAdmin,
+    lojas,
     refreshPermissions,
     revokePermission,
+    updateLoja,
   ]);
 
   if (authLoading || accessLoading) {
@@ -417,26 +484,53 @@ export default function UsuariosPage() {
             </div>
             <div className="mt-4">
               <label className="text-xs font-semibold text-slate-600">
-                Função
+                FunÃ§Ã£o
                 <select
                   value={editingRole}
-                  onChange={(event) =>
-                    setEditingRole(event.target.value as "admin" | "colaborador")
-                  }
+                  onChange={(event) => {
+                    const value = event.target.value as
+                      | "admin"
+                      | "colaborador"
+                      | "gerente_loja";
+                    setEditingRole(value);
+                    if (value !== "gerente_loja") {
+                      setEditingLojaId("");
+                    }
+                  }}
                   className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
                 >
                   <option value="admin">Administrador</option>
                   <option value="colaborador">Colaborador</option>
+                  <option value="gerente_loja">Gerente de Loja</option>
                 </select>
               </label>
               <p className="mt-2 text-[11px] text-slate-500">
                 Administradores veem todas as telas. Colaboradores veem apenas os
-                documentos do grupo vinculado ao e-mail.
+                documentos do grupo vinculado ao e-mail. Gerentes veem os
+                documentos da sua loja.
               </p>
-              {isUserGerente(editingUser) && !isUserAdmin(editingUser) && (
-                <p className="mt-2 text-[11px] text-slate-500">
-                  Gerentes de loja são definidos na tela de Lojas.
-                </p>
+              {editingRole === "gerente_loja" && (
+                <label className="mt-4 block text-xs font-semibold text-slate-600">
+                  Loja
+                  <select
+                    value={editingLojaId}
+                    onChange={(event) => setEditingLojaId(event.target.value)}
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+                  >
+                    <option value="">Selecione uma loja</option>
+                    {lojas.map((loja) => (
+                      <option key={loja.id} value={loja.id}>
+                        {loja.nome}
+                        {loja.codigo ? ` - ${loja.codigo}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {lojas.length === 0 && (
+                    <span className="mt-2 block text-[11px] font-normal text-slate-500">
+                      Cadastre uma loja antes de atribuir o gerente.
+                    </span>
+                  )}
+                </label>
               )}
             </div>
             <div className="mt-6 flex justify-end gap-2 text-xs">
@@ -462,3 +556,7 @@ export default function UsuariosPage() {
     </div>
   );
 }
+
+
+
+
