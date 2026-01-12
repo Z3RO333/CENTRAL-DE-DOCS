@@ -3,6 +3,13 @@
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
+  --app-bg: #f8fafc;
+  --app-surface: #ffffff;
+  --app-sidebar: #ffffff;
+  --app-accent: #2563eb;
+  --app-accent-soft: #dbeafe;
+  --app-muted: #64748b;
+  --app-border: #e2e8f0;
 }
 
 @theme inline {
