@@ -412,12 +412,18 @@ export default function FormularioPage() {
 
   const formatTipo = (tipo: string) => tipoLabel[tipo] ?? tipo;
 
-  const formatData = (value: string) => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return "--";
+
+  const resolveSignedPdfPath = (path?: string | null) => {
+    if (!path) {
+      return null;
     }
-    return date.toLocaleString("pt-BR");
+    if (path.endsWith("-view.html")) {
+      return path.replace(/-view\.html$/, ".pdf");
+    }
+    if (path.endsWith(".html")) {
+      return path.replace(/\.html$/, ".pdf");
+    }
+    return path;
   };
 
 
@@ -922,6 +928,7 @@ export default function FormularioPage() {
     </div>
   );
 }
+
 
 
 
