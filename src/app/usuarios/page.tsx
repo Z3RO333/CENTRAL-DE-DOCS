@@ -248,7 +248,7 @@ export default function UsuariosPage() {
         throw new Error("Selecione a loja do gerente.");
       }
       if (editingRole === "gerente_loja" && !normalizedEmail) {
-        throw new Error("Informe o e-mail do usuÃ¡rio para virar gerente.");
+        throw new Error("Informe o e-mail do usuário para virar gerente.");
       }
       const admin = isUserAdmin(editingUser);
       if (editingRole === "admin" && !admin) {
@@ -310,10 +310,10 @@ export default function UsuariosPage() {
 
       await refreshPermissions();
       setEditingUser(null);
-      setFeedback("FunÃ§Ã£o atualizada com sucesso.");
+      setFeedback("Função atualizada com sucesso.");
     } catch (err) {
       setFeedback(
-        err instanceof Error ? err.message : "Falha ao atualizar a funÃ§Ã£o.",
+        err instanceof Error ? err.message : "Falha ao atualizar a função.",
       );
     } finally {
       setSavingRole(false);
@@ -484,7 +484,7 @@ export default function UsuariosPage() {
             </div>
             <div className="mt-4">
               <label className="text-xs font-semibold text-slate-600">
-                FunÃ§Ã£o
+                Função
                 <select
                   value={editingRole}
                   onChange={(event) => {
@@ -556,6 +556,7 @@ export default function UsuariosPage() {
     </div>
   );
 }
+
 
 
 
