@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 const poppins = Poppins({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["600"],
   variable: "--font-poppins",
 });
 
@@ -33,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body
-        className={`${poppins.variable} ${geistSans.variable} ${geistMono.variable} bg-background text-foreground antialiased`}
+        className={`${poppins.className} font-semibold ${poppins.variable} ${geistSans.variable} ${geistMono.variable} bg-background text-foreground antialiased`}
       >
         <AuthProvider>
           <AppShell>{children}</AppShell>
