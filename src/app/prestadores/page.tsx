@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, ClipboardList, UserPlus } from "lucide-react";
+import { Search, UserPlus } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
@@ -53,6 +53,8 @@ export default function PrestadoresPage() {
     error: string | null;
     success: string | null;
   }>({ error: null, success: null });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -75,6 +77,28 @@ export default function PrestadoresPage() {
 
   const selectedPrestador =
     prestadores.find((item) => item.id === selectedPrestadorId) ?? null;
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredPrestadores = useMemo(() => {
+    if (!normalizedSearch) {
+      return prestadores;
+    }
+    return prestadores.filter((prestador) => {
+      const nome = prestador.nome?.toLowerCase() ?? "";
+      const tipo = prestador.tipo_servico?.toLowerCase() ?? "";
+      const cnpj = prestador.cnpj?.toLowerCase() ?? "";
+      const emails = prestador.usuarios.join(" ").toLowerCase();
+      return (
+        nome.includes(normalizedSearch) ||
+        tipo.includes(normalizedSearch) ||
+        cnpj.includes(normalizedSearch) ||
+        emails.includes(normalizedSearch)
+      );
+    });
+  }, [prestadores, normalizedSearch]);
+  const visiblePrestadores = useMemo(
+    () => filteredPrestadores.slice(0, pageSize),
+    [filteredPrestadores, pageSize],
+  );
 
   const formularioOptions = [
     { value: "registro_laudos", label: "Registro e Laudos" },
@@ -94,15 +118,6 @@ export default function PrestadoresPage() {
     }
     const match = formularioOptions.find((option) => option.value === alvo);
     return match?.label ?? alvo;
-  };
-  const prestadorAccent = (index: number) => {
-    const accents = [
-      "from-sky-100 via-white to-transparent",
-      "from-emerald-100 via-white to-transparent",
-      "from-amber-100 via-white to-transparent",
-      "from-rose-100 via-white to-transparent",
-    ];
-    return accents[index % accents.length];
   };
 
   const carregarRegras = useCallback(async () => {
@@ -597,14 +612,19 @@ export default function PrestadoresPage() {
   };
 
   return (
-    <div className="relative mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+    <div className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6">
+      <div className="flex items-center gap-2 text-xs text-slate-500">
+        <span className="font-medium">Home</span>
+        <span className="text-slate-300">/</span>
+        <span className="font-semibold text-slate-700">Prestadores</span>
+      </div>
+
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <Building2 className="h-4 w-4 text-slate-600" />
-            Prestadores
-          </p>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-semibold text-slate-900">
+            Gerenciamento de prestadores
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
             Cadastre prestadores, adicione e-mails e defina regras de monitoramento.
           </p>
         </div>
@@ -614,7 +634,7 @@ export default function PrestadoresPage() {
         >
           Voltar para formulários
         </Link>
-      </div>
+      </header>
 
       {(prestadorFeedback.error ||
         prestadorFeedback.success ||
@@ -631,145 +651,108 @@ export default function PrestadoresPage() {
             prestadorFeedback.success}
         </div>
       )}
-      <div className="rounded-2xl bg-slate-50/70 p-4 text-xs text-slate-600">
-        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          <ClipboardList className="h-4 w-4 text-slate-500" />
-          Passo 1
+      <section className="rounded-2xl bg-white p-5 shadow-sm shadow-slate-200">
+        <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
+          <label className="text-xs font-semibold text-slate-600">
+            Pesquisar
+            <div className="mt-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Pesquisar por nome, serviço, CNPJ ou e-mail..."
+                className="w-full text-sm text-slate-700 outline-none"
+              />
+              <Search className="h-4 w-4 text-slate-400" />
+            </div>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Qtd. de registros
+            <select
+              value={pageSize}
+              onChange={(event) => setPageSize(Number(event.target.value))}
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+            >
+              {[10, 20, 50].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
-        <p className="mt-2 text-sm font-semibold text-slate-800">
-          Escolha um prestador
-        </p>
-        <p className="mt-1 text-[11px] text-slate-500">
-          Selecione o prestador para ver detalhes e regras.
-        </p>
-      </div>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-5 py-3 text-left">Nome</th>
+                <th className="px-5 py-3 text-left">Tipo de serviço</th>
+                <th className="px-5 py-3 text-left">CNPJ</th>
+                <th className="px-5 py-3 text-left">E-mails</th>
+                <th className="px-5 py-3 text-left">Regras</th>
+                <th className="px-5 py-3 text-right"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {prestadoresLoading ? (
+                <tr>
+                  <td className="px-5 py-6 text-center text-slate-500" colSpan={6}>
+                    Carregando prestadores...
+                  </td>
+                </tr>
+              ) : visiblePrestadores.length === 0 ? (
+                <tr>
+                  <td className="px-5 py-6 text-center text-slate-500" colSpan={6}>
+                    Nenhum prestador encontrado.
+                  </td>
+                </tr>
+              ) : (
+                visiblePrestadores.map((prestador) => {
+                  const isSelected = prestador.id === selectedPrestadorId;
+                  const regrasCount =
+                    regrasPorPrestador[prestador.id]?.length ?? 0;
+                  return (
+                    <tr
+                      key={prestador.id}
+                      className={isSelected ? "bg-sky-50/40" : "text-slate-700"}
+                    >
+                      <td className="px-5 py-4">
+                        <div className="font-semibold text-slate-900">
+                          {prestador.nome}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">{prestador.tipo_servico}</td>
+                      <td className="px-5 py-4">{prestador.cnpj}</td>
+                      <td className="px-5 py-4">
+                        {prestador.usuarios.length} e-mail(s)
+                      </td>
+                      <td className="px-5 py-4">{regrasCount} regra(s)</td>
+                      <td className="px-5 py-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPrestadorId(prestador.id)}
+                          className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                        >
+                          {isSelected ? "Selecionado" : "Ver detalhes"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-start lg:gap-10">
         <div className="space-y-6">
           <div className="rounded-2xl bg-white/80 p-4 shadow-sm shadow-slate-100">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  1. Escolha o prestador
-                </p>
-                <span className="text-[11px] text-slate-500">
-                  Selecione para ver detalhes e gerenciar regras.
-                </span>
-              </div>
-              <span className="text-[11px] text-slate-400">
-                {prestadores.length} prestador(es)
-              </span>
-            </div>
-
-            {prestadoresLoading ? (
-              <p className="mt-3 text-xs text-slate-500">
-                Carregando prestadores...
-              </p>
-            ) : prestadores.length === 0 ? (
-              <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-6 text-center">
-                <p className="text-sm font-semibold text-slate-700">
-                  Nenhum prestador cadastrado ainda.
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Cadastre um prestador para ver nome e e-mails destacados aqui.
-                </p>
-              </div>
-            ) : (
-              <div className="mt-4 grid gap-3 md:grid-cols-1 xl:grid-cols-2">
-                {prestadores.map((prestador, index) => {
-                  const regrasDoPrestador =
-                    regrasPorPrestador[prestador.id] ?? [];
-                  const regraDestaque = regrasDoPrestador[0] ?? null;
-                  const labelDestaque = regraDestaque
-                    ? resolveRegraLabel(regraDestaque.alvo, regraDestaque.label)
-                    : null;
-                  const emailsPreview = prestador.usuarios.slice(0, 3);
-                  const extraEmails = Math.max(
-                    prestador.usuarios.length - emailsPreview.length,
-                    0,
-                  );
-
-                  return (
-                    <button
-                      key={prestador.id}
-                      type="button"
-                      onClick={() => setSelectedPrestadorId(prestador.id)}
-                      className={`relative min-h-[160px] overflow-hidden text-left rounded-2xl px-4 py-4 transition ${
-                        selectedPrestadorId === prestador.id
-                          ? "bg-white shadow-sm shadow-sky-100"
-                          : "bg-white hover:bg-slate-50"
-                      }`}
-                    >
-                      <div
-                        className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${prestadorAccent(
-                          index,
-                        )} opacity-80 blur-xl`}
-                      />
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-base font-semibold text-slate-900 md:text-lg">
-                            {prestador.nome}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            {prestador.tipo_servico}
-                          </p>
-                          {prestador.usuarios.length > 0 ? (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                              {emailsPreview.map((email) => (
-                                <span
-                                  key={email}
-                                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600"
-                                >
-                                  {email}
-                                </span>
-                              ))}
-                              {extraEmails > 0 ? (
-                                <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] text-slate-600">
-                                  +{extraEmails}
-                                </span>
-                              ) : null}
-                            </div>
-                          ) : (
-                            <p className="mt-2 text-[11px] text-slate-400">
-                              Sem emails cadastrados.
-                            </p>
-                          )}
-                        </div>
-                        <span className="text-[11px] font-semibold text-slate-500">
-                          {regrasDoPrestador.length} regra(s)
-                        </span>
-                      </div>
-                      {labelDestaque ? (
-                        <p className="mt-2 text-[11px] text-slate-500">
-                          Regra destaque: {labelDestaque} -{" "}
-                          {regraDestaque?.quantidade} /{" "}
-                          {regraDestaque?.periodo === "mensal" ? "mês" : "ano"}
-                        </p>
-                      ) : (
-                        <p className="mt-2 text-[11px] text-slate-500">
-                          Nenhuma regra cadastrada.
-                        </p>
-                      )}
-                      <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-slate-500">
-                        <span className="rounded-full bg-slate-100 px-2 py-1">
-                          {selectedPrestadorId === prestador.id
-                            ? "Selecionado"
-                            : "Clique para detalhes"}
-                        </span>
-                        <span className="rounded-full bg-slate-100 px-2 py-1">
-                          {prestador.usuarios.length} e-mail(s)
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl bg-white/80 p-4 shadow-sm shadow-slate-100">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              2. Detalhes do prestador
+              Detalhes do prestador
             </p>
             {regrasLoading && (
               <p className="mt-2 text-xs text-slate-500">
@@ -957,7 +940,7 @@ export default function PrestadoresPage() {
           >
             <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <UserPlus className="h-4 w-4 text-slate-600" />
-              3. Cadastrar novo prestador
+              Cadastrar novo prestador
             </p>
             <div className="grid gap-3">
               <label className="text-xs font-semibold text-slate-600">
@@ -1030,7 +1013,7 @@ export default function PrestadoresPage() {
             className="space-y-4 rounded-2xl bg-white/80 p-4 shadow-sm shadow-slate-100"
           >
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              4. Criar regra de monitoramento
+              Criar regra de monitoramento
             </p>
             <p className="text-[11px] text-slate-500">
               Prestador selecionado:{" "}
