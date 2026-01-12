@@ -14,12 +14,13 @@ import { Eye, FilePlus2 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
+import { useLojas } from "@/hooks/useLojas";
 import { resolveServicoOficial } from "@/lib/servicosVocab";
 
 type FormField = {
   name: string;
   label: string;
-  type: "text" | "textarea" | "number" | "date";
+  type: "text" | "textarea" | "number" | "date" | "select";
   placeholder?: string;
   options?: string[];
 };
@@ -42,6 +43,11 @@ const FORM_CONFIGS: FormConfig[] = [
       "Informe os dados necessários para análise e controle de retenções trabalhistas.",
     defaultStatus: "em_analise",
     fields: [
+      {
+        name: "loja_id",
+        label: "Loja",
+        type: "select",
+      },
       {
         name: "empresa",
         label: "Empresa",
@@ -75,6 +81,11 @@ const FORM_CONFIGS: FormConfig[] = [
     description:
       "Envie laudos e registros técnicos para armazenamento e controle interno.",
     fields: [
+      {
+        name: "loja_id",
+        label: "Loja",
+        type: "select",
+      },
       {
         name: "prestador",
         label: "Prestador",
@@ -115,6 +126,11 @@ const FORM_CONFIGS: FormConfig[] = [
       "Cadastre e armazene notas fiscais emitidas para controle e auditoria.",
     defaultStatus: "em_analise",
     fields: [
+      {
+        name: "loja_id",
+        label: "Loja",
+        type: "select",
+      },
       {
         name: "prestador",
         label: "Prestador",
@@ -200,6 +216,7 @@ export default function FormularioPage() {
     assignedOnly: true,
     enabled: true,
   });
+  const { lojas, loading: lojasLoading } = useLojas({ enabled: true });
   const tipoServicoFiltro = searchParams.get("tipoServico") ?? "";
 
   const getInitialValues = useCallback((): FormValues => {
@@ -359,6 +376,10 @@ export default function FormularioPage() {
     handleChange("prestador", prestador?.nome ?? "");
   };
 
+  const handleLojaSelection = (lojaId: string) => {
+    handleChange("loja_id", lojaId);
+  };
+
   const beginFormProgress = () => {
     if (formProgressTimer.current) {
       clearInterval(formProgressTimer.current);
@@ -467,6 +488,8 @@ export default function FormularioPage() {
     tipoFormulario: string,
     statusPadrao: string,
     prestadorId?: string | null,
+    lojaId?: string | null,
+    lojaNome?: string | null,
   ) => {
     for (const arquivo of arquivos) {
       const payloadDados: Record<string, unknown> = {
@@ -480,6 +503,12 @@ export default function FormularioPage() {
           },
         ],
       };
+      if (lojaId) {
+        payloadDados.loja_id = lojaId;
+      }
+      if (lojaNome) {
+        payloadDados.loja_nome = lojaNome;
+      }
 
       const payload = {
         user_id: usuarioId,
@@ -565,6 +594,10 @@ export default function FormularioPage() {
         enablePrestadorDropdown && selectedPrestadorId
           ? selectedPrestadorId
           : null;
+      const lojaSelecionada =
+        values.loja_id && lojas.length > 0
+          ? lojas.find((loja) => loja.id === values.loja_id) ?? null
+          : null;
       await salvarDocumentosSeparados(
         uploadResults,
         valoresAtuais,
@@ -572,6 +605,8 @@ export default function FormularioPage() {
         config.tipo,
         statusPadrao,
         prestadorIdParaSalvar,
+        lojaSelecionada?.id ?? null,
+        lojaSelecionada?.nome ?? null,
       );
 
       setSuccess(
@@ -668,6 +703,28 @@ export default function FormularioPage() {
                     </option>
                   ))}
                 </select>
+              ) : field.type === "select" && field.name === "loja_id" ? (
+                <select
+                  id={field.name}
+                  required
+                  value={values[field.name] ?? ""}
+                  onChange={(e) => handleLojaSelection(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-sky-500/40 placeholder:text-slate-400 focus:border-sky-500 focus:ring"
+                  disabled={lojasLoading || lojas.length === 0}
+                >
+                  <option value="">
+                    {lojasLoading
+                      ? "Carregando lojas..."
+                      : lojas.length === 0
+                        ? "Nenhuma loja cadastrada"
+                        : "Selecione uma loja"}
+                  </option>
+                  {lojas.map((loja) => (
+                    <option key={loja.id} value={loja.id}>
+                      {loja.nome}
+                    </option>
+                  ))}
+                </select>
               ) : field.type === "textarea" ? (
                 <textarea
                   id={field.name}
@@ -705,6 +762,15 @@ export default function FormularioPage() {
                     : prestadoresDisponiveis.length === 0
                       ? "Nenhum prestador foi associado à sua conta. Peça ao administrador para adicionar seu e-mail ao grupo correto."
                       : "Escolha um prestador cadastrado pelo administrador para vincular o envio."}
+                </p>
+              )}
+              {field.name === "loja_id" && (
+                <p className="text-[11px] text-slate-500">
+                  {lojasLoading
+                    ? "Carregando lojas disponíveis..."
+                    : lojas.length === 0
+                      ? "Cadastre uma loja antes de enviar documentos."
+                      : "Selecione a loja para vincular o envio."}
                 </p>
               )}
             </div>

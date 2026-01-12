@@ -250,7 +250,7 @@ const anoAtual = new Date().getFullYear().toString();
 export default function DocumentosPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
-  const { isAdmin, loading: accessLoading, error: accessError } =
+  const { isAdmin, role, loading: accessLoading, error: accessError } =
     useDocumentsAccess();
   const canViewAllDocuments = isAdmin;
   const canManageDocuments = isAdmin;
@@ -259,7 +259,7 @@ export default function DocumentosPage() {
     loading: prestadoresUsuarioLoading,
   } = usePrestadores({
     assignedOnly: true,
-    enabled: Boolean(user) && !canViewAllDocuments,
+    enabled: Boolean(user) && !canViewAllDocuments && role !== "gerente_loja",
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -526,7 +526,7 @@ export default function DocumentosPage() {
       return;
     }
 
-    if (!canViewAllDocuments && prestadoresUsuarioLoading) {
+    if (!canViewAllDocuments && role !== "gerente_loja" && prestadoresUsuarioLoading) {
       return;
     }
 
@@ -540,7 +540,9 @@ export default function DocumentosPage() {
         const token = await getAccessToken();
         const params = new URLSearchParams();
         if (!canViewAllDocuments) {
-          if (prestadoresDoUsuario.length > 0) {
+          if (role === "gerente_loja") {
+            // Usa o filtro por loja no backend.
+          } else if (prestadoresDoUsuario.length > 0) {
             prestadoresDoUsuario.forEach((prestador) => {
               params.append("prestadorId", prestador.id);
             });
@@ -626,6 +628,7 @@ export default function DocumentosPage() {
     user,
     router,
     canViewAllDocuments,
+    role,
     getAccessToken,
     prestadoresUsuarioLoading,
     prestadoresDoUsuario,

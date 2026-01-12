@@ -136,6 +136,30 @@ async function getAuthorizedPrestadorIds(
     .map((item) => item.id);
 }
 
+async function getAuthorizedLojaIds(
+  email: string | null,
+  supabaseAdmin = createSupabaseAdminClient(),
+) {
+  if (!email) {
+    return [];
+  }
+  const { data, error } = await supabaseAdmin
+    .from("lojas")
+    .select("id,usuarios")
+    .contains("usuarios", [email]);
+  if (error) {
+    throw error;
+  }
+  return (
+    data?.map((item) => ({
+      id: item.id as string,
+      usuarios: (item.usuarios as string[] | null) ?? [],
+    })) ?? []
+  )
+    .filter((item) => item.usuarios.some((usuario) => usuario === email))
+    .map((item) => item.id);
+}
+
 function mapRows(rows: FormularioRow[]): DocumentRecord[] {
   return rows.map((item) => ({
     id: item.id,
@@ -163,12 +187,17 @@ export async function GET(request: Request) {
       email,
       supabaseAdmin,
     );
+    const allowedLojas = await getAuthorizedLojaIds(email, supabaseAdmin);
 
     const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
     const { searchParams } = new URL(request.url);
     const filterUserId = searchParams.get("userId");
     const filterPrestadores = searchParams
       .getAll("prestadorId")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const filterLojas = searchParams
+      .getAll("lojaId")
       .map((value) => value.trim())
       .filter(Boolean);
     const tipoFilter = searchParams.get("tipo");
@@ -187,9 +216,14 @@ export async function GET(request: Request) {
       : null;
     const offset = Number.isFinite(offsetParam) ? Math.max(offsetParam, 0) : 0;
     let prestadoresPermitidos = filterPrestadores;
+    let lojasPermitidas = filterLojas;
     let userFilter = filterUserId;
 
-    if (!canAccess) {
+    const hasPrestadorAccess = allowedPrestadores.length > 0;
+    const hasLojaAccess = allowedLojas.length > 0;
+    const isSelfFilter = userFilter && userFilter === user.id;
+
+    if (!canAccess && !hasPrestadorAccess && !hasLojaAccess && !isSelfFilter) {
       throw new HttpError(
         403,
         "Voce nao possui permissao para remover este documento.",
@@ -208,10 +242,36 @@ export async function GET(request: Request) {
       query = query.eq("user_id", userFilter);
     }
 
+    if (!canAccess && hasPrestadorAccess) {
+      if (prestadoresPermitidos.length > 0) {
+        prestadoresPermitidos = prestadoresPermitidos.filter((id) =>
+          allowedPrestadores.includes(id),
+        );
+      } else {
+        prestadoresPermitidos = allowedPrestadores;
+      }
+    }
+
+    if (!canAccess && hasLojaAccess) {
+      if (lojasPermitidas.length > 0) {
+        lojasPermitidas = lojasPermitidas.filter((id) =>
+          allowedLojas.includes(id),
+        );
+      } else {
+        lojasPermitidas = allowedLojas;
+      }
+    }
+
     if (prestadoresPermitidos.length === 1) {
       query = query.eq("prestador_id", prestadoresPermitidos[0]);
     } else if (prestadoresPermitidos.length > 1) {
       query = query.in("prestador_id", prestadoresPermitidos);
+    }
+
+    if (lojasPermitidas.length === 1) {
+      query = query.eq("dados->>loja_id", lojasPermitidas[0]);
+    } else if (lojasPermitidas.length > 1) {
+      query = query.in("dados->>loja_id", lojasPermitidas);
     }
 
     if (tipoFilter && tipoFilter !== "todos") {

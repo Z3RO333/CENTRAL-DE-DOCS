@@ -8,7 +8,7 @@ type ModuleKey = "documentos" | "dashboards" | "perfil";
 
 type ModulesAccess = Record<ModuleKey, boolean>;
 
-type AccessRole = "admin" | "colaborador";
+type AccessRole = "admin" | "colaborador" | "gerente_loja";
 
 type UseDocumentsAccessResult = {
   hasAccess: boolean;
@@ -136,6 +136,20 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         applyRecords(emailData ?? null);
       }
 
+      let isGerenteLoja = false;
+
+      if (!resolvedIsAdmin && normalizedEmail) {
+        const { data: lojaData, error: lojaError } = await supabase
+          .from("lojas")
+          .select("id,usuarios")
+          .contains("usuarios", [normalizedEmail]);
+        if (lojaError) {
+          console.error("Erro ao verificar lojas do usuário:", lojaError);
+        } else if ((lojaData ?? []).length > 0) {
+          isGerenteLoja = true;
+        }
+      }
+
       if (resolvedIsAdmin) {
         baseModules.documentos = true;
         baseModules.dashboards = true;
@@ -143,7 +157,13 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
       }
       setModules(baseModules);
       setIsAdmin(resolvedIsAdmin);
-      setRole(resolvedIsAdmin ? "admin" : "colaborador");
+      if (resolvedIsAdmin) {
+        setRole("admin");
+      } else if (isGerenteLoja) {
+        setRole("gerente_loja");
+      } else {
+        setRole("colaborador");
+      }
       setHasAccess(Boolean(user));
       setError(null);
     } catch (err) {

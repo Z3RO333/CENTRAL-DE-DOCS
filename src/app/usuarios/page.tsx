@@ -9,6 +9,7 @@ import {
   useDocumentPermissions,
   type DocumentPermission,
 } from "@/hooks/useDocumentPermissions";
+import { useLojas } from "@/hooks/useLojas";
 import { supabase } from "@/lib/supabaseClient";
 
 const ADMIN_MODULES = new Set(["admin", "documentos", "dashboards", "perfil"]);
@@ -45,13 +46,21 @@ const getNameFromEmail = (email: string | null) => {
 const getDisplayName = (user: AppUser) =>
   user.name?.trim() || getNameFromEmail(user.email);
 
-const getRoleLabel = (isAdmin: boolean) =>
-  isAdmin ? "Administrador" : "Colaborador";
+const getRoleLabel = (role: "admin" | "gerente_loja" | "colaborador") => {
+  if (role === "admin") {
+    return "Administrador";
+  }
+  if (role === "gerente_loja") {
+    return "Gerente de Loja";
+  }
+  return "Colaborador";
+};
 
 export default function UsuariosPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
   const { isAdmin, loading: accessLoading } = useDocumentsAccess();
+  const { lojas } = useLojas({ enabled: isAdmin });
   const {
     permissions,
     loading: permissionsLoading,
@@ -76,6 +85,15 @@ export default function UsuariosPage() {
     () => permissions.filter((permission) => ADMIN_MODULES.has(permission.module)),
     [permissions],
   );
+  const gerenteEmails = useMemo(
+    () =>
+      new Set(
+        lojas.flatMap((loja) =>
+          loja.usuarios.map((email) => email.toLowerCase()),
+        ),
+      ),
+    [lojas],
+  );
 
   const isUserAdmin = useCallback(
     (target: AppUser) => {
@@ -87,6 +105,30 @@ export default function UsuariosPage() {
       });
     },
     [adminPermissions],
+  );
+
+  const isUserGerente = useCallback(
+    (target: AppUser) => {
+      const normalizedEmail = target.email?.toLowerCase().trim() ?? null;
+      if (!normalizedEmail) {
+        return false;
+      }
+      return gerenteEmails.has(normalizedEmail);
+    },
+    [gerenteEmails],
+  );
+
+  const getUserRole = useCallback(
+    (target: AppUser) => {
+      if (isUserAdmin(target)) {
+        return "admin";
+      }
+      if (isUserGerente(target)) {
+        return "gerente_loja";
+      }
+      return "colaborador";
+    },
+    [isUserAdmin, isUserGerente],
   );
 
   const getAdminEntriesForUser = useCallback(
@@ -321,7 +363,7 @@ export default function UsuariosPage() {
                 </tr>
               ) : (
                 visibleUsers.map((entry) => {
-                  const admin = isUserAdmin(entry);
+                  const role = getUserRole(entry);
                   return (
                     <tr key={entry.id} className="text-slate-700">
                       <td className="px-5 py-4">
@@ -332,7 +374,7 @@ export default function UsuariosPage() {
                       <td className="px-5 py-4">{entry.email ?? "-"}</td>
                       <td className="px-5 py-4">
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                          {getRoleLabel(admin)}
+                          {getRoleLabel(role)}
                         </span>
                       </td>
                       <td className="px-5 py-4">
@@ -391,6 +433,11 @@ export default function UsuariosPage() {
                 Administradores veem todas as telas. Colaboradores veem apenas os
                 documentos do grupo vinculado ao e-mail.
               </p>
+              {isUserGerente(editingUser) && !isUserAdmin(editingUser) && (
+                <p className="mt-2 text-[11px] text-slate-500">
+                  Gerentes de loja são definidos na tela de Lojas.
+                </p>
+              )}
             </div>
             <div className="mt-6 flex justify-end gap-2 text-xs">
               <button

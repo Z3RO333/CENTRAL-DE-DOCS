@@ -12,6 +12,7 @@ import {
   BarChart3,
   ShieldCheck,
   Building2,
+  Store,
   HelpCircle,
   Menu,
   X,
@@ -69,6 +70,13 @@ export default function AppShell({
       icon: FileText,
       isActive: pathname?.startsWith("/documentos"),
       isVisible: canAccessDocuments,
+    },
+    {
+      href: "/lojas",
+      label: "Lojas",
+      icon: Store,
+      isActive: pathname?.startsWith("/lojas"),
+      isVisible: isAdmin,
     },
     {
       href: "/prestadores",
