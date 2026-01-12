@@ -213,6 +213,18 @@ const getTipoLaudo = (registro: FormularioRecord) =>
 const getObservacoes = (registro: FormularioRecord) =>
   getCampoTexto(registro.dados, ["observacoes"]);
 
+const getPageCount = (registro: FormularioRecord) => {
+  const raw = registro.dados?.page_count;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw;
+  }
+  if (typeof raw === "string" && raw.trim()) {
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+};
+
 const getDocumentoNome = (registro: FormularioRecord) => {
   const anexos = registro.dados?.anexos;
   if (Array.isArray(anexos) && anexos.length > 0) {
@@ -1665,7 +1677,7 @@ export default function DocumentosPage() {
                   const identificacaoConfig = getIdentificacaoConfig(
                     registro.tipo,
                   );
-                  const nomeDocumento = getDocumentoNome(registro);
+                  const nomeDocumento = getDocumentoNome(registro);\r\n            const pageCount = getPageCount(registro);
                   const identificacaoValor =
                     getIdentificacaoValor(registro) ??
                     `${identificacaoConfig.label} não informado`;
@@ -1694,11 +1706,16 @@ export default function DocumentosPage() {
                       )}
                       <td className="px-4 py-3">
                         <p
-                          className="text-sm font-semibold text-slate-900"
+                          className="max-w-[220px] break-words text-sm font-semibold text-slate-900"
                           title={nomeDocumento}
                         >
                           {nomeDocumento}
                         </p>
+                        {pageCount ? (
+                          <p className="text-xs text-slate-500">
+                            {pageCount} página(s)
+                          </p>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1713,7 +1730,7 @@ export default function DocumentosPage() {
                           </p>
                         )}
                         {edicaoInfo && (
-                          <p className="text-xs font-semibold text-amber-600">
+                          <p className="mt-1 text-[11px] font-semibold text-amber-700">
                             Documento alterado por {edicaoInfo.editedBy ?? "admin"}
                             {edicaoInfo.editedAt ? ` em ${edicaoInfo.editedAt}` : ""}
                           </p>
@@ -1722,12 +1739,12 @@ export default function DocumentosPage() {
                       <td className="px-4 py-3 text-sm text-slate-600">
                         {getTipoDescricao(registro.tipo)}
                       </td>
-                      <td className="hidden px-4 py-3 text-xs text-slate-500 lg:table-cell">
+                      <td className="hidden px-4 py-3 text-xs leading-5 text-slate-500 lg:table-cell">
                         {registro.tipo === TIPO_ASSINAVEL && tipoLaudo
                           ? tipoLaudo
                           : "-"}
                       </td>
-                      <td className="hidden px-4 py-3 text-xs text-slate-500 xl:table-cell">
+                      <td className="hidden px-4 py-3 text-xs leading-5 text-slate-500 xl:table-cell">
                         {registro.tipo === TIPO_ASSINAVEL && observacoes
                           ? observacoes
                           : "-"}
@@ -1747,18 +1764,18 @@ export default function DocumentosPage() {
                         {formatDateTime(registro.created_at)}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-wrap justify-end gap-2 text-[11px]">
+                        <div className="flex flex-col items-end gap-2 text-[11px]">
                           <button
                             type="button"
                             onClick={() => void abrirDocumento(registro)}
-                            className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                            className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                           >
                             Abrir
                           </button>
                           <button
                             type="button"
                             onClick={() => void baixarDocumento(registro)}
-                            className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                            className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                           >
                             Baixar
                           </button>
@@ -1766,7 +1783,7 @@ export default function DocumentosPage() {
                             <button
                               type="button"
                               onClick={() => abrirEdicao(registro)}
-                              className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                              className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                             >
                               Editar
                             </button>
@@ -1776,7 +1793,7 @@ export default function DocumentosPage() {
                               type="button"
                               onClick={() => void removerDocumento(registro)}
                               disabled={deletingId === registro.id}
-                              className="rounded-full border border-red-200 px-3 py-1 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                              className="min-w-[88px] rounded-full border border-red-200 px-3 py-1 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {deletingId === registro.id
                                 ? "Removendo..."
@@ -1787,7 +1804,7 @@ export default function DocumentosPage() {
                             <button
                               type="button"
                               onClick={() => router.push(`/documentos/${registro.id}`)}
-                              className="rounded-full bg-sky-500 px-3 py-1 text-white transition hover:bg-sky-400"
+                              className="min-w-[88px] rounded-full bg-sky-500 px-3 py-1 text-white transition hover:bg-sky-400"
                             >
                               Assinar
                             </button>
@@ -1805,7 +1822,7 @@ export default function DocumentosPage() {
         <div className="grid gap-4 md:grid-cols-2">
           {registrosFiltrados.map((registro) => {
             const identificacaoConfig = getIdentificacaoConfig(registro.tipo);
-            const nomeDocumento = getDocumentoNome(registro);
+            const nomeDocumento = getDocumentoNome(registro);\r\n            const pageCount = getPageCount(registro);
             const identificacaoValor =
               getIdentificacaoValor(registro) ??
               `${identificacaoConfig.label} não informado`;
@@ -1835,6 +1852,11 @@ export default function DocumentosPage() {
                     >
                       {nomeDocumento}
                     </p>
+                    {pageCount ? (
+                      <p className="text-xs text-slate-500">
+                        {pageCount} página(s)
+                      </p>
+                    ) : null}
                   </div>
                   {canManageDocuments && (
                     <label className="flex items-center gap-2 text-xs text-slate-500">
@@ -1862,7 +1884,7 @@ export default function DocumentosPage() {
                       </p>
                     )}
                     {edicaoInfo && (
-                      <p className="text-xs font-semibold text-amber-600">
+                      <p className="mt-1 text-[11px] font-semibold text-amber-700">
                         Documento alterado por {edicaoInfo.editedBy ?? "admin"}
                         {edicaoInfo.editedAt ? ` em ${edicaoInfo.editedAt}` : ""}
                       </p>
@@ -1909,14 +1931,14 @@ export default function DocumentosPage() {
                   <button
                     type="button"
                     onClick={() => void abrirDocumento(registro)}
-                    className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                    className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                   >
                     Abrir
                   </button>
                   <button
                     type="button"
                     onClick={() => void baixarDocumento(registro)}
-                    className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                    className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                   >
                     Baixar
                   </button>
@@ -1924,7 +1946,7 @@ export default function DocumentosPage() {
                     <button
                       type="button"
                       onClick={() => abrirEdicao(registro)}
-                      className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                      className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                     >
                       Editar
                     </button>
@@ -1934,7 +1956,7 @@ export default function DocumentosPage() {
                       type="button"
                       onClick={() => void removerDocumento(registro)}
                       disabled={deletingId === registro.id}
-                      className="rounded-full border border-red-200 px-3 py-1 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="min-w-[88px] rounded-full border border-red-200 px-3 py-1 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {deletingId === registro.id ? "Removendo..." : "Remover"}
                     </button>
@@ -1943,7 +1965,7 @@ export default function DocumentosPage() {
                     <button
                       type="button"
                       onClick={() => router.push(`/documentos/${registro.id}`)}
-                      className="rounded-full bg-sky-500 px-3 py-1 text-white transition hover:bg-sky-400"
+                      className="min-w-[88px] rounded-full bg-sky-500 px-3 py-1 text-white transition hover:bg-sky-400"
                     >
                       Assinar
                     </button>
@@ -1957,6 +1979,10 @@ export default function DocumentosPage() {
     </div>
   );
 }
+
+
+
+
 
 
 

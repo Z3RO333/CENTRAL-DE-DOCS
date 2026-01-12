@@ -11,6 +11,7 @@ import {
 } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Eye, FilePlus2 } from "lucide-react";
+import { PDFDocument } from "pdf-lib";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
@@ -188,6 +189,7 @@ type UploadedFileSummary = {
   name: string;
   type: string;
   size: number;
+  pageCount?: number | null;
 };
 
 export default function FormularioPage() {
@@ -431,15 +433,22 @@ export default function FormularioPage() {
     return path;
   };
 
-  const getSignedFileUrl = async (path: string) => {
-    const { data, error } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .createSignedUrl(path, SIGNED_URL_EXPIRES_IN);
-
-    if (error || !data?.signedUrl) {
-      throw error ?? new Error("NÃ£o foi possÃ­vel gerar o link do arquivo.");
+  
+  const getPdfPageCount = async (file: File) => {
+    const isPdf =
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      return null;
     }
-    return data.signedUrl;
+    try {
+      const buffer = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(buffer);
+      return pdfDoc.getPageCount();
+    } catch (err) {
+      console.warn("Não foi possível ler o PDF para contar páginas.", err);
+      return null;
+    }
   };
 
   const abrirDocumento = async (registro: DocumentoHistorico) => {
@@ -498,6 +507,9 @@ export default function FormularioPage() {
           },
         ],
       };
+      if (typeof arquivo.pageCount === "number") {
+        payloadDados.page_count = arquivo.pageCount;
+      }
       if (lojaId) {
         payloadDados.loja_id = lojaId;
       }
@@ -560,11 +572,14 @@ export default function FormularioPage() {
           return;
         }
 
+        const pageCount = await getPdfPageCount(currentFile);
+
         uploadResults.push({
           path: uploadData.path ?? filePath,
           name: currentFile.name,
           type: currentFile.type,
           size: currentFile.size,
+          pageCount,
         });
       }
 
@@ -908,4 +923,9 @@ export default function FormularioPage() {
     </div>
   );
 }
+
+
+
+
+
 
