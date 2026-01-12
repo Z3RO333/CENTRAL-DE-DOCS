@@ -1156,7 +1156,6 @@ export default function DocumentosPage() {
         </div>
       )}
 
-      {canManageDocuments && (
       <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
@@ -1217,7 +1216,6 @@ export default function DocumentosPage() {
         </div>
       </div>
 
-      {canManageDocuments && (
       <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
