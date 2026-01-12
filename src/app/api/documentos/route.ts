@@ -433,4 +433,75 @@ export async function DELETE(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  try {
+    const user = await getSessionUser(request);
+    const email = user.email?.toLowerCase().trim() ?? null;
+    const supabaseAdmin = createSupabaseAdminClient();
+    const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
+
+    if (!canAccess) {
+      throw new HttpError(403, "Ação restrita para administradores.");
+    }
+
+    const body = (await request.json()) as {
+      id?: string;
+      updates?: Record<string, unknown>;
+    };
+    const id = body.id?.trim();
+    if (!id || !body.updates || typeof body.updates !== "object") {
+      throw new HttpError(400, "Informe o id e os dados para atualização.");
+    }
+
+    const { data: registro, error: registroError } = await supabaseAdmin
+      .from("formularios")
+      .select("id,dados")
+      .eq("id", id)
+      .maybeSingle();
+    if (registroError) {
+      throw registroError;
+    }
+    if (!registro) {
+      throw new HttpError(404, "Documento não encontrado.");
+    }
+
+    const dadosAtuais =
+      typeof registro.dados === "string"
+        ? (JSON.parse(registro.dados) as Record<string, unknown>)
+        : ((registro.dados ?? {}) as Record<string, unknown>);
+    const dadosAtualizados = {
+      ...dadosAtuais,
+      ...body.updates,
+      edited_by: email ?? user.id,
+      edited_at: new Date().toISOString(),
+    };
+
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from("formularios")
+      .update({ dados: dadosAtualizados })
+      .eq("id", id)
+      .select(
+        "id,tipo,status,arquivo_path,arquivo_assinado_path,created_at,dados,assinado_por,user_id,prestador_id",
+      )
+      .maybeSingle();
+    if (updateError) {
+      throw updateError;
+    }
+
+    return NextResponse.json({
+      registro: updated ? mapRows([updated as FormularioRow])[0] : null,
+    });
+  } catch (err) {
+    console.error("Erro ao atualizar documento:", err);
+    if (err instanceof HttpError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Não foi possível atualizar o documento.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
 

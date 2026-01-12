@@ -2,16 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  BriefcaseBusiness,
-  FileBadge,
-  Files,
-  Filter,
-  LayoutGrid,
-  ReceiptText,
-  Table as TableIcon,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Files, Filter, LayoutGrid, Table as TableIcon } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
@@ -29,43 +20,39 @@ type FormularioRecord = {
   prestador_id?: string | null;
 };
 
+type EditField = {
+  name: string;
+  label: string;
+  type?: "text" | "textarea" | "number" | "date";
+};
+
 const tipoLabel: Record<string, string> = {
   retencao_trabalhista: "Retenção Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
 };
 
-type FilterCardConfig = {
-  value: keyof typeof tipoLabel;
-  label: string;
-  description: string;
-  icon: LucideIcon;
-  accent: string;
+const EDIT_FIELDS_BY_TIPO: Record<string, EditField[]> = {
+  retencao_trabalhista: [
+    { name: "competencia", label: "Competência" },
+    { name: "prestador", label: "Prestador" },
+    { name: "observacoes", label: "Observações", type: "textarea" },
+  ],
+  registro_laudos: [
+    { name: "prestador", label: "Prestador" },
+    { name: "tipo_laudo", label: "Tipo de laudo" },
+    { name: "responsavel", label: "Responsável" },
+    { name: "data_emissao", label: "Data de emissão", type: "date" },
+    { name: "observacoes", label: "Observações", type: "textarea" },
+  ],
+  notas_fiscais: [
+    { name: "prestador", label: "Prestador" },
+    { name: "numero_pedido", label: "Número do pedido" },
+    { name: "numero_nf", label: "Número da nota" },
+    { name: "valor", label: "Valor", type: "number" },
+    { name: "descricao", label: "Descrição / Histórico", type: "textarea" },
+  ],
 };
-
-const FORM_FILTER_CARDS: FilterCardConfig[] = [
-  {
-    value: "retencao_trabalhista",
-    label: tipoLabel.retencao_trabalhista,
-    description: "Documentos ligados a retenção de tributos trabalhistas.",
-    icon: BriefcaseBusiness,
-    accent: "from-sky-100 via-sky-50 to-transparent",
-  },
-  {
-    value: "registro_laudos",
-    label: tipoLabel.registro_laudos,
-    description: "Registros técnicos e laudos enviados para validação.",
-    icon: FileBadge,
-    accent: "from-emerald-100 via-emerald-50 to-transparent",
-  },
-  {
-    value: "notas_fiscais",
-    label: tipoLabel.notas_fiscais,
-    description: "Notas emitidas e anexadas via formulários.",
-    icon: ReceiptText,
-    accent: "from-amber-100 via-amber-50 to-transparent",
-  },
-];
 
 const TIPO_ASSINAVEL = "registro_laudos";
 const STORAGE_BUCKET = "formularios";
@@ -128,6 +115,8 @@ const formatStatusLabel = (status: string) =>
 
 const getTipoDescricao = (tipo: string) =>
   tipoLabel[tipo] ?? humanizeTexto(tipo);
+
+const getEditFields = (tipo: string) => EDIT_FIELDS_BY_TIPO[tipo] ?? [];
 
 const identificacaoFieldMap: Record<
   string,
@@ -244,6 +233,16 @@ const formatDateTime = (value: string) => {
   return date.toLocaleString("pt-BR");
 };
 
+const getEdicaoInfo = (registro: FormularioRecord) => {
+  const editedBy = getCampoTexto(registro.dados, ["edited_by"]);
+  const editedAtRaw = getCampoTexto(registro.dados, ["edited_at"]);
+  if (!editedBy && !editedAtRaw) {
+    return null;
+  }
+  const editedAt = editedAtRaw ? formatDateTime(editedAtRaw) : null;
+  return { editedBy, editedAt };
+};
+
 const mesAtual = String(new Date().getMonth() + 1).padStart(2, "0");
 const anoAtual = new Date().getFullYear().toString();
 
@@ -288,6 +287,11 @@ export default function DocumentosPage() {
     type: "single" | "batch";
     registro?: FormularioRecord;
   } | null>(null);
+  const [editDialog, setEditDialog] = useState<{
+    registro: FormularioRecord;
+    values: Record<string, string>;
+  } | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const getAccessToken = useCallback(async () => {
     const { data: sessionData, error: sessionError } =
@@ -696,12 +700,100 @@ export default function DocumentosPage() {
     }
   };
 
+  
   const removerDocumento = async (registro: FormularioRecord) => {
     if (!canManageDocuments) {
       setError("Ação restrita para administradores.");
       return;
     }
     setConfirmDialog({ type: "single", registro });
+  };
+  const abrirEdicao = (registro: FormularioRecord) => {
+    if (!canManageDocuments) {
+      setError("Ação restrita para administradores.");
+      return;
+    }
+    const campos = getEditFields(registro.tipo);
+    const values = campos.reduce<Record<string, string>>((acc, campo) => {
+      const raw = registro.dados?.[campo.name];
+      acc[campo.name] = raw === null || raw === undefined ? "" : String(raw);
+      return acc;
+    }, {});
+    setEditDialog({ registro, values });
+  };
+
+  const atualizarEdicao = (campo: string, valor: string) => {
+    setEditDialog((prev) =>
+      prev
+        ? {
+            ...prev,
+            values: {
+              ...prev.values,
+              [campo]: valor,
+            },
+          }
+        : prev,
+    );
+  };
+
+  const salvarEdicao = async () => {
+    if (!editDialog) {
+      return;
+    }
+    if (!canManageDocuments) {
+      setError("Ação restrita para administradores.");
+      return;
+    }
+    try {
+      setSavingEdit(true);
+      setError(null);
+      const token = await getAccessToken();
+      const response = await fetch("/api/documentos", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: editDialog.registro.id,
+          updates: editDialog.values,
+        }),
+      });
+      const payload = (await response.json()) as {
+        registro?: FormularioRecord;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(
+          payload.error ?? "Não foi possível atualizar o documento.",
+        );
+      }
+      setRegistros((prev) =>
+        prev.map((item) =>
+          item.id === editDialog.registro.id
+            ? normalizeRegistroStatus(
+                payload.registro ?? {
+                  ...item,
+                  dados: {
+                    ...(item.dados ?? {}),
+                    ...editDialog.values,
+                  },
+                },
+              )
+            : item,
+        ),
+      );
+      setEditDialog(null);
+    } catch (err) {
+      console.error("Erro ao atualizar documento:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível atualizar o documento.",
+      );
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const confirmarRemocao = async () => {
@@ -1049,6 +1141,84 @@ export default function DocumentosPage() {
           </div>
         </div>
       )}
+      {editDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6"
+          onClick={() => setEditDialog(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl shadow-slate-900/20"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-title"
+          >
+            <p
+              id="edit-title"
+              className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+            >
+              Editar documento
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">
+              {getTipoDescricao(editDialog.registro.tipo)}
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500">
+              {editDialog.registro.id}
+            </p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {getEditFields(editDialog.registro.tipo).map((campo) => {
+                const value = editDialog.values[campo.name] ?? "";
+                return (
+                  <label
+                    key={campo.name}
+                    className={`text-xs font-semibold text-slate-600 ${
+                      campo.type === "textarea" ? "md:col-span-2" : ""
+                    }`}
+                  >
+                    {campo.label}
+                    {campo.type === "textarea" ? (
+                      <textarea
+                        value={value}
+                        onChange={(event) =>
+                          atualizarEdicao(campo.name, event.target.value)
+                        }
+                        rows={3}
+                        className="mt-1 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+                      />
+                    ) : (
+                      <input
+                        type={campo.type ?? "text"}
+                        value={value}
+                        onChange={(event) =>
+                          atualizarEdicao(campo.name, event.target.value)
+                        }
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+                      />
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex justify-end gap-2 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setEditDialog(null)}
+                className="rounded-full border border-slate-300 px-4 py-1.5 text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void salvarEdicao()}
+                disabled={savingEdit}
+                className="rounded-full bg-sky-600 px-4 py-1.5 font-semibold text-white shadow-sm shadow-sky-200 transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {savingEdit ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -1088,136 +1258,12 @@ export default function DocumentosPage() {
       )}
 
       {registrosRecentes.length > 0 && (
-        <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
-          <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Últimos documentos enviados
-              </p>
-              <p className="text-[11px] text-slate-500">
-                Lista rápida das últimas submissões, independente dos filtros.
-              </p>
-            </div>
-            <span className="text-xs font-semibold text-slate-400">
-              Atualizados em tempo real
-            </span>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            {registrosRecentes.map((registro) => {
-              const identificacaoConfig = getIdentificacaoConfig(registro.tipo);
-              const identificacaoValor =
-                getIdentificacaoValor(registro) ??
-                `${identificacaoConfig.label} não informado`;
-              return (
-                <div
-                  key={registro.id}
-                  className="rounded-xl bg-slate-50/70 p-4 text-sm text-slate-600 shadow-sm shadow-slate-200"
-                >
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    {getTipoDescricao(registro.tipo)}
-                  </p>
-                  <p className="mt-1 font-mono text-[11px] text-slate-400">
-                    {registro.id}
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-slate-900">
-                    {identificacaoValor}
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    {formatDateTime(registro.created_at)}
-                  </p>
-                  <div className="mt-3 flex items-center justify-between text-[11px]">
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1 font-semibold ${
-                        registro.status === "assinado"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-amber-50 text-amber-700"
-                      }`}
-                    >
-                      {formatStatusLabel(registro.status)}
-                    </span>
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => void abrirDocumento(registro)}
-                        className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-white"
-                      >
-                        Abrir
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/documentos/${registro.id}`)}
-                        className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-white"
-                      >
-                        Detalhes
-                      </button>
-                    </div>
-                  </div>
                 </div>
               );
             })}
           </div>
         </div>
       )}
-
-      <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Filtros rápidos por formulário
-            </p>
-            <p className="text-[11px] text-slate-500">
-              Clique em um card para aplicar o filtro desejado.
-            </p>
-          </div>
-          {tipoFilter !== "todos" && (
-            <button
-              type="button"
-              onClick={() => setTipoFilter("todos")}
-              className="text-[11px] font-semibold text-sky-600 underline underline-offset-2"
-            >
-              Limpar filtro
-            </button>
-          )}
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {FORM_FILTER_CARDS.map((card) => {
-            const Icon = card.icon;
-            const isActive = tipoFilter === card.value;
-            const totalTipo = contagemPorTipo[card.value] ?? 0;
-            return (
-              <button
-                key={card.value}
-                type="button"
-                onClick={() =>
-                  setTipoFilter((prev) =>
-                    prev === card.value ? "todos" : card.value,
-                  )
-                }
-                aria-pressed={isActive}
-                className={`group relative overflow-hidden rounded-2xl p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-                  isActive ? "bg-sky-50/70" : "bg-white"
-                }`}
-              >
-                <div
-                  className={`pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-gradient-to-br ${card.accent} opacity-80 blur-2xl`}
-                />
-                <div className="relative flex h-full flex-col gap-2">
-                  <div className="flex items-center gap-2 text-slate-800">
-                    <Icon className="h-5 w-5 text-slate-700" />
-                    <p className="text-sm font-semibold">{card.label}</p>
-                  </div>
-                  <p className="flex-1 text-xs text-slate-500">
-                    {card.description}
-                  </p>
-                  <span className="text-[11px] font-semibold text-slate-500">
-                    {totalTipo} documento(s)
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
       <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
@@ -1552,6 +1598,7 @@ export default function DocumentosPage() {
                     `${identificacaoConfig.label} não informado`;
                   const identificacaoComplemento =
                     getIdentificacaoComplemento(registro);
+                  const edicaoInfo = getEdicaoInfo(registro);
                   const tipoLaudo = getTipoLaudo(registro);
                   const observacoes = getObservacoes(registro);
                   const isSelecionavel =
@@ -1590,6 +1637,12 @@ export default function DocumentosPage() {
                         {identificacaoComplemento && (
                           <p className="text-xs text-slate-500">
                             {identificacaoComplemento}
+                          </p>
+                        )}
+                        {edicaoInfo && (
+                          <p className="text-xs font-semibold text-amber-600">
+                            Documento alterado por {edicaoInfo.editedBy ?? "admin"}
+                            {edicaoInfo.editedAt ? ` em ${edicaoInfo.editedAt}` : ""}
                           </p>
                         )}
                       </td>
@@ -1639,6 +1692,15 @@ export default function DocumentosPage() {
                           {canManageDocuments && (
                             <button
                               type="button"
+                              onClick={() => abrirEdicao(registro)}
+                              className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                            >
+                              Editar
+                            </button>
+                          )}
+                          {canManageDocuments && (
+                            <button
+                              type="button"
                               onClick={() => void removerDocumento(registro)}
                               disabled={deletingId === registro.id}
                               className="rounded-full border border-red-200 px-3 py-1 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1676,6 +1738,7 @@ export default function DocumentosPage() {
               `${identificacaoConfig.label} não informado`;
             const identificacaoComplemento =
               getIdentificacaoComplemento(registro);
+            const edicaoInfo = getEdicaoInfo(registro);
             const tipoLaudo = getTipoLaudo(registro);
             const observacoes = getObservacoes(registro);
             const isSelecionavel =
@@ -1723,6 +1786,12 @@ export default function DocumentosPage() {
                     {identificacaoComplemento && (
                       <p className="text-xs text-slate-500">
                         {identificacaoComplemento}
+                      </p>
+                    )}
+                    {edicaoInfo && (
+                      <p className="text-xs font-semibold text-amber-600">
+                        Documento alterado por {edicaoInfo.editedBy ?? "admin"}
+                        {edicaoInfo.editedAt ? ` em ${edicaoInfo.editedAt}` : ""}
                       </p>
                     )}
                   </div>
@@ -1781,6 +1850,15 @@ export default function DocumentosPage() {
                   {canManageDocuments && (
                     <button
                       type="button"
+                      onClick={() => abrirEdicao(registro)}
+                      className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                      Editar
+                    </button>
+                  )}
+                  {canManageDocuments && (
+                    <button
+                      type="button"
                       onClick={() => void removerDocumento(registro)}
                       disabled={deletingId === registro.id}
                       className="rounded-full border border-red-200 px-3 py-1 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1806,6 +1884,18 @@ export default function DocumentosPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
