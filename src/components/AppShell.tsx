@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Building2,
   HelpCircle,
+  Menu,
   X,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
@@ -40,6 +41,7 @@ export default function AppShell({
   const canAccessPerfil = modulesAccess.perfil && !documentsAccessLoading;
   const resolvedWithoutUser = !isLoading && !isAuthenticated;
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -55,167 +57,215 @@ export default function AppShell({
     return <>{children}</>;
   }
 
+  const navItems = [
+    {
+      href: "/dashboard",
+      label: "Formulários",
+      icon: LayoutDashboard,
+      isActive: pathname === "/dashboard",
+      isVisible: true,
+    },
+    {
+      href: "/documentos",
+      label: "Documentos",
+      icon: FileText,
+      isActive: pathname?.startsWith("/documentos"),
+      isVisible: canAccessDocuments,
+    },
+    {
+      href: "/prestadores",
+      label: "Prestadores",
+      icon: Building2,
+      isActive: pathname?.startsWith("/prestadores"),
+      isVisible: canAccessDocuments,
+    },
+    {
+      href: "/dashboard/analises",
+      label: "Dashboards",
+      icon: BarChart3,
+      isActive: pathname?.startsWith("/dashboard/analises"),
+      isVisible: canAccessDashboards,
+    },
+    {
+      href: "/dashboard/permissoes",
+      label: "Permissões",
+      icon: ShieldCheck,
+      isActive: pathname?.startsWith("/dashboard/permissoes"),
+      isVisible: canAccessDocuments,
+    },
+    {
+      href: "/perfil",
+      label: "Perfil",
+      icon: UserRound,
+      isActive: pathname?.startsWith("/perfil"),
+      isVisible: canAccessPerfil,
+    },
+  ];
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(30,64,175,0.12),transparent_45%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(14,116,144,0.12),transparent_50%)]" />
+    <div className="relative min-h-screen overflow-hidden bg-[#f6f2ec] text-slate-900">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.18),transparent_45%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(14,165,233,0.16),transparent_50%)]" />
       <div className="pointer-events-none absolute inset-0 opacity-40">
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.06)_1px,transparent_1px)] bg-[size:160px_160px]" />
-        <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(15,23,42,0.06)_1px,transparent_1px)] bg-[size:160px_160px]" />
       </div>
-      <div className="pointer-events-none absolute -left-24 top-12 h-56 w-56 rounded-full bg-sky-200/70 blur-3xl" />
-      <div className="pointer-events-none absolute -right-20 bottom-10 h-64 w-64 rounded-full bg-cyan-200/70 blur-3xl" />
-      <header className="relative z-10 border-b border-slate-200/80 bg-white/80 text-slate-900 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex flex-col leading-tight">
-              <span className="text-sm font-semibold tracking-tight text-slate-900">
-                {"Formul\u00e1rio Central"}
-              </span>
-              <span className="text-xs text-slate-500">
-                Plataforma de documentos
-              </span>
-            </div>
-          </Link>
-          <nav className="flex items-center gap-4 text-sm">
+
+      <div className="relative z-10 flex min-h-screen">
+        <div
+          className={`fixed inset-0 z-30 bg-slate-900/40 transition md:hidden ${
+            isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+          onClick={() => setIsSidebarOpen(false)}
+          aria-hidden="true"
+        />
+
+        <aside
+          className={`fixed left-0 top-0 z-40 flex h-full w-72 flex-col bg-slate-950/95 text-slate-100 shadow-2xl shadow-slate-900/40 backdrop-blur transition-transform md:relative md:translate-x-0 ${
+            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <div className="flex items-center justify-between px-6 pb-4 pt-6">
             <Link
               href="/dashboard"
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                pathname === "/dashboard"
-                  ? "bg-sky-500 text-white shadow-md shadow-sky-300/60"
-                  : "text-slate-600 hover:bg-sky-50 hover:text-sky-700"
-              }`}
+              className="flex items-center gap-3 text-left"
+              onClick={() => setIsSidebarOpen(false)}
             >
-              <LayoutDashboard className="h-4 w-4" />
-              {"Formul\u00e1rio"}
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300 via-orange-300 to-rose-300 text-slate-900 shadow-lg shadow-amber-200/40">
+                <LayoutDashboard className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-200">
+                  Central
+                </p>
+                <p className="text-[11px] text-slate-300">
+                  Fluxo de documentos
+                </p>
+              </div>
             </Link>
-            {canAccessDocuments && (
-              <Link
-                href="/documentos"
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                  pathname?.startsWith("/documentos")
-                    ? "bg-sky-500 text-white shadow-md shadow-sky-300/60"
-                    : "text-slate-600 hover:bg-sky-50 hover:text-sky-700"
-                }`}
-              >
-                <FileText className="h-4 w-4" />
-                Documentos
-              </Link>
-            )}
-            {canAccessDocuments && (
-              <Link
-                href="/prestadores"
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                  pathname?.startsWith("/prestadores")
-                    ? "bg-sky-500 text-white shadow-md shadow-sky-300/60"
-                    : "text-slate-600 hover:bg-sky-50 hover:text-sky-700"
-                }`}
-              >
-                <Building2 className="h-4 w-4" />
-                Prestadores
-              </Link>
-            )}
-            {canAccessDashboards && (
-              <Link
-                href="/dashboard/analises"
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                  pathname?.startsWith("/dashboard/analises")
-                    ? "bg-sky-500 text-white shadow-md shadow-sky-300/60"
-                    : "text-slate-600 hover:bg-sky-50 hover:text-sky-700"
-                }`}
-              >
-                <BarChart3 className="h-4 w-4" />
-                Dashboards
-              </Link>
-            )}
-            {canAccessPerfil && (
-              <Link
-                href="/perfil"
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                  pathname?.startsWith("/perfil")
-                    ? "bg-sky-500 text-white shadow-md shadow-sky-300/60"
-                    : "text-slate-600 hover:bg-sky-50 hover:text-sky-700"
-                }`}
-              >
-                <UserRound className="h-4 w-4" />
-                Perfil
-              </Link>
-            )}
-            {canAccessDocuments && (
-              <Link
-                href="/dashboard/permissoes"
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                  pathname?.startsWith("/dashboard/permissoes")
-                    ? "bg-sky-500 text-white shadow-md shadow-sky-300/60"
-                    : "text-slate-600 hover:bg-sky-50 hover:text-sky-700"
-                }`}
-              >
-                <ShieldCheck className="h-4 w-4" />
-                {"Permiss\u00f5es"}
-              </Link>
-            )}
             <button
               type="button"
-              onClick={() => setIsHelpOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-sky-500 hover:bg-sky-50 hover:text-sky-700"
-              aria-label="Ajuda"
+              className="rounded-full bg-white/10 p-2 text-slate-100 hover:bg-white/20 md:hidden"
+              onClick={() => setIsSidebarOpen(false)}
+              aria-label="Fechar menu"
             >
-              <HelpCircle className="h-3.5 w-3.5" />
-              Ajuda
+              <X className="h-4 w-4" />
             </button>
-            {isAuthenticated && (
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-sky-500 hover:bg-sky-50 hover:text-sky-700"
-              >
-                <LogOut className="h-3.5 w-3.5" />
-                Sair
-              </button>
-            )}
-          </nav>
-        </div>
-      </header>
+          </div>
 
-      <main className="relative z-10 mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-5xl px-4 py-10">
-        <div className="pointer-events-none absolute inset-4 rounded-[32px] border border-slate-200/70" />
-        <div className="pointer-events-none absolute inset-0 opacity-50">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.08),transparent_55%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(45,212,191,0.1),transparent_50%)]" />
-        </div>
-        <div className="relative flex w-full flex-col rounded-[32px] border border-slate-200 bg-white/95 p-8 text-slate-900 shadow-[0_30px_80px_rgba(15,23,42,0.12)] backdrop-blur">
-          {authError && (
-            <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-              <p className="font-medium">{authError}</p>
+          <nav className="flex flex-1 flex-col gap-1 px-4">
+            {navItems
+              .filter((item) => item.isVisible)
+              .map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setIsSidebarOpen(false)}
+                    className={`group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                      item.isActive
+                        ? "bg-white text-slate-900 shadow-lg shadow-black/20"
+                        : "text-slate-200 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+                        item.isActive
+                          ? "bg-slate-900 text-amber-200"
+                          : "bg-white/10 text-slate-200 group-hover:text-amber-200"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    {item.label}
+                  </Link>
+                );
+              })}
+          </nav>
+
+          <div className="px-4 pb-6 pt-4">
+            <div className="rounded-2xl bg-white/10 px-4 py-3 text-xs text-slate-200">
+              <p className="font-semibold text-amber-200">Sessão ativa</p>
+              <p className="mt-1 truncate text-[11px] text-slate-300">
+                {user?.email ?? "Visitante"}
+              </p>
+            </div>
+            <div className="mt-3 grid gap-2">
               <button
                 type="button"
-                onClick={() => refresh()}
-                className="mt-2 text-amber-700 underline underline-offset-2"
+                onClick={() => setIsHelpOpen(true)}
+                className="inline-flex items-center justify-between rounded-2xl bg-white/10 px-4 py-2 text-xs font-semibold text-slate-100 transition hover:bg-white/20"
               >
-                Tentar novamente
+                Ajuda rápida
+                <HelpCircle className="h-4 w-4 text-amber-200" />
               </button>
+              {isAuthenticated && (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="inline-flex items-center justify-between rounded-2xl bg-white/10 px-4 py-2 text-xs font-semibold text-slate-100 transition hover:bg-white/20"
+                >
+                  Sair
+                  <LogOut className="h-4 w-4 text-amber-200" />
+                </button>
+              )}
             </div>
-          )}
-          {isLoading ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
-              Carregando sessão...
+          </div>
+        </aside>
+
+        <div className="flex min-h-screen flex-1 flex-col">
+          <header className="sticky top-0 z-20 flex items-center justify-between bg-[#f6f2ec]/80 px-4 py-3 backdrop-blur md:hidden">
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen(true)}
+              className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-slate-900/30"
+            >
+              <Menu className="h-4 w-4" />
+              Menu
+            </button>
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              Formulário Central
+            </span>
+          </header>
+
+          <main className="relative flex-1 px-4 pb-10 pt-6 md:px-8">
+            <div className="mx-auto flex w-full max-w-6xl flex-1">
+              <div className="relative w-full rounded-[28px] bg-white/90 p-6 shadow-[0_28px_70px_rgba(15,23,42,0.16)]">
+                {authError && (
+                  <div className="mb-4 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                    <p className="font-medium">{authError}</p>
+                    <button
+                      type="button"
+                      onClick={() => refresh()}
+                      className="mt-2 text-amber-700 underline underline-offset-2"
+                    >
+                      Tentar novamente
+                    </button>
+                  </div>
+                )}
+                {isLoading ? (
+                  <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
+                    Carregando sessão...
+                  </div>
+                ) : resolvedWithoutUser ? (
+                  <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-slate-500">
+                    <p>Sessão expirada. Faça login novamente para continuar.</p>
+                    <button
+                      type="button"
+                      onClick={() => router.push("/login")}
+                      className="rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white shadow-md shadow-slate-900/30 transition hover:bg-slate-800"
+                    >
+                      Ir para login
+                    </button>
+                  </div>
+                ) : (
+                  children
+                )}
+              </div>
             </div>
-          ) : resolvedWithoutUser ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-slate-500">
-              <p>Sessão expirada. Faça login novamente para continuar.</p>
-              <button
-                type="button"
-                onClick={() => router.push("/login")}
-                className="rounded-full bg-sky-500 px-4 py-1.5 text-xs font-semibold text-white shadow-md shadow-sky-300/80 transition hover:bg-sky-400"
-              >
-                Ir para login
-              </button>
-            </div>
-          ) : (
-            children
-          )}
+          </main>
         </div>
-      </main>
+      </div>
 
       {isHelpOpen ? (
         <div
@@ -223,7 +273,7 @@ export default function AppShell({
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-xl">
+          <div className="w-full max-w-3xl rounded-3xl bg-white p-6 text-slate-900 shadow-xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -236,22 +286,24 @@ export default function AppShell({
               <button
                 type="button"
                 onClick={() => setIsHelpOpen(false)}
-                className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                className="rounded-full bg-slate-900/10 p-2 text-slate-600 transition hover:bg-slate-900/20"
                 aria-label="Fechar ajuda"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
             <div className="mt-4 grid gap-4 text-sm text-slate-600 lg:grid-cols-2">
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{"Formul\u00e1rio"}</p>
+              <div className="rounded-xl bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {"Formulário"}
+                </p>
                 <ul className="mt-2 space-y-1">
                   <li>Escolha o tipo de formulário e envie os documentos.</li>
                   <li>Use o prestador correto ao preencher as informações.</li>
                   <li>Consulte o histórico de envios do seu grupo.</li>
                 </ul>
               </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+              <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Documentos
                 </p>
@@ -261,7 +313,7 @@ export default function AppShell({
                   <li>Abra, baixe ou assine quando aplicável.</li>
                 </ul>
               </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+              <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Prestadores
                 </p>
@@ -271,7 +323,7 @@ export default function AppShell({
                   <li>Crie regras de monitoramento por período.</li>
                 </ul>
               </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+              <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Dashboards
                 </p>
@@ -281,16 +333,17 @@ export default function AppShell({
                   <li>Use os gráficos para identificar tendências.</li>
                 </ul>
               </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+              <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {"Permiss\u00f5es"}</p>
+                  {"Permissões"}
+                </p>
                 <ul className="mt-2 space-y-1">
                   <li>Conceda acesso por módulo e e-mail.</li>
                   <li>Revise permissões periodicamente.</li>
                   <li>Remova acessos quando necessário.</li>
                 </ul>
               </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+              <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Perfil
                 </p>
@@ -315,4 +368,3 @@ export default function AppShell({
     </div>
   );
 }
-

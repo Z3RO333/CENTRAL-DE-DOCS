@@ -318,12 +318,12 @@ export default function PerfilPage() {
 
       {(status || authError) && (
         <div
-          className={`rounded-2xl border px-4 py-3 text-xs ${
+          className={`rounded-2xl px-4 py-3 text-xs ${
             status?.type === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              ? "bg-emerald-50 text-emerald-800"
               : status?.type === "error"
-                ? "border-red-200 bg-red-50 text-red-700"
-                : "border-amber-200 bg-amber-50 text-amber-800"
+                ? "bg-red-50 text-red-700"
+                : "bg-amber-50 text-amber-800"
           }`}
         >
           {status?.message ?? authError}
@@ -331,7 +331,7 @@ export default function PerfilPage() {
       )}
 
       <div className="grid gap-5 lg:grid-cols-[3fr_2fr]">
-        <div className="space-y-4 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-200">
+        <div className="space-y-4 rounded-3xl bg-white/90 p-5 shadow-sm shadow-slate-200">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <PenLine className="h-4 w-4 text-slate-600" />
             Assinatura digital
@@ -340,7 +340,7 @@ export default function PerfilPage() {
             Use o mouse ou o dedo (em telas touch) para desenhar a assinatura que
             será usada ao enviar documentos assinados.
           </p>
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3">
+          <div className="rounded-2xl bg-slate-50 p-3">
             <canvas
               ref={canvasRef}
               width={900}
@@ -352,7 +352,7 @@ export default function PerfilPage() {
               className="h-48 w-full rounded-xl border border-slate-200 bg-white shadow-inner"
             />
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-[11px] text-slate-600">
+          <div className="rounded-2xl bg-slate-50/80 p-4 text-[11px] text-slate-600">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <Upload className="h-3.5 w-3.5 text-slate-600" />
               Ou anexe sua assinatura pronta
@@ -407,12 +407,12 @@ export default function PerfilPage() {
           </div>
         </div>
 
-        <div className="space-y-4 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-200">
+        <div className="space-y-4 rounded-3xl bg-white/90 p-5 shadow-sm shadow-slate-200">
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Seus dados
             </span>
-            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-xs text-slate-600">
+            <div className="rounded-2xl bg-slate-50 p-4 text-xs text-slate-600">
               <p className="font-semibold text-slate-900">
                 {user.user_metadata?.name ?? user.email}
               </p>
@@ -431,7 +431,7 @@ export default function PerfilPage() {
               Assinatura salva
             </span>
             {signaturePreview ? (
-              <div className="rounded-2xl border border-slate-200 bg-white/90 p-3">
+              <div className="rounded-2xl bg-white/90 p-3">
                 <img
                   src={signaturePreview}
                   alt="Pré-visualização da assinatura"
@@ -444,7 +444,7 @@ export default function PerfilPage() {
                 </p>
               </div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-[11px] text-slate-500">
+              <div className="rounded-2xl bg-slate-50 p-4 text-[11px] text-slate-500">
                 Nenhuma assinatura salva ainda. Depois de desenhar e salvar, ela
                 aparecerá aqui para download rápido.
               </div>

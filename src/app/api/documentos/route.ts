@@ -77,7 +77,7 @@ async function hasDocumentosAccess(
     .from("documentos_acesso")
     .select("id")
     .eq("user_id", userId)
-    .eq("modulo", "documentos")
+    .in("modulo", ["documentos", "dashboards"])
     .maybeSingle();
 
   if (error) {
@@ -99,7 +99,7 @@ async function hasDocumentosAccess(
     .from("documentos_acesso")
     .select("id")
     .eq("email", email)
-    .eq("modulo", "documentos")
+    .in("modulo", ["documentos", "dashboards"])
     .maybeSingle();
 
   if (emailError) {

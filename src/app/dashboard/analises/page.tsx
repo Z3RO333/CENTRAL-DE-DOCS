@@ -461,7 +461,7 @@ export default function DashboardAnalisesPage() {
           return (
             <div
               key={card.label}
-              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200"
+              className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200"
             >
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -482,7 +482,7 @@ export default function DashboardAnalisesPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200 lg:col-span-2">
+        <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200 lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -517,7 +517,7 @@ export default function DashboardAnalisesPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
+        <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -561,7 +561,7 @@ export default function DashboardAnalisesPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm shadow-slate-200">
+      <div className="rounded-2xl bg-white/80 p-4 shadow-sm shadow-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -666,7 +666,7 @@ export default function DashboardAnalisesPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
+        <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -706,7 +706,7 @@ export default function DashboardAnalisesPage() {
             )}
           </div>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
+        <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">

@@ -835,7 +835,7 @@ export default function AssinaturaDocumentoPage() {
       </div>
 
       {exibirInfosFormulario && (
-        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 text-xs text-slate-600 shadow-sm shadow-slate-200">
+        <div className="rounded-2xl bg-white/80 p-4 text-xs text-slate-600 shadow-sm shadow-slate-200">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Informações do formulário
           </p>
@@ -863,7 +863,7 @@ export default function AssinaturaDocumentoPage() {
       )}
 
       {batchActive && (
-        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 text-xs text-slate-600 shadow-sm shadow-slate-200">
+        <div className="rounded-2xl bg-white/80 p-4 text-xs text-slate-600 shadow-sm shadow-slate-200">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -933,7 +933,7 @@ export default function AssinaturaDocumentoPage() {
       )}
 
       {signProgress > 0 && (
-        <div className="rounded-2xl border border-sky-100 bg-sky-50/80 p-4 text-xs text-slate-600 shadow-sm shadow-sky-100">
+        <div className="rounded-2xl bg-sky-50/80 p-4 text-xs text-slate-600 shadow-sm shadow-sky-100">
           <div className="flex items-center justify-between">
             <p className="font-semibold text-slate-600">
               Processando assinatura
@@ -956,7 +956,7 @@ export default function AssinaturaDocumentoPage() {
       )}
 
       <div className="grid gap-5 md:grid-cols-2">
-        <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
+        <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
             Documento original
           </h2>
@@ -998,7 +998,7 @@ export default function AssinaturaDocumentoPage() {
           )}
         </div>
 
-        <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
+        <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
             Tela de assinatura
           </h2>
@@ -1067,7 +1067,7 @@ export default function AssinaturaDocumentoPage() {
             )}
           </div>
 
-          <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-[11px] text-slate-600">
+          <div className="space-y-3 rounded-2xl bg-slate-50/70 p-4 text-[11px] text-slate-600">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
               Como deseja aplicar a assinatura?
             </p>
@@ -1120,7 +1120,7 @@ export default function AssinaturaDocumentoPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-3 pt-2 text-sm">
-            <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <div className="space-y-2 rounded-2xl bg-slate-50/70 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                 Upload do arquivo assinado
               </p>

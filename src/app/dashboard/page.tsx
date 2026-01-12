@@ -7,6 +7,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { BriefcaseBusiness, Eye, FileBadge, ReceiptText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { usePrestadores } from "@/hooks/usePrestadores";
+import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { supabase } from "@/lib/supabaseClient";
 import { isInPeriodo, type PrestadorRegra } from "@/lib/prestadorRegras";
 
@@ -99,12 +100,15 @@ const getLocalDateLabel = (date: Date) => {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading, error: authError } = useAuth();
+  const { modules: modulesAccess, loading: accessLoading } =
+    useDocumentsAccess();
+  const canViewAllDocuments = modulesAccess.dashboards;
   const {
     prestadores: prestadoresDoUsuario,
     loading: prestadoresLoading,
   } = usePrestadores({
     assignedOnly: true,
-    enabled: Boolean(user),
+    enabled: Boolean(user) && !canViewAllDocuments,
   });
   const [historico, setHistorico] = useState<
     {
@@ -209,12 +213,14 @@ export default function DashboardPage() {
         throw new Error("Sessão expirada. Faça login novamente.");
       }
       const params = new URLSearchParams();
-      if (prestadoresDoUsuario.length > 0) {
-        prestadoresDoUsuario.forEach((prestador) =>
-          params.append("prestadorId", prestador.id),
-        );
-      } else {
-        params.set("userId", user.id);
+      if (!canViewAllDocuments) {
+        if (prestadoresDoUsuario.length > 0) {
+          prestadoresDoUsuario.forEach((prestador) =>
+            params.append("prestadorId", prestador.id),
+          );
+        } else {
+          params.set("userId", user.id);
+        }
       }
       const url =
         params.size > 0 ? `/api/documentos?${params.toString()}` : "/api/documentos";
@@ -259,7 +265,7 @@ export default function DashboardPage() {
         setHistoricoLoading(false);
       }
     }
-  }, [user, prestadoresDoUsuario]);
+  }, [user, prestadoresDoUsuario, canViewAllDocuments]);
 
   const carregarRegras = useCallback(async (signal?: AbortSignal) => {
     if (!user) {
@@ -323,22 +329,34 @@ export default function DashboardPage() {
   }, [prestadoresDoUsuario, user]);
 
   useEffect(() => {
-    if (user && !prestadoresLoading) {
+    if (user && !accessLoading && (canViewAllDocuments || !prestadoresLoading)) {
       const controller = new AbortController();
       void carregarHistorico(controller.signal);
       return () => controller.abort();
     }
     return undefined;
-  }, [user, prestadoresLoading, carregarHistorico]);
+  }, [
+    user,
+    accessLoading,
+    canViewAllDocuments,
+    prestadoresLoading,
+    carregarHistorico,
+  ]);
 
   useEffect(() => {
-    if (user && !prestadoresLoading) {
+    if (user && !accessLoading && !canViewAllDocuments && !prestadoresLoading) {
       const controller = new AbortController();
       void carregarRegras(controller.signal);
       return () => controller.abort();
     }
     return undefined;
-  }, [user, prestadoresLoading, carregarRegras]);
+  }, [
+    user,
+    accessLoading,
+    canViewAllDocuments,
+    prestadoresLoading,
+    carregarRegras,
+  ]);
 
   const historicoTipoOptions = useMemo(() => {
     const extras = Array.from(new Set(historico.map((item) => item.tipo)))
@@ -635,7 +653,7 @@ export default function DashboardPage() {
           Ver documentos enviados
         </Link>
       </div>
-      <section className="rounded-3xl border border-slate-200 bg-white/80 p-4 shadow-sm shadow-slate-100/80">
+      <section className="rounded-3xl bg-white/80 p-4 shadow-sm shadow-slate-100/80">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -688,7 +706,7 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
-      <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 text-xs text-slate-600 shadow-sm shadow-slate-100/80">
+      <div className="rounded-2xl bg-white/80 p-4 text-xs text-slate-600 shadow-sm shadow-slate-100/80">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -811,7 +829,7 @@ export default function DashboardPage() {
         })}
       </div>
 
-      <section className="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm shadow-slate-100/80">
+      <section className="rounded-3xl bg-white/80 p-6 shadow-sm shadow-slate-100/80">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -825,7 +843,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+          <div className="rounded-2xl bg-slate-50/70 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Status dos envios
             </p>
@@ -860,7 +878,7 @@ export default function DashboardPage() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+          <div className="rounded-2xl bg-slate-50/70 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Envios por tipo
             </p>
@@ -893,7 +911,7 @@ export default function DashboardPage() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+          <div className="rounded-2xl bg-slate-50/70 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Envios nos últimos 30 dias
             </p>
@@ -920,7 +938,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+          <div className="rounded-2xl bg-slate-50/70 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Envios por prestador
             </p>
@@ -960,7 +978,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm shadow-slate-100/80">
+      <section className="rounded-3xl bg-white/80 p-6 shadow-sm shadow-slate-100/80">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -978,7 +996,7 @@ export default function DashboardPage() {
             Carregando histórico de envios...
           </p>
         ) : historicoErro ? (
-          <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
             {historicoErro}
           </p>
         ) : historicoFiltrado.length === 0 ? (
@@ -998,7 +1016,7 @@ export default function DashboardPage() {
                 return (
                   <li
                     key={registro.id}
-                    className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
+                    className="rounded-2xl bg-slate-50/80 px-4 py-3"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
@@ -1061,7 +1079,7 @@ export default function DashboardPage() {
       </section>
         </>
       ) : (
-      <section className="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm shadow-slate-100/80">
+      <section className="rounded-3xl bg-white/80 p-6 shadow-sm shadow-slate-100/80">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1083,7 +1101,7 @@ export default function DashboardPage() {
             Carregando regras de progresso...
           </p>
         ) : regrasErro ? (
-          <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
             {regrasErro}
           </p>
         ) : prestadoresProgresso.length === 0 ? (
@@ -1095,7 +1113,7 @@ export default function DashboardPage() {
             {prestadoresProgresso.map((item) => (
               <div
                 key={item.prestador.id}
-                className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3 text-xs text-slate-600"
+                className="rounded-2xl bg-slate-50/70 px-4 py-3 text-xs text-slate-600"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>

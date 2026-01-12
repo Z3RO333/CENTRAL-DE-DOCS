@@ -616,10 +616,10 @@ export default function PrestadoresPage() {
         prestadorFeedback.success ||
         prestadoresError) && (
         <div
-          className={`rounded-2xl border px-4 py-3 text-xs ${
+          className={`rounded-2xl px-4 py-3 text-xs ${
             prestadorFeedback.error || prestadoresError
-              ? "border-red-200 bg-red-50 text-red-700"
-              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+              ? "bg-red-50 text-red-700"
+              : "bg-emerald-50 text-emerald-800"
           }`}
         >
           {prestadorFeedback.error ||
@@ -627,7 +627,7 @@ export default function PrestadoresPage() {
             prestadorFeedback.success}
         </div>
       )}
-      <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-xs text-slate-600">
+      <div className="rounded-2xl bg-slate-50/70 p-4 text-xs text-slate-600">
         <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
           <ClipboardList className="h-4 w-4 text-slate-500" />
           Passo 1
@@ -642,7 +642,7 @@ export default function PrestadoresPage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-start lg:gap-10">
         <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm shadow-slate-100">
+          <div className="rounded-2xl bg-white/80 p-4 shadow-sm shadow-slate-100">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -662,7 +662,7 @@ export default function PrestadoresPage() {
                 Carregando prestadores...
               </p>
             ) : prestadores.length === 0 ? (
-              <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
+              <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-6 text-center">
                 <p className="text-sm font-semibold text-slate-700">
                   Nenhum prestador cadastrado ainda.
                 </p>
@@ -690,10 +690,10 @@ export default function PrestadoresPage() {
                       key={prestador.id}
                       type="button"
                       onClick={() => setSelectedPrestadorId(prestador.id)}
-                      className={`relative min-h-[160px] overflow-hidden text-left rounded-2xl border px-4 py-4 transition ${
+                      className={`relative min-h-[160px] overflow-hidden text-left rounded-2xl px-4 py-4 transition ${
                         selectedPrestadorId === prestador.id
-                          ? "border-sky-300 bg-white shadow-sm shadow-sky-100"
-                          : "border-slate-100 bg-white hover:border-slate-200"
+                          ? "bg-white shadow-sm shadow-sky-100"
+                          : "bg-white hover:bg-slate-50"
                       }`}
                     >
                       <div
@@ -763,7 +763,7 @@ export default function PrestadoresPage() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm shadow-slate-100">
+          <div className="rounded-2xl bg-white/80 p-4 shadow-sm shadow-slate-100">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               2. Detalhes do prestador
             </p>
@@ -773,13 +773,13 @@ export default function PrestadoresPage() {
               </p>
             )}
             {regrasError && (
-              <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              <p className="mt-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
                 {regrasError}
               </p>
             )}
             {selectedPrestador ? (
               <div className="mt-3 space-y-3 text-xs text-slate-600">
-                <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <div className="rounded-xl bg-slate-50 px-4 py-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     Prestador selecionado
                   </p>
@@ -817,7 +817,7 @@ export default function PrestadoresPage() {
                   </button>
                 </div>
                 <div className="grid gap-3 lg:grid-cols-2">
-                  <div className="rounded-xl border border-slate-100 bg-white px-3 py-2">
+                  <div className="rounded-xl bg-white px-3 py-2">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                       E-mails do prestador
                     </p>
@@ -834,10 +834,10 @@ export default function PrestadoresPage() {
                     <form onSubmit={handleEmailsSubmit} className="mt-2 space-y-2">
                       {emailsFeedback.error || emailsFeedback.success ? (
                         <div
-                          className={`rounded-md border px-2 py-1 text-[11px] ${
+                          className={`rounded-md px-2 py-1 text-[11px] ${
                             emailsFeedback.error
-                              ? "border-red-200 bg-red-50 text-red-700"
-                              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+                              ? "bg-red-50 text-red-700"
+                              : "bg-emerald-50 text-emerald-800"
                           }`}
                         >
                           {emailsFeedback.error || emailsFeedback.success}
@@ -889,7 +889,7 @@ export default function PrestadoresPage() {
                       )}
                     </div>
                   </div>
-                  <div className="rounded-xl border border-slate-100 bg-white px-3 py-2">
+                  <div className="rounded-xl bg-white px-3 py-2">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                       Regras de monitoramento
                     </p>
@@ -910,7 +910,7 @@ export default function PrestadoresPage() {
                           return (
                             <div
                               key={regra.id}
-                              className="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2"
+                              className="rounded-xl bg-slate-50/60 px-3 py-2"
                             >
                               <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
                               <span className="font-semibold text-slate-700">
@@ -949,7 +949,7 @@ export default function PrestadoresPage() {
         <div className="space-y-6">
           <form
             onSubmit={handlePrestadorSubmit}
-            className="space-y-4 rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm shadow-slate-100"
+            className="space-y-4 rounded-2xl bg-white/80 p-4 shadow-sm shadow-slate-100"
           >
             <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <UserPlus className="h-4 w-4 text-slate-600" />
@@ -1023,7 +1023,7 @@ export default function PrestadoresPage() {
 
           <form
             onSubmit={handleRegraSubmit}
-            className="space-y-4 rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-sm shadow-slate-100"
+            className="space-y-4 rounded-2xl bg-white/80 p-4 shadow-sm shadow-slate-100"
           >
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               4. Criar regra de monitoramento
@@ -1039,10 +1039,10 @@ export default function PrestadoresPage() {
             </p>
             {(regraFeedback.error || regraFeedback.success) && (
               <div
-                className={`rounded-xl border px-3 py-2 text-[11px] ${
+                className={`rounded-xl px-3 py-2 text-[11px] ${
                   regraFeedback.error
-                    ? "border-red-200 bg-red-50 text-red-700"
-                    : "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    ? "bg-red-50 text-red-700"
+                    : "bg-emerald-50 text-emerald-800"
                 }`}
               >
                 {regraFeedback.error || regraFeedback.success}

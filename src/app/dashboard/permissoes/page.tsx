@@ -367,13 +367,13 @@ export default function PermissoesPage() {
         accessError ||
         appUsersError) && (
         <div
-          className={`rounded-2xl border px-4 py-3 text-xs ${
+          className={`rounded-2xl px-4 py-3 text-xs ${
             feedback.error ||
             permissionsError ||
             accessError ||
             appUsersError
-              ? "border-red-200 bg-red-50 text-red-700"
-              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+              ? "bg-red-50 text-red-700"
+              : "bg-emerald-50 text-emerald-800"
           }`}
         >
           {feedback.error ||
@@ -387,7 +387,7 @@ export default function PermissoesPage() {
       <section className="grid gap-4 lg:grid-cols-[2fr_3fr]">
         <form
           onSubmit={handleGrant}
-          className="space-y-4 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-200"
+          className="space-y-4 rounded-3xl bg-white/90 p-5 shadow-sm shadow-slate-200"
         >
           <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <UserPlus className="h-4 w-4 text-slate-600" />
@@ -438,7 +438,7 @@ export default function PermissoesPage() {
           </div>
         </form>
 
-        <div className="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm shadow-slate-200">
+        <div className="space-y-4 rounded-3xl bg-white/95 p-5 shadow-sm shadow-slate-200">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -497,10 +497,10 @@ export default function PermissoesPage() {
                 key={permission.id}
                 type="button"
                 onClick={() => setSelectedPermissionId(permission.id)}
-                  className={`w-full rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                  className={`w-full rounded-2xl px-4 py-3 text-left text-sm transition ${
                     permission.id === selectedPermissionId
-                      ? "border-sky-300 bg-sky-50 text-sky-900"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                      ? "bg-sky-50 text-sky-900"
+                      : "bg-white text-slate-600 hover:bg-slate-50"
                   }`}
                 >
                   <p className="font-semibold text-slate-900">
@@ -533,7 +533,7 @@ export default function PermissoesPage() {
       </section>
 
       {selectedPermission && (
-        <section className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm shadow-slate-200">
+        <section className="rounded-3xl bg-white/95 p-5 shadow-sm shadow-slate-200">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -546,7 +546,7 @@ export default function PermissoesPage() {
             </span>
           </div>
           <div className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-            <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <div className="rounded-2xl bg-slate-50/70 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 user_id
               </p>
@@ -554,7 +554,7 @@ export default function PermissoesPage() {
                 {selectedPermission.user_id ?? "não informado"}
               </p>
             </div>
-            <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <div className="rounded-2xl bg-slate-50/70 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Tela liberada
               </p>
@@ -563,7 +563,7 @@ export default function PermissoesPage() {
                   selectedPermission.module}
               </p>
             </div>
-            <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <div className="rounded-2xl bg-slate-50/70 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Criado em
               </p>
@@ -589,7 +589,7 @@ export default function PermissoesPage() {
         </section>
       )}
 
-      <section className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm shadow-slate-200">
+      <section className="rounded-3xl bg-white/95 p-5 shadow-sm shadow-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">

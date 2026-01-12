@@ -605,7 +605,7 @@ export default function FormularioPage() {
       </div>
 
       {formProgress > 0 && (
-        <div className="rounded-2xl border border-sky-100 bg-sky-50/80 p-4 text-xs text-slate-600 shadow-sm shadow-sky-100">
+        <div className="rounded-2xl bg-sky-50/80 p-4 text-xs text-slate-600 shadow-sm shadow-sky-100">
           <div className="flex items-center justify-between">
             <p className="font-semibold text-slate-600">
               Enviando formulário
@@ -628,7 +628,7 @@ export default function FormularioPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200"
+        className="grid gap-4 rounded-2xl bg-white p-5 shadow-sm shadow-slate-200"
       >
         <div className="grid gap-4 md:grid-cols-2">
           {config.fields.map((field) => (
@@ -751,7 +751,7 @@ export default function FormularioPage() {
         </div>
       </form>
 
-      <section className="rounded-2xl border border-slate-200 bg-white/80 p-5">
+      <section className="rounded-2xl bg-white/80 p-5">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -790,7 +790,7 @@ export default function FormularioPage() {
               return (
                 <li
                   key={registro.id}
-                  className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2"
+                  className="rounded-xl bg-slate-50/80 px-3 py-2"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>

@@ -981,7 +981,7 @@ export default function DocumentosPage() {
     <div className="flex flex-1 flex-col gap-6 py-4">
       {confirmDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6" onClick={() => setConfirmDialog(null)}>
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/20" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl shadow-slate-900/20" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">
             <p id="confirm-title" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Confirmar exclusão
             </p>
@@ -991,7 +991,7 @@ export default function DocumentosPage() {
                 : "Tem certeza que deseja remover este documento? Esta ação não pode ser desfeita."}
             </p>
             {confirmDialog.type === "single" && confirmDialog.registro && (
-              <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600">
+              <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
                 <p className="font-mono text-[11px] text-slate-500">
                   {confirmDialog.registro.id}
                 </p>
@@ -1049,7 +1049,7 @@ export default function DocumentosPage() {
       </div>
 
       {showErrorMessage && (
-        <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-700 shadow-sm shadow-red-100">
+        <div className="rounded-2xl bg-red-50 p-4 text-sm text-red-700 shadow-sm shadow-red-100">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs sm:text-sm">{showErrorMessage}</p>
             {error && (
@@ -1066,7 +1066,7 @@ export default function DocumentosPage() {
       )}
 
       {registrosRecentes.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
+        <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1089,7 +1089,7 @@ export default function DocumentosPage() {
               return (
                 <div
                   key={registro.id}
-                  className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-600 shadow-sm shadow-slate-200"
+                  className="rounded-xl bg-slate-50/70 p-4 text-sm text-slate-600 shadow-sm shadow-slate-200"
                 >
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     {getTipoDescricao(registro.tipo)}
@@ -1137,7 +1137,7 @@ export default function DocumentosPage() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
+      <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1172,10 +1172,8 @@ export default function DocumentosPage() {
                   )
                 }
                 aria-pressed={isActive}
-                className={`group relative overflow-hidden rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-                  isActive
-                    ? "border-sky-400 bg-sky-50/70"
-                    : "border-slate-200 bg-white"
+                className={`group relative overflow-hidden rounded-2xl p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                  isActive ? "bg-sky-50/70" : "bg-white"
                 }`}
               >
                 <div
@@ -1199,7 +1197,7 @@ export default function DocumentosPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
+      <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <Filter className="h-4 w-4 text-slate-400" />
@@ -1318,7 +1316,7 @@ export default function DocumentosPage() {
               ))}
             </select>
           </label>
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-500">
+          <div className="rounded-xl bg-slate-50 p-3 text-[11px] text-slate-500">
             Os filtros acima são aplicados automaticamente. Por padrão
             consideramos o mês corrente ({MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual"}).
           </div>
@@ -1345,13 +1343,13 @@ export default function DocumentosPage() {
             />
             Apenas disponíveis para assinatura em lote
           </label>
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+          <div className="rounded-xl bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
             Combine os filtros para chegar ao subconjunto desejado.
           </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200">
+      <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1437,7 +1435,7 @@ export default function DocumentosPage() {
       </div>
 
       {totalResultados > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-500 shadow-sm shadow-slate-200">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-white p-3 text-xs text-slate-500 shadow-sm shadow-slate-200">
           <span>
             {totalResultados} resultado(s) · Página {page} de {totalPages}
           </span>
@@ -1463,7 +1461,7 @@ export default function DocumentosPage() {
       )}
 
       {totalResultados === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm shadow-slate-200">
+        <div className="rounded-2xl bg-white p-8 text-center text-sm text-slate-500 shadow-sm shadow-slate-200">
           <p className="text-base font-semibold text-slate-700">
             Nenhum documento encontrado
           </p>
@@ -1481,7 +1479,7 @@ export default function DocumentosPage() {
           </div>
         </div>
       ) : viewMode === "tabela" ? (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200">
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
@@ -1656,7 +1654,7 @@ export default function DocumentosPage() {
             return (
               <div
                 key={registro.id}
-                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200"
+                className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
