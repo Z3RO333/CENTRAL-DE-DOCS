@@ -83,8 +83,6 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.06)_1px,transparent_1px)] bg-[size:160px_160px]" />
         <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(15,23,42,0.06)_1px,transparent_1px)] bg-[size:160px_160px]" />
       </div>
-      <div className="pointer-events-none absolute -left-24 top-12 h-56 w-56 rounded-full bg-sky-200/70 blur-3xl" />
-      <div className="pointer-events-none absolute -right-20 bottom-10 h-64 w-64 rounded-full bg-cyan-200/70 blur-3xl" />
 
       <div className="relative mx-auto flex w-full max-w-md flex-col items-center gap-6 sm:gap-8">
         <div className="flex flex-col items-center gap-3 text-center">
