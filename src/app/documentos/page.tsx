@@ -1217,6 +1217,7 @@ export default function DocumentosPage() {
         </div>
       </div>
 
+      {canManageDocuments && (
       <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1369,92 +1370,91 @@ export default function DocumentosPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Assinaturas disponíveis
-            </p>
-            <p className="text-sm text-slate-600">
-              {assinaturasPendentes.length > 0 ? (
-                <>
-                  {assinaturasPendentes.length} documento(s) pendentes do tipo
-                  Registro e Laudos podem ser assinados.
-                </>
-              ) : (
-                <>Nenhum documento pendente para assinatura em lote.</>
-              )}
-            </p>
-            {canManageDocuments && hasSelection && (
-              <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
-                {selectedIds.slice(0, 4).map((id) => (
-                  <span
-                    key={id}
-                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 font-mono text-[10px] text-slate-600"
-                  >
-                    {id.slice(0, 8)}...
-                    <button
-                      type="button"
-                      onClick={() => toggleSelecionar(id)}
-                      className="text-[10px] font-semibold text-slate-500 transition hover:text-slate-800"
-                      title="Remover da seleção"
-                    >
-                      x
-                    </button>
-                  </span>
-                ))}
-                {selectedIds.length > 4 && (
-                  <span className="text-[11px] text-slate-500">
-                    +{selectedIds.length - 4} outros
-                  </span>
+      {canManageDocuments && (
+        <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Assinaturas disponiveis
+              </p>
+              <p className="text-sm text-slate-600">
+                {assinaturasPendentes.length > 0 ? (
+                  <>
+                    {assinaturasPendentes.length} documento(s) pendentes do tipo
+                    Registro e Laudos podem ser assinados.
+                  </>
+                ) : (
+                  <>Nenhum documento pendente para assinatura em lote.</>
                 )}
-              </div>
-            )}
-          </div>
-          {canManageDocuments && (
+              </p>
+              {hasSelection && (
+                <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
+                  {selectedIds.slice(0, 4).map((id) => (
+                    <span
+                      key={id}
+                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 font-mono text-[10px] text-slate-600"
+                    >
+                      {id.slice(0, 8)}...
+                      <button
+                        type="button"
+                        onClick={() => toggleSelecionar(id)}
+                        className="text-[10px] font-semibold text-slate-500 transition hover:text-slate-800"
+                        title="Remover da selecao"
+                      >
+                        x
+                      </button>
+                    </span>
+                  ))}
+                  {selectedIds.length > 4 && (
+                    <span className="text-[11px] text-slate-500">
+                      +{selectedIds.length - 4} outros
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2 text-[11px]">
-            <button
-              type="button"
-              onClick={selecionarTodos}
-              disabled={registrosFiltrados.length === 0}
-              className="rounded-full border border-slate-200 px-4 py-1.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {registrosFiltrados.length === 0
-                ? "Nenhum registro"
-                : "Selecionar todos"}
-            </button>
-            <button
-              type="button"
-              onClick={limparSelecao}
-              disabled={!hasSelection}
-              className="rounded-full border border-slate-200 px-4 py-1.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Limpar seleção
-            </button>
-            <button
-              type="button"
-              onClick={removerSelecionados}
-              disabled={!hasSelection || deletingBatch}
-              className="rounded-full border border-red-200 px-4 py-1.5 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {deletingBatch ? "Removendo..." : "Remover selecionados"}
-            </button>
-            <button
-              type="button"
-              onClick={iniciarAssinaturaEmLote}
-              disabled={assinaturasSelecionadasCount === 0 || startingBatch}
-              className="rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white shadow-sm shadow-emerald-200 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {startingBatch
-                ? "Abrindo..."
-                : assinaturasSelecionadasCount > 1
-                  ? "Assinar em lote"
-                  : "Assinar selecionados"}
-            </button>
+              <button
+                type="button"
+                onClick={selecionarTodos}
+                disabled={registrosFiltrados.length === 0}
+                className="rounded-full border border-slate-200 px-4 py-1.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {registrosFiltrados.length === 0
+                  ? "Nenhum registro"
+                  : "Selecionar todos"}
+              </button>
+              <button
+                type="button"
+                onClick={limparSelecao}
+                disabled={!hasSelection}
+                className="rounded-full border border-slate-200 px-4 py-1.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Limpar selecao
+              </button>
+              <button
+                type="button"
+                onClick={removerSelecionados}
+                disabled={!hasSelection || deletingBatch}
+                className="rounded-full border border-red-200 px-4 py-1.5 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deletingBatch ? "Removendo..." : "Remover selecionados"}
+              </button>
+              <button
+                type="button"
+                onClick={iniciarAssinaturaEmLote}
+                disabled={assinaturasSelecionadasCount === 0 || startingBatch}
+                className="rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white shadow-sm shadow-emerald-200 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {startingBatch
+                  ? "Abrindo..."
+                  : assinaturasSelecionadasCount > 1
+                    ? "Assinar em lote"
+                    : "Assinar selecionados"}
+              </button>
+            </div>
           </div>
-          )}
         </div>
-      </div>
       )}
 
       {totalResultados > 0 && (
@@ -1805,6 +1805,8 @@ export default function DocumentosPage() {
     </div>
   );
 }
+
+
 
 
 
