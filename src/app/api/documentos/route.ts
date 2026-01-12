@@ -201,6 +201,7 @@ export async function GET(request: Request) {
       .map((value) => value.trim())
       .filter(Boolean);
     const tipoFilter = searchParams.get("tipo");
+    const tipoLaudoFilter = searchParams.get("tipoLaudo");
     const statusFilter = searchParams.get("status");
     const anoFilter = searchParams.get("ano");
     const mesFilter = searchParams.get("mes");
@@ -276,6 +277,10 @@ export async function GET(request: Request) {
 
     if (tipoFilter && tipoFilter !== "todos") {
       query = query.eq("tipo", tipoFilter);
+    }
+
+    if (tipoLaudoFilter && tipoLaudoFilter !== "todos") {
+      query = query.eq("dados->>tipo_laudo", tipoLaudoFilter);
     }
 
     if (statusFilter && statusFilter !== "todos") {

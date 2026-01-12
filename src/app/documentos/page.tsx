@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
+import { useLojas } from "@/hooks/useLojas";
 
 type FormularioRecord = {
   id: string;
@@ -62,6 +63,8 @@ const LIST_CACHE_STORAGE_KEY = "documentos:list-cache";
 
 type DocumentosListState = {
   tipoFilter: string;
+  tipoLaudoFilter: string;
+  lojaFilter: string;
   statusFilter: string;
   identificacaoFilter: string;
   anoFilter: string;
@@ -260,10 +263,13 @@ export default function DocumentosPage() {
     assignedOnly: true,
     enabled: Boolean(user) && !canViewAllDocuments && role !== "gerente_loja",
   });
+  const { lojas } = useLojas({ enabled: canManageDocuments });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [registros, setRegistros] = useState<FormularioRecord[]>([]);
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
+  const [tipoLaudoFilter, setTipoLaudoFilter] = useState<string>("todos");
+  const [lojaFilter, setLojaFilter] = useState<string>("todos");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [identificacaoFilter, setIdentificacaoFilter] = useState<string>("");
   const [anoFilter, setAnoFilter] = useState<string>(anoAtual);
@@ -344,6 +350,12 @@ export default function DocumentosPage() {
         if (parsed.tipoFilter) {
           setTipoFilter(parsed.tipoFilter);
         }
+        if (parsed.tipoLaudoFilter) {
+          setTipoLaudoFilter(parsed.tipoLaudoFilter);
+        }
+        if (parsed.lojaFilter) {
+          setLojaFilter(parsed.lojaFilter);
+        }
         if (parsed.statusFilter) {
           setStatusFilter(parsed.statusFilter);
         }
@@ -375,6 +387,8 @@ export default function DocumentosPage() {
         }
         listStateRef.current = {
           tipoFilter: parsed.tipoFilter ?? "todos",
+          tipoLaudoFilter: parsed.tipoLaudoFilter ?? "todos",
+          lojaFilter: parsed.lojaFilter ?? "todos",
           statusFilter: parsed.statusFilter ?? "todos",
           identificacaoFilter: parsed.identificacaoFilter ?? "",
           anoFilter: parsed.anoFilter ?? anoAtual,
@@ -444,6 +458,8 @@ export default function DocumentosPage() {
 
     const next: DocumentosListState = {
       tipoFilter,
+      tipoLaudoFilter,
+      lojaFilter,
       statusFilter,
       identificacaoFilter,
       anoFilter,
@@ -464,6 +480,8 @@ export default function DocumentosPage() {
   }, [
     hasRestoredState,
     tipoFilter,
+    tipoLaudoFilter,
+    lojaFilter,
     statusFilter,
     identificacaoFilter,
     anoFilter,
@@ -507,6 +525,8 @@ export default function DocumentosPage() {
     setPage(1);
   }, [
     tipoFilter,
+    tipoLaudoFilter,
+    lojaFilter,
     statusFilter,
     identificacaoFilter,
     anoFilter,
@@ -558,6 +578,12 @@ export default function DocumentosPage() {
         params.set("offset", ((page - 1) * pageSize).toString());
         if (tipoFilter !== "todos") {
           params.set("tipo", tipoFilter);
+        }
+        if (tipoLaudoFilter !== "todos") {
+          params.set("tipoLaudo", tipoLaudoFilter);
+        }
+        if (lojaFilter !== "todos") {
+          params.set("lojaId", lojaFilter);
         }
         if (statusFilter !== "todos") {
           params.set("status", statusFilter);
@@ -639,6 +665,8 @@ export default function DocumentosPage() {
     page,
     pageSize,
     tipoFilter,
+    tipoLaudoFilter,
+    lojaFilter,
     statusFilter,
     anoFilter,
     mesFilter,
@@ -1010,6 +1038,8 @@ export default function DocumentosPage() {
 
   const resetFilters = () => {
     setTipoFilter("todos");
+    setTipoLaudoFilter("todos");
+    setLojaFilter("todos");
     setStatusFilter("todos");
     setIdentificacaoFilter("");
     setAnoFilter(anoAtual);
@@ -1066,6 +1096,28 @@ export default function DocumentosPage() {
       return true;
     });
   }, [registros]);
+
+  const tipoLaudoOptions = useMemo(() => {
+    const valores = Array.from(
+      new Set(
+        registros
+          .map((registro) => getCampoTexto(registro.dados, ["tipo_laudo"]))
+          .filter((valor): valor is string => Boolean(valor)),
+      ),
+    );
+    return ["todos", ...valores];
+  }, [registros]);
+
+  const lojaOptions = useMemo(
+    () => [
+      { value: "todos", label: "Todas as lojas" },
+      ...lojas.map((loja) => ({
+        value: loja.id,
+        label: loja.codigo ? `${loja.nome} - ${loja.codigo}` : loja.nome,
+      })),
+    ],
+    [lojas],
+  );
 
   const showErrorMessage = error ?? authError ?? accessError;
   const hasSelection = selectedIds.length > 0;
@@ -1302,7 +1354,7 @@ export default function DocumentosPage() {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="mt-4 grid gap-3 md:grid-cols-4">
           <label className="text-xs font-semibold text-slate-600">
             Identificação (Empresa/Prestador/Número do pedido)
             <input
@@ -1328,6 +1380,20 @@ export default function DocumentosPage() {
             </select>
           </label>
           <label className="text-xs font-semibold text-slate-600">
+            Tipo de laudo
+            <select
+              value={tipoLaudoFilter}
+              onChange={(event) => setTipoLaudoFilter(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+            >
+              {tipoLaudoOptions.map((tipoLaudo) => (
+                <option key={tipoLaudo} value={tipoLaudo}>
+                  {tipoLaudo === "todos" ? "Todos os tipos" : tipoLaudo}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
             Status
             <select
               value={statusFilter}
@@ -1345,7 +1411,23 @@ export default function DocumentosPage() {
           </label>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="mt-4 grid gap-3 md:grid-cols-4">
+          {canManageDocuments && (
+            <label className="text-xs font-semibold text-slate-600">
+              Loja
+              <select
+                value={lojaFilter}
+                onChange={(event) => setLojaFilter(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+              >
+                {lojaOptions.map((loja) => (
+                  <option key={loja.value} value={loja.value}>
+                    {loja.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="text-xs font-semibold text-slate-600">
             Ano de envio
             <select
@@ -1381,8 +1463,7 @@ export default function DocumentosPage() {
             consideramos o mês corrente ({MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual"}).
           </div>
         </div>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+<div className="mt-4 grid gap-3 md:grid-cols-4">
           <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
             <input
               type="checkbox"
@@ -1876,6 +1957,8 @@ export default function DocumentosPage() {
     </div>
   );
 }
+
+
 
 
 
