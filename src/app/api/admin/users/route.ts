@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Configuração incompleta. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+            "ConfiguraÃ§Ã£o incompleta. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
         },
         { status: 500 },
       );
@@ -86,7 +86,7 @@ export async function GET(request: Request) {
 
     if (!hasPermission) {
       return NextResponse.json(
-        { error: "Você não possui permissão para listar usuários." },
+        { error: "VocÃª nÃ£o possui permissÃ£o para listar usuÃ¡rios." },
         { status: 403 },
       );
     }
@@ -138,9 +138,11 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ users: allUsers });
   } catch (err) {
-    console.error("Erro ao listar usuários:", err);
+    console.error("Erro ao listar usuarios:", err);
     const message =
-      err instanceof Error ? err.message : "Erro interno ao listar usuários.";
+      err && typeof err === "object" && "message" in err
+        ? String((err as { message?: unknown }).message)
+        : "Erro interno ao listar usuarios.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
