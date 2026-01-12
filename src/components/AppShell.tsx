@@ -79,7 +79,7 @@ export default function AppShell({
     },
     {
       href: "/dashboard/analises",
-      label: "Dashboards",
+      label: "Gráficos",
       icon: BarChart3,
       isActive: pathname?.startsWith("/dashboard/analises"),
       isVisible: canAccessDashboards,
