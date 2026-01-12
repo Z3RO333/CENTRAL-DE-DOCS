@@ -117,9 +117,9 @@ export default function AppShell({
         />
 
         <aside
-          className={`fixed left-0 top-0 z-40 flex h-screen w-72 flex-col overflow-y-auto bg-[var(--app-sidebar)] text-slate-700 shadow-2xl shadow-slate-200/70 backdrop-blur transition-transform md:sticky md:translate-x-0 ${
+          className={`fixed left-0 top-0 z-40 flex h-screen w-72 flex-col overflow-y-auto bg-[var(--app-sidebar)] text-slate-700 shadow-2xl shadow-slate-200/70 backdrop-blur transition-transform ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
+          } md:translate-x-0`}
         >
           <div className="flex items-center justify-between px-6 pb-4 pt-6">
             <Link
@@ -210,7 +210,7 @@ export default function AppShell({
           </div>
         </aside>
 
-        <div className="flex min-h-screen flex-1 flex-col">
+        <div className="flex min-h-screen flex-1 flex-col md:pl-72">
           <header className="sticky top-0 z-20 flex items-center justify-between bg-[#f6f2ec]/80 px-4 py-3 backdrop-blur md:hidden">
             <button
               type="button"
