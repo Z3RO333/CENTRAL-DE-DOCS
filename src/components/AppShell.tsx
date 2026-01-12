@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -127,8 +128,15 @@ export default function AppShell({
               className="flex items-center gap-3 text-left"
               onClick={() => setIsSidebarOpen(false)}
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-100 via-white to-slate-200 text-slate-700 shadow-lg shadow-slate-200/60">
-                <LayoutDashboard className="h-5 w-5" />
+              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg shadow-slate-200/60">
+                <Image
+                  src="/Letra _b_ em azul vibrante.png"
+                  alt="Logo da Bemol"
+                  width={40}
+                  height={40}
+                  className="h-9 w-9 object-contain"
+                  priority
+                />
               </div>
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-700">
@@ -220,9 +228,16 @@ export default function AppShell({
               <Menu className="h-4 w-4" />
               Menu
             </button>
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Formulário Central
-            </span>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <Image
+                src="/Letra _b_ em azul vibrante.png"
+                alt="Logo da Bemol"
+                width={24}
+                height={24}
+                className="h-6 w-6 object-contain"
+              />
+              <span>Formulário Central</span>
+            </div>
           </header>
 
           <main className="relative flex-1 px-4 pb-10 pt-6 md:px-8">
