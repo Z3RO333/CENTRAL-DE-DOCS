@@ -55,6 +55,9 @@ export default function PrestadoresPage() {
   }>({ error: null, success: null });
   const [searchTerm, setSearchTerm] = useState("");
   const [pageSize, setPageSize] = useState(10);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isCreatePrestadorOpen, setIsCreatePrestadorOpen] = useState(false);
+  const [isCreateRegraOpen, setIsCreateRegraOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -278,6 +281,7 @@ export default function PrestadoresPage() {
         cnpj: "",
         usuarios: "",
       });
+      setIsCreatePrestadorOpen(false);
       if (created) {
         setSelectedPrestadorId(created.id);
       }
@@ -380,6 +384,7 @@ export default function PrestadoresPage() {
         quantidade: prev.quantidade || "12",
       }));
       await carregarRegras();
+      setIsCreateRegraOpen(false);
     } catch (err) {
       setRegraFeedback({
         error:
@@ -564,6 +569,7 @@ export default function PrestadoresPage() {
       await refreshPrestadores();
       await carregarRegras();
       setSelectedPrestadorId("");
+      setIsDetailsOpen(false);
     } catch (err) {
       setPrestadorFeedback({
         error:
@@ -628,12 +634,28 @@ export default function PrestadoresPage() {
             Cadastre prestadores, adicione e-mails e defina regras de monitoramento.
           </p>
         </div>
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center rounded-full border border-slate-200 px-4 py-1.5 text-xs font-medium text-slate-600 transition hover:border-sky-400 hover:text-sky-600"
-        >
-          Voltar para formulários
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsCreatePrestadorOpen(true)}
+            className="inline-flex items-center rounded-full bg-sky-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm shadow-sky-200 transition hover:bg-sky-500"
+          >
+            Novo prestador
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsCreateRegraOpen(true)}
+            className="inline-flex items-center rounded-full bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 shadow-sm shadow-slate-200 transition hover:bg-slate-50"
+          >
+            Nova regra
+          </button>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center rounded-full border border-slate-200 px-4 py-1.5 text-xs font-medium text-slate-600 transition hover:border-sky-400 hover:text-sky-600"
+          >
+            Voltar para formulários
+          </Link>
+        </div>
       </header>
 
       {(prestadorFeedback.error ||
@@ -733,7 +755,10 @@ export default function PrestadoresPage() {
                       <td className="px-5 py-4 text-right">
                         <button
                           type="button"
-                          onClick={() => setSelectedPrestadorId(prestador.id)}
+                          onClick={() => {
+                            setSelectedPrestadorId(prestador.id);
+                            setIsDetailsOpen(true);
+                          }}
                           className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
                         >
                           {isSelected ? "Selecionado" : "Ver detalhes"}
@@ -748,24 +773,45 @@ export default function PrestadoresPage() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-start lg:gap-10">
-        <div className="space-y-6">
-          <div className="rounded-2xl bg-white/80 p-4 shadow-sm shadow-slate-100">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Detalhes do prestador
-            </p>
+      {isDetailsOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-100/80 px-4 py-6"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-4xl rounded-3xl bg-white p-6 text-slate-900 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Detalhes do prestador
+                </p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">
+                  {selectedPrestador?.nome ?? "Nenhum prestador selecionado"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDetailsOpen(false)}
+                className="rounded-full bg-slate-100 p-2 text-slate-600 transition hover:bg-slate-200"
+                aria-label="Fechar detalhes"
+              >
+                ✕
+              </button>
+            </div>
+
             {regrasLoading && (
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-4 text-xs text-slate-500">
                 Carregando regras de progresso...
               </p>
             )}
             {regrasError && (
-              <p className="mt-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
+              <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
                 {regrasError}
               </p>
             )}
+
             {selectedPrestador ? (
-              <div className="mt-3 space-y-3 text-xs text-slate-600">
+              <div className="mt-4 space-y-4 text-xs text-slate-600">
                 <div className="rounded-xl bg-slate-50 px-4 py-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     Prestador selecionado
@@ -882,7 +928,8 @@ export default function PrestadoresPage() {
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-slate-500">
                       <span className="rounded-full bg-slate-100 px-2 py-1">
-                        {regrasPorPrestador[selectedPrestador.id]?.length ?? 0} regra(s)
+                        {regrasPorPrestador[selectedPrestador.id]?.length ?? 0}{" "}
+                        regra(s)
                       </span>
                       <span className="rounded-full bg-slate-100 px-2 py-1">
                         {regrasPorPrestador[selectedPrestador.id]?.length
@@ -893,16 +940,16 @@ export default function PrestadoresPage() {
                     {regrasPorPrestador[selectedPrestador.id]?.length ? (
                       <div className="mt-2 space-y-2">
                         {regrasPorPrestador[selectedPrestador.id].map((regra) => {
-                        const label = resolveRegraLabel(regra.alvo, regra.label);
+                          const label = resolveRegraLabel(regra.alvo, regra.label);
                           return (
                             <div
                               key={regra.id}
                               className="rounded-xl bg-slate-50/60 px-3 py-2"
                             >
                               <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
-                              <span className="font-semibold text-slate-700">
-                                {label}
-                              </span>
+                                <span className="font-semibold text-slate-700">
+                                  {label}
+                                </span>
                                 <button
                                   type="button"
                                   onClick={() => void handleRegraDelete(regra.id)}
@@ -912,7 +959,8 @@ export default function PrestadoresPage() {
                                 </button>
                               </div>
                               <p className="mt-1 text-[11px] text-slate-500">
-                                Meta: {regra.quantidade} no período {regra.periodo === "mensal" ? "mensal" : "anual"}
+                                Meta: {regra.quantidade} no período{" "}
+                                {regra.periodo === "mensal" ? "mensal" : "anual"}
                               </p>
                             </div>
                           );
@@ -924,98 +972,161 @@ export default function PrestadoresPage() {
                       </p>
                     )}
                   </div>
-                </div>              </div>
+                </div>
+              </div>
             ) : (
-              <p className="mt-3 text-xs text-slate-500">
+              <p className="mt-4 text-xs text-slate-500">
                 Selecione um prestador para ver detalhes e regras.
               </p>
             )}
-          </div>
-        </div>
 
-        <div className="space-y-6">
-          <form
-            onSubmit={handlePrestadorSubmit}
-            className="space-y-4 rounded-2xl bg-white/80 p-4 shadow-sm shadow-slate-100"
-          >
-            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <UserPlus className="h-4 w-4 text-slate-600" />
-              Cadastrar novo prestador
-            </p>
-            <div className="grid gap-3">
-              <label className="text-xs font-semibold text-slate-600">
-                Nome do prestador
-                <input
-                  type="text"
-                  value={prestadorForm.nome}
-                  onChange={(event) =>
-                    handlePrestadorFieldChange("nome", event.target.value)
-                  }
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                  placeholder="Ex.: Laboratório XPTO"
-                  required
-                />
-              </label>
-              <label className="text-xs font-semibold text-slate-600">
-                Tipo de serviço
-                <input
-                  type="text"
-                  value={prestadorForm.tipoServico}
-                  onChange={(event) =>
-                    handlePrestadorFieldChange("tipoServico", event.target.value)
-                  }
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                  placeholder="Ex.: Laudos técnicos"
-                  required
-                />
-              </label>
-              <label className="text-xs font-semibold text-slate-600">
-                CNPJ do prestador
-                <input
-                  type="text"
-                  value={prestadorForm.cnpj}
-                  onChange={(event) =>
-                    handlePrestadorFieldChange("cnpj", event.target.value)
-                  }
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                  placeholder="00.000.000/0000-00"
-                  required
-                />
-              </label>
-              <label className="text-xs font-semibold text-slate-600">
-                Usuários autorizados
-                <textarea
-                  value={prestadorForm.usuarios}
-                  onChange={(event) =>
-                    handlePrestadorFieldChange("usuarios", event.target.value)
-                  }
-                  className="mt-1 min-h-[90px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                  placeholder="Ex.: ana@empresa.com, bruno@empresa.com"
-                />
-                <span className="text-[11px] text-slate-500">
-                  Digite os e-mails de quem poderá usar esse prestador no formulário.
-                </span>
-              </label>
-            </div>
-            <div className="flex justify-end">
+            <div className="mt-6 flex justify-end">
               <button
-                type="submit"
-                disabled={creatingPrestador}
-                className="rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-sky-200 transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-70"
+                type="button"
+                onClick={() => setIsDetailsOpen(false)}
+                className="rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-sky-500"
               >
-                {creatingPrestador ? "Salvando..." : "Cadastrar prestador"}
+                Fechar
               </button>
             </div>
-          </form>
+          </div>
+        </div>
+      )}
 
-          <form
-            onSubmit={handleRegraSubmit}
-            className="space-y-4 rounded-2xl bg-white/80 p-4 shadow-sm shadow-slate-100"
-          >
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Criar regra de monitoramento
-            </p>
-            <p className="text-[11px] text-slate-500">
+      {isCreatePrestadorOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-100/80 px-4 py-6"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 text-slate-900 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Cadastrar novo prestador
+                </p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">
+                  Preencha os dados do prestador
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreatePrestadorOpen(false)}
+                className="rounded-full bg-slate-100 p-2 text-slate-600 transition hover:bg-slate-200"
+                aria-label="Fechar cadastro"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={handlePrestadorSubmit}
+              className="mt-4 space-y-4"
+            >
+              <div className="grid gap-3">
+                <label className="text-xs font-semibold text-slate-600">
+                  Nome do prestador
+                  <input
+                    type="text"
+                    value={prestadorForm.nome}
+                    onChange={(event) =>
+                      handlePrestadorFieldChange("nome", event.target.value)
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                    placeholder="Ex.: Laboratório XPTO"
+                    required
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Tipo de serviço
+                  <input
+                    type="text"
+                    value={prestadorForm.tipoServico}
+                    onChange={(event) =>
+                      handlePrestadorFieldChange("tipoServico", event.target.value)
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                    placeholder="Ex.: Laudos técnicos"
+                    required
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  CNPJ do prestador
+                  <input
+                    type="text"
+                    value={prestadorForm.cnpj}
+                    onChange={(event) =>
+                      handlePrestadorFieldChange("cnpj", event.target.value)
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                    placeholder="00.000.000/0000-00"
+                    required
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Usuários autorizados
+                  <textarea
+                    value={prestadorForm.usuarios}
+                    onChange={(event) =>
+                      handlePrestadorFieldChange("usuarios", event.target.value)
+                    }
+                    className="mt-1 min-h-[90px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                    placeholder="Ex.: ana@empresa.com, bruno@empresa.com"
+                  />
+                  <span className="text-[11px] text-slate-500">
+                    Digite os e-mails de quem poderá usar esse prestador no formulário.
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreatePrestadorOpen(false)}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingPrestador}
+                  className="rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-sky-200 transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {creatingPrestador ? "Salvando..." : "Cadastrar prestador"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isCreateRegraOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-100/80 px-4 py-6"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 text-slate-900 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Criar regra de monitoramento
+                </p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">
+                  Defina o alvo e o período
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateRegraOpen(false)}
+                className="rounded-full bg-slate-100 p-2 text-slate-600 transition hover:bg-slate-200"
+                aria-label="Fechar regra"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="mt-3 text-[11px] text-slate-500">
               Prestador selecionado:{" "}
               <span className="font-semibold text-slate-700">
                 {selectedPrestador?.nome ?? "Nenhum"}
@@ -1024,9 +1135,10 @@ export default function PrestadoresPage() {
             <p className="text-[11px] text-slate-500">
               Informe o alvo da regra e a quantidade por período.
             </p>
+
             {(regraFeedback.error || regraFeedback.success) && (
               <div
-                className={`rounded-xl px-3 py-2 text-[11px] ${
+                className={`mt-3 rounded-xl px-3 py-2 text-[11px] ${
                   regraFeedback.error
                     ? "bg-red-50 text-red-700"
                     : "bg-emerald-50 text-emerald-800"
@@ -1035,76 +1147,86 @@ export default function PrestadoresPage() {
                 {regraFeedback.error || regraFeedback.success}
               </div>
             )}
-            <div className="grid gap-3">
-              <label className="text-xs font-semibold text-slate-600">
-                Alvo da regra
-                <input
-                  type="text"
-                  value={regraForm.alvo}
-                  onChange={(event) =>
-                    handleRegraFieldChange("alvo", event.target.value)
-                  }
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                  placeholder="Ex.: refrigeração, notas_fiscais, retencao_trabalhista"
-                  list="regra-alvos-sugestoes"
-                  required
-                />
-              </label>
-              <datalist id="regra-alvos-sugestoes">
-                {alvoSugestoes.map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-              <label className="text-xs font-semibold text-slate-600">
-                Período
-                <select
-                  value={regraForm.periodo}
-                  onChange={(event) =>
-                    handleRegraFieldChange("periodo", event.target.value)
-                  }
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+
+            <form onSubmit={handleRegraSubmit} className="mt-4 space-y-4">
+              <div className="grid gap-3">
+                <label className="text-xs font-semibold text-slate-600">
+                  Alvo da regra
+                  <input
+                    type="text"
+                    value={regraForm.alvo}
+                    onChange={(event) =>
+                      handleRegraFieldChange("alvo", event.target.value)
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                    placeholder="Ex.: refrigeração, notas_fiscais, retencao_trabalhista"
+                    list="regra-alvos-sugestoes"
+                    required
+                  />
+                </label>
+                <datalist id="regra-alvos-sugestoes">
+                  {alvoSugestoes.map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+                </datalist>
+                <label className="text-xs font-semibold text-slate-600">
+                  Período
+                  <select
+                    value={regraForm.periodo}
+                    onChange={(event) =>
+                      handleRegraFieldChange("periodo", event.target.value)
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                  >
+                    <option value="mensal">Mensal</option>
+                    <option value="anual">Anual</option>
+                  </select>
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Quantidade esperada
+                  <input
+                    type="number"
+                    min="1"
+                    value={regraForm.quantidade}
+                    onChange={(event) =>
+                      handleRegraFieldChange("quantidade", event.target.value)
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                    required
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Nome exibido (opcional)
+                  <input
+                    type="text"
+                    value={regraForm.label}
+                    onChange={(event) =>
+                      handleRegraFieldChange("label", event.target.value)
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                    placeholder="Ex.: Refrigeração mensal"
+                  />
+                </label>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateRegraOpen(false)}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
                 >
-                  <option value="mensal">Mensal</option>
-                  <option value="anual">Anual</option>
-                </select>
-              </label>
-              <label className="text-xs font-semibold text-slate-600">
-                Quantidade esperada
-                <input
-                  type="number"
-                  min="1"
-                  value={regraForm.quantidade}
-                  onChange={(event) =>
-                    handleRegraFieldChange("quantidade", event.target.value)
-                  }
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                  required
-                />
-              </label>
-              <label className="text-xs font-semibold text-slate-600">
-                Nome exibido (opcional)
-                <input
-                  type="text"
-                  value={regraForm.label}
-                  onChange={(event) =>
-                    handleRegraFieldChange("label", event.target.value)
-                  }
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
-                  placeholder="Ex.: Refrigeração mensal"
-                />
-              </label>
-            </div>
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                className="rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-sky-200 transition hover:bg-sky-500"
-              >
-                Salvar regra
-              </button>
-            </div>
-          </form>
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-sky-200 transition hover:bg-sky-500"
+                >
+                  Salvar regra
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>
+      )}
 
     </div>
   );
