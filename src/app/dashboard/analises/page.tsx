@@ -89,10 +89,8 @@ export default function DashboardAnalisesPage() {
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [servicoFilter, setServicoFilter] = useState<string>("todos");
-  const anoAtual = new Date().getFullYear().toString();
-  const mesAtual = String(new Date().getMonth() + 1).padStart(2, "0");
-  const [anoFilter, setAnoFilter] = useState<string>(anoAtual);
-  const [mesFilter, setMesFilter] = useState<string>(mesAtual);
+  const [anoFilter, setAnoFilter] = useState<string>("todos");
+  const [mesFilter, setMesFilter] = useState<string>("todos");
   const showServicoFilter = tipoFilter === "registro_laudos";
   const mesSelecionadoLabel =
     MESES.find((mes) => mes.value === mesFilter)?.label ?? "Todos os meses";
@@ -128,15 +126,6 @@ export default function DashboardAnalisesPage() {
       );
       setLoading(false);
       router.replace("/dashboard");
-      return;
-    }
-
-    const email = user.email?.toLowerCase() ?? "";
-    if (!email.endsWith("@bemol.com.br")) {
-      setError(
-        "Você não tem acesso a esta área. Procure por richardoliveira@bemol.com para solicitar acesso.",
-      );
-      setLoading(false);
       return;
     }
 
@@ -212,6 +201,12 @@ export default function DashboardAnalisesPage() {
       setServicoFilter("todos");
     }
   }, [tipoFilter, servicoFilter]);
+
+  useEffect(() => {
+    if (anoFilter === "todos" && mesFilter !== "todos") {
+      setMesFilter("todos");
+    }
+  }, [anoFilter, mesFilter]);
 
   const anosDisponiveis = useMemo(() => {
     return Array.from(
@@ -368,8 +363,8 @@ export default function DashboardAnalisesPage() {
     setTipoFilter("todos");
     setStatusFilter("todos");
     setServicoFilter("todos");
-    setAnoFilter(anoAtual);
-    setMesFilter(mesAtual);
+    setAnoFilter("todos");
+    setMesFilter("todos");
   };
 
   if (authLoading || accessLoading || loading) {
