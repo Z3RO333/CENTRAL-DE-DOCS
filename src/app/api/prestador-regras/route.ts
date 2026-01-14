@@ -12,7 +12,7 @@ type PrestadorRegraRow = {
   label: string | null;
   ativo: boolean | null;
   created_at: string;
-  created_by: string | null;
+  created_by?: string | null;
 };
 
 class HttpError extends Error {
