@@ -306,6 +306,7 @@ export default function PrestadoresPage() {
             tipo: string;
             created_at: string;
             dados: Record<string, unknown> | null;
+            prestador_id?: string | null;
           }[];
           error?: string;
         };
@@ -316,7 +317,11 @@ export default function PrestadoresPage() {
           );
         }
 
-        setDocumentosVinculo(payload.registros ?? []);
+        const filtrados =
+          payload.registros?.filter(
+            (registro) => registro.prestador_id === prestadorId,
+          ) ?? [];
+        setDocumentosVinculo(filtrados);
       } catch (err) {
         setDocumentosError(
           err instanceof Error
