@@ -500,7 +500,7 @@ export default function PrestadoresPage() {
     setRegraForm((prev) => ({
       ...prev,
       [field]: value,
-      ...(field === "tipo_regra" ? { alvo: "" } : null),
+      ...(field === "tipo_regra" ? { alvo: "" } : {}),
     }));
     setRegraFeedback({ error: null, success: null });
   };
