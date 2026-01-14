@@ -11,6 +11,9 @@ type PrestadorRegraRow = {
   quantidade: number;
   label: string | null;
   ativo: boolean | null;
+  aplica_anteriores?: boolean | null;
+  aplica_desde?: string | null;
+  modo_conflito?: "multi" | "single" | null;
   created_at: string;
   created_by?: string | null;
 };
