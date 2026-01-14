@@ -15,6 +15,8 @@ import {
   Store,
   HelpCircle,
   Menu,
+  ChevronLeft,
+  ChevronRight,
   X,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
@@ -41,6 +43,7 @@ export default function AppShell({
   const resolvedWithoutUser = !isLoading && !isAuthenticated;
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -126,11 +129,15 @@ export default function AppShell({
         />
 
         <aside
-          className={`fixed left-0 top-0 z-40 flex h-screen w-72 flex-col overflow-y-auto bg-[var(--app-sidebar)] text-slate-700 shadow-2xl shadow-slate-200/70 backdrop-blur transition-transform ${
+          className={`fixed left-0 top-0 z-40 flex h-screen w-72 flex-col overflow-y-auto bg-[var(--app-sidebar)] text-slate-700 shadow-2xl shadow-slate-200/70 backdrop-blur transition-all ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } md:translate-x-0`}
+          } ${isSidebarCollapsed ? "md:w-20" : "md:w-72"} md:translate-x-0`}
         >
-          <div className="flex items-center justify-between px-6 pb-4 pt-6">
+          <div
+            className={`flex items-center justify-between pb-4 pt-6 ${
+              isSidebarCollapsed ? "px-3" : "px-6"
+            }`}
+          >
             <Link
               href="/dashboard"
               className="flex items-center gap-3 text-left"
@@ -146,26 +153,48 @@ export default function AppShell({
                   priority
                 />
               </div>
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-700">
-                  Central
-                </p>
-                <p className="text-[11px] text-slate-500">
-                  Fluxo de documentos
-                </p>
-              </div>
+              {!isSidebarCollapsed && (
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-700">
+                    Central
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Fluxo de documentos
+                  </p>
+                </div>
+              )}
             </Link>
-            <button
-              type="button"
-              className="rounded-full bg-slate-100/80 p-2 text-slate-600 hover:bg-slate-200 md:hidden"
-              onClick={() => setIsSidebarOpen(false)}
-              aria-label="Fechar menu"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded-full bg-slate-100/80 p-2 text-slate-600 hover:bg-slate-200 md:hidden"
+                onClick={() => setIsSidebarOpen(false)}
+                aria-label="Fechar menu"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                className="hidden rounded-full bg-slate-100/80 p-2 text-slate-600 transition hover:bg-slate-200 md:inline-flex"
+                onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+                aria-label={
+                  isSidebarCollapsed ? "Expandir menu" : "Recolher menu"
+                }
+              >
+                {isSidebarCollapsed ? (
+                  <ChevronRight className="h-4 w-4" />
+                ) : (
+                  <ChevronLeft className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
 
-          <nav className="flex flex-1 flex-col gap-1 px-4">
+          <nav
+            className={`flex flex-1 flex-col gap-1 ${
+              isSidebarCollapsed ? "px-2" : "px-4"
+            }`}
+          >
             {navItems
               .filter((item) => item.isVisible)
               .map((item) => {
@@ -175,52 +204,81 @@ export default function AppShell({
                     key={item.href}
                     href={item.href}
                     onClick={() => setIsSidebarOpen(false)}
-                    className={`group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                    className={`group flex items-center rounded-2xl px-4 py-3 text-sm font-semibold transition ${
                       item.isActive
                         ? "bg-[var(--app-surface)] text-slate-900 shadow-lg shadow-slate-200/70"
                         : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                    }`}
+                    } ${isSidebarCollapsed ? "justify-center gap-0" : "gap-3"}`}
                   >
                     <span className="flex h-9 w-9 items-center justify-center text-slate-600 group-hover:text-sky-700">
                       <Icon className="h-5 w-5" />
                     </span>
-                    {item.label}
+                    {!isSidebarCollapsed && item.label}
                   </Link>
                 );
               })}
           </nav>
 
-          <div className="px-4 pb-6 pt-4">
-            <div className="rounded-2xl bg-slate-100/80 px-4 py-3 text-xs text-slate-600">
-              <p className="font-semibold text-slate-700">Sessão ativa</p>
-              <p className="mt-1 truncate text-[11px] text-slate-500">
-                {user?.email ?? "Visitante"}
-              </p>
-            </div>
-            <div className="mt-3 grid gap-2">
-              <button
-                type="button"
-                onClick={() => setIsHelpOpen(true)}
-                className="inline-flex items-center justify-between rounded-2xl bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-              >
-                Ajuda rápida
-                <HelpCircle className="h-4 w-4 text-sky-600" />
-              </button>
-              {isAuthenticated && (
+          <div className={`${isSidebarCollapsed ? "px-2" : "px-4"} pb-6 pt-4`}>
+            {isSidebarCollapsed ? (
+              <div className="grid gap-2">
                 <button
                   type="button"
-                  onClick={handleLogout}
-                  className="inline-flex items-center justify-between rounded-2xl bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                  onClick={() => setIsHelpOpen(true)}
+                  className="inline-flex items-center justify-center rounded-2xl bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                  aria-label="Ajuda rápida"
                 >
-                  Sair
-                  <LogOut className="h-4 w-4 text-sky-600" />
+                  <HelpCircle className="h-4 w-4 text-sky-600" />
                 </button>
-              )}
-            </div>
+                {isAuthenticated && (
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="inline-flex items-center justify-center rounded-2xl bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                    aria-label="Sair"
+                  >
+                    <LogOut className="h-4 w-4 text-sky-600" />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="rounded-2xl bg-slate-100/80 px-4 py-3 text-xs text-slate-600">
+                  <p className="font-semibold text-slate-700">Sessão ativa</p>
+                  <p className="mt-1 truncate text-[11px] text-slate-500">
+                    {user?.email ?? "Visitante"}
+                  </p>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsHelpOpen(true)}
+                    className="inline-flex items-center justify-between rounded-2xl bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                  >
+                    Ajuda rápida
+                    <HelpCircle className="h-4 w-4 text-sky-600" />
+                  </button>
+                  {isAuthenticated && (
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="inline-flex items-center justify-between rounded-2xl bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                    >
+                      Sair
+                      <LogOut className="h-4 w-4 text-sky-600" />
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </aside>
 
-        <div className="flex min-h-screen flex-1 flex-col md:pl-72">
+        <div
+          className={`flex min-h-screen flex-1 flex-col ${
+            isSidebarCollapsed ? "md:pl-20" : "md:pl-72"
+          }`}
+        >
           <header className="sticky top-0 z-20 flex items-center justify-between bg-[#f6f2ec]/80 px-4 py-3 backdrop-blur md:hidden">
             <button
               type="button"
@@ -382,3 +440,4 @@ export default function AppShell({
     </div>
   );
 }
+
