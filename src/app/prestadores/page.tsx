@@ -1306,7 +1306,7 @@ const getDocumentoNome = (registro: {
                             >
                               <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
                                 <span className="font-semibold text-slate-700">
-                                  {label}
+                                  Regra: {label}
                                 </span>
                                 <div className="flex flex-wrap items-center gap-2">
                                   <button
@@ -1346,8 +1346,8 @@ const getDocumentoNome = (registro: {
                               <p className="mt-1 text-[11px] text-slate-500">
                                 Tipo:{" "}
                                 {regra.tipo_regra === "tipo_servico"
-                                  ? "Servico"
-                                  : "Formulario"}
+                                  ? "Tipo de servico"
+                                  : "Tipo de formulario"}
                               </p>
                               <p className="mt-1 text-[11px] text-slate-500">
                                 Aplicacao:{" "}
