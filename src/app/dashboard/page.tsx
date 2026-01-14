@@ -689,7 +689,7 @@ export default function DashboardPage() {
               Filtros globais
             </p>
             <span className="text-[11px] text-slate-500">
-              Ajuste os filtros para todas as visualizações do dashboard.
+              Ajuste os filtros para todas as visualizações do documentos.
             </span>
           </div>
         </div>
