@@ -688,7 +688,9 @@ export default function DashboardPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Filtros globais
             </p>
-            <span className="text-[11px] text-slate-500">{"Ajuste os filtros para todas as visualiza\\u00e7\\u00f5es do dashboard."}</span>
+            <span className="text-[11px] text-slate-500">
+              Ajuste os filtros para todas as visualizações do dashboard.
+            </span>
           </div>
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
