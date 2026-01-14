@@ -1636,7 +1636,7 @@ export default function DocumentosPage() {
       ) : viewMode === "tabela" ? (
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-100 text-sm">
+            <table className="w-full min-w-[900px] divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   {canManageDocuments && (

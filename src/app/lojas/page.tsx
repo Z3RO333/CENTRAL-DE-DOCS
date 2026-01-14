@@ -236,7 +236,7 @@ export default function LojasPage() {
 
       <section className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+          <table className="w-full min-w-[560px] text-sm">
             <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-5 py-3 text-left">Loja</th>

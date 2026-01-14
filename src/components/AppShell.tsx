@@ -129,13 +129,13 @@ export default function AppShell({
         />
 
         <aside
-          className={`fixed left-0 top-0 z-40 flex h-screen w-72 flex-col overflow-y-auto bg-[var(--app-sidebar)] text-slate-700 shadow-2xl shadow-slate-200/70 backdrop-blur transition-all ${
+          className={`fixed left-0 top-0 z-40 flex h-screen w-72 flex-col overflow-x-hidden overflow-y-auto bg-[var(--app-sidebar)] text-slate-700 shadow-2xl shadow-slate-200/70 backdrop-blur transition-all ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           } ${isSidebarCollapsed ? "md:w-20" : "md:w-72"} md:translate-x-0`}
         >
           <div
-            className={`flex items-center justify-between pb-4 pt-6 ${
-              isSidebarCollapsed ? "px-3" : "px-6"
+            className={`flex items-center justify-between px-6 pb-4 pt-6 ${
+              isSidebarCollapsed ? "md:px-3" : ""
             }`}
           >
             <Link
@@ -153,16 +153,14 @@ export default function AppShell({
                   priority
                 />
               </div>
-              {!isSidebarCollapsed && (
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-700">
-                    Central
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    Fluxo de documentos
-                  </p>
-                </div>
-              )}
+              <div className={isSidebarCollapsed ? "md:hidden" : ""}>
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-700">
+                  Central
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Fluxo de documentos
+                </p>
+              </div>
             </Link>
             <div className="flex items-center gap-2">
               <button
@@ -191,8 +189,8 @@ export default function AppShell({
           </div>
 
           <nav
-            className={`flex flex-1 flex-col gap-1 ${
-              isSidebarCollapsed ? "px-2" : "px-4"
+            className={`flex flex-1 flex-col gap-1 px-4 ${
+              isSidebarCollapsed ? "md:px-2" : ""
             }`}
           >
             {navItems
@@ -208,69 +206,68 @@ export default function AppShell({
                       item.isActive
                         ? "bg-[var(--app-surface)] text-slate-900 shadow-lg shadow-slate-200/70"
                         : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                    } ${isSidebarCollapsed ? "justify-center gap-0" : "gap-3"}`}
+                    } ${isSidebarCollapsed ? "gap-3 md:justify-center md:gap-0" : "gap-3"}`}
                   >
                     <span className="flex h-9 w-9 items-center justify-center text-slate-600 group-hover:text-sky-700">
                       <Icon className="h-5 w-5" />
                     </span>
-                    {!isSidebarCollapsed && item.label}
+                    <span className={isSidebarCollapsed ? "md:hidden" : ""}>
+                      {item.label}
+                    </span>
                   </Link>
                 );
               })}
           </nav>
 
-          <div className={`${isSidebarCollapsed ? "px-2" : "px-4"} pb-6 pt-4`}>
-            {isSidebarCollapsed ? (
-              <div className="grid gap-2">
+          <div className={`px-4 pb-6 pt-4 ${isSidebarCollapsed ? "md:px-2" : ""}`}>
+            <div className={isSidebarCollapsed ? "hidden md:grid gap-2" : "hidden"}>
+              <button
+                type="button"
+                onClick={() => setIsHelpOpen(true)}
+                className="inline-flex items-center justify-center rounded-2xl bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                aria-label="Ajuda rápida"
+              >
+                <HelpCircle className="h-4 w-4 text-sky-600" />
+              </button>
+              {isAuthenticated && (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="inline-flex items-center justify-center rounded-2xl bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                  aria-label="Sair"
+                >
+                  <LogOut className="h-4 w-4 text-sky-600" />
+                </button>
+              )}
+            </div>
+            <div className={isSidebarCollapsed ? "md:hidden" : ""}>
+              <div className="rounded-2xl bg-slate-100/80 px-4 py-3 text-xs text-slate-600">
+                <p className="font-semibold text-slate-700">Sessão ativa</p>
+                <p className="mt-1 truncate text-[11px] text-slate-500">
+                  {user?.email ?? "Visitante"}
+                </p>
+              </div>
+              <div className="mt-3 grid gap-2">
                 <button
                   type="button"
                   onClick={() => setIsHelpOpen(true)}
-                  className="inline-flex items-center justify-center rounded-2xl bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                  aria-label="Ajuda rápida"
+                  className="inline-flex items-center justify-between rounded-2xl bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
                 >
+                  Ajuda rápida
                   <HelpCircle className="h-4 w-4 text-sky-600" />
                 </button>
                 {isAuthenticated && (
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="inline-flex items-center justify-center rounded-2xl bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                    aria-label="Sair"
+                    className="inline-flex items-center justify-between rounded-2xl bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
                   >
+                    Sair
                     <LogOut className="h-4 w-4 text-sky-600" />
                   </button>
                 )}
               </div>
-            ) : (
-              <>
-                <div className="rounded-2xl bg-slate-100/80 px-4 py-3 text-xs text-slate-600">
-                  <p className="font-semibold text-slate-700">Sessão ativa</p>
-                  <p className="mt-1 truncate text-[11px] text-slate-500">
-                    {user?.email ?? "Visitante"}
-                  </p>
-                </div>
-                <div className="mt-3 grid gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsHelpOpen(true)}
-                    className="inline-flex items-center justify-between rounded-2xl bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                  >
-                    Ajuda rápida
-                    <HelpCircle className="h-4 w-4 text-sky-600" />
-                  </button>
-                  {isAuthenticated && (
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="inline-flex items-center justify-between rounded-2xl bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                    >
-                      Sair
-                      <LogOut className="h-4 w-4 text-sky-600" />
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
+            </div>
           </div>
         </aside>
 
@@ -440,4 +437,6 @@ export default function AppShell({
     </div>
   );
 }
+
+
 
