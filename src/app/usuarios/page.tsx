@@ -348,7 +348,8 @@ export default function UsuariosPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6">\n\n      <header>
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6">
+      <header>
         <h1 className="text-2xl font-semibold text-slate-900">
           Gerenciamento de usuários
         </h1>
