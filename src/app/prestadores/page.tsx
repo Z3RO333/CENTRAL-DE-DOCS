@@ -78,6 +78,8 @@ export default function PrestadoresPage() {
       tipo: string;
       created_at: string;
       dados: Record<string, unknown> | null;
+      arquivo_path?: string | null;
+      arquivo_assinado_path?: string | null;
     }[]
   >([]);
   const [documentosLoading, setDocumentosLoading] = useState(false);
@@ -140,13 +142,33 @@ export default function PrestadoresPage() {
     }
     return [...SERVICOS_OFICIAIS];
   }, [regraForm.tipo_regra]);
-  const resolveRegraLabel = (alvo: string, label?: string | null) => {
-    if (label && label.trim()) {
-      return label.trim();
+const resolveRegraLabel = (alvo: string, label?: string | null) => {
+  if (label && label.trim()) {
+    return label.trim();
+  }
+  const match = formularioOptions.find((option) => option.value === alvo);
+  return match?.label ?? alvo;
+};
+
+const getDocumentoNome = (registro: {
+  id: string;
+  dados: Record<string, unknown> | null;
+  arquivo_path?: string | null;
+  arquivo_assinado_path?: string | null;
+}) => {
+  const anexos = registro.dados?.anexos;
+  if (Array.isArray(anexos) && anexos.length > 0) {
+    const primeiro = anexos[0] as { nome?: unknown } | null;
+    if (primeiro && typeof primeiro.nome === "string" && primeiro.nome.trim()) {
+      return primeiro.nome.trim();
     }
-    const match = formularioOptions.find((option) => option.value === alvo);
-    return match?.label ?? alvo;
-  };
+  }
+  const path = registro.arquivo_assinado_path ?? registro.arquivo_path;
+  if (path) {
+    return path.split("/").pop() ?? path;
+  }
+  return registro.id;
+};
 
   const carregarRegras = useCallback(async () => {
     if (!user) {
@@ -307,6 +329,8 @@ export default function PrestadoresPage() {
             created_at: string;
             dados: Record<string, unknown> | null;
             prestador_id?: string | null;
+            arquivo_path?: string | null;
+            arquivo_assinado_path?: string | null;
           }[];
           error?: string;
         };
@@ -1760,6 +1784,7 @@ export default function PrestadoresPage() {
                       typeof doc.dados?.tipo_laudo === "string"
                         ? doc.dados.tipo_laudo
                         : "";
+                    const nomeArquivo = getDocumentoNome(doc);
                     return (
                       <label
                         key={doc.id}
@@ -1784,7 +1809,10 @@ export default function PrestadoresPage() {
                           />
                           <div>
                             <p className="font-semibold text-slate-700">
-                              {doc.tipo}
+                              {nomeArquivo}
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              Tipo: {doc.tipo}
                             </p>
                             {servico ? (
                               <p className="text-[11px] text-slate-500">
