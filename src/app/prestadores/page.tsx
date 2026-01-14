@@ -383,6 +383,14 @@ export default function PrestadoresPage() {
     });
   }, [documentosVinculo, documentoSearch]);
 
+  const isDocumentoVinculado = useCallback(
+    (documentoId: string, regraId: string) => {
+      const list = vinculos[documentoId] ?? [];
+      return list.some((item) => item.regra_id === regraId);
+    },
+    [vinculos],
+  );
+
 
   if (isLoading || !user) {
     return (
@@ -880,14 +888,6 @@ export default function PrestadoresPage() {
       setApplyRegraId(null);
     }
   };
-
-  const isDocumentoVinculado = useCallback(
-    (documentoId: string, regraId: string) => {
-      const list = vinculos[documentoId] ?? [];
-      return list.some((item) => item.regra_id === regraId);
-    },
-    [vinculos],
-  );
 
   const handleToggleVinculo = async (
     documentoId: string,
