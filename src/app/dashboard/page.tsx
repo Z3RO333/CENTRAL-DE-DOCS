@@ -84,6 +84,26 @@ const formatStatus = (status: string) =>
 
 const formatTipo = (tipo: string) => TIPO_LABEL[tipo] ?? tipo;
 
+const getDocumentoNome = (registro: {
+  id: string;
+  dados: Record<string, unknown> | null;
+  arquivo_assinado_path?: string | null;
+  arquivo_path?: string | null;
+}) => {
+  const anexos = registro.dados?.anexos;
+  if (Array.isArray(anexos) && anexos.length > 0) {
+    const primeiro = anexos[0] as { nome?: unknown } | null;
+    if (primeiro && typeof primeiro.nome === "string" && primeiro.nome.trim()) {
+      return primeiro.nome.trim();
+    }
+  }
+  const path = registro.arquivo_assinado_path ?? registro.arquivo_path;
+  if (path) {
+    return path.split("/").pop() ?? path;
+  }
+  return registro.id;
+};
+
 const getLocalDateKey = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -852,6 +872,9 @@ export default function DashboardPage() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold text-slate-800">
+                          {getDocumentoNome(registro)}
+                        </p>
+                        <p className="text-[11px] text-slate-500">
                           {formatTipo(registro.tipo)}
                         </p>
                         <p className="text-[11px] text-slate-500">
@@ -1010,9 +1033,6 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-
-
 
 
 
