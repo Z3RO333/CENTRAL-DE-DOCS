@@ -43,10 +43,14 @@ export default function PrestadoresPage() {
     success: string | null;
   }>({ error: null, success: null });
   const [regraForm, setRegraForm] = useState({
+    tipo_regra: "formulario",
     alvo: "",
     periodo: "mensal",
     quantidade: "12",
     label: "",
+    aplica_anteriores: "true",
+    aplica_desde: "",
+    modo_conflito: "multi",
   });
   const [emailsForm, setEmailsForm] = useState("");
   const [emailsFeedback, setEmailsFeedback] = useState<{
@@ -58,6 +62,28 @@ export default function PrestadoresPage() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isCreatePrestadorOpen, setIsCreatePrestadorOpen] = useState(false);
   const [isCreateRegraOpen, setIsCreateRegraOpen] = useState(false);
+  const [isVinculoOpen, setIsVinculoOpen] = useState(false);
+  const [vinculoRegraId, setVinculoRegraId] = useState<string | null>(null);
+  const [vinculos, setVinculos] = useState<
+    Record<
+      string,
+      { regra_id: string; tipo_vinculo: "auto" | "manual" }[]
+    >
+  >({});
+  const [vinculosLoading, setVinculosLoading] = useState(false);
+  const [vinculosError, setVinculosError] = useState<string | null>(null);
+  const [documentosVinculo, setDocumentosVinculo] = useState<
+    {
+      id: string;
+      tipo: string;
+      created_at: string;
+      dados: Record<string, unknown> | null;
+    }[]
+  >([]);
+  const [documentosLoading, setDocumentosLoading] = useState(false);
+  const [documentosError, setDocumentosError] = useState<string | null>(null);
+  const [documentoSearch, setDocumentoSearch] = useState("");
+  const [applyRegraId, setApplyRegraId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -108,13 +134,12 @@ export default function PrestadoresPage() {
     { value: "retencao_trabalhista", label: "Retenção Trabalhista" },
     { value: "notas_fiscais", label: "Notas Fiscais" },
   ];
-  const alvoSugestoes = useMemo(
-    () => [
-      ...formularioOptions.map((option) => option.value),
-      ...SERVICOS_OFICIAIS,
-    ],
-    [],
-  );
+  const alvoSugestoes = useMemo(() => {
+    if (regraForm.tipo_regra === "formulario") {
+      return formularioOptions.map((option) => option.value);
+    }
+    return [...SERVICOS_OFICIAIS];
+  }, [regraForm.tipo_regra]);
   const resolveRegraLabel = (alvo: string, label?: string | null) => {
     if (label && label.trim()) {
       return label.trim();
@@ -172,11 +197,158 @@ export default function PrestadoresPage() {
     }
   }, [prestadores, user]);
 
+  const carregarVinculos = useCallback(
+    async (prestadorId: string) => {
+      if (!user) {
+        return;
+      }
+
+      setVinculosLoading(true);
+      setVinculosError(null);
+
+      try {
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          throw sessionError;
+        }
+        const token = data.session?.access_token;
+        if (!token) {
+          throw new Error("Sessao expirada. Faca login novamente.");
+        }
+
+        const response = await fetch(
+          `/api/prestador-regras-vinculos?prestadorId=${encodeURIComponent(
+            prestadorId,
+          )}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
+        const payload = (await response.json()) as {
+          vinculos?: {
+            regra_id: string;
+            documento_id: string;
+            tipo_vinculo: "auto" | "manual";
+          }[];
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Nao foi possivel carregar vinculos.");
+        }
+
+        const next = (payload.vinculos ?? []).reduce<
+          Record<
+            string,
+            { regra_id: string; tipo_vinculo: "auto" | "manual" }[]
+          >
+        >((acc, vinculo) => {
+          if (!acc[vinculo.documento_id]) {
+            acc[vinculo.documento_id] = [];
+          }
+          acc[vinculo.documento_id].push({
+            regra_id: vinculo.regra_id,
+            tipo_vinculo: vinculo.tipo_vinculo,
+          });
+          return acc;
+        }, {});
+
+        setVinculos(next);
+      } catch (err) {
+        setVinculosError(
+          err instanceof Error
+            ? err.message
+            : "Nao foi possivel carregar vinculos.",
+        );
+        setVinculos({});
+      } finally {
+        setVinculosLoading(false);
+      }
+    },
+    [user],
+  );
+
+  const carregarDocumentosVinculo = useCallback(
+    async (prestadorId: string) => {
+      if (!user) {
+        return;
+      }
+
+      setDocumentosLoading(true);
+      setDocumentosError(null);
+
+      try {
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          throw sessionError;
+        }
+        const token = data.session?.access_token;
+        if (!token) {
+          throw new Error("Sessao expirada. Faca login novamente.");
+        }
+
+        const params = new URLSearchParams();
+        params.set("prestadorId", prestadorId);
+        params.set("limit", "200");
+
+        const response = await fetch(`/api/documentos?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const payload = (await response.json()) as {
+          registros?: {
+            id: string;
+            tipo: string;
+            created_at: string;
+            dados: Record<string, unknown> | null;
+          }[];
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(
+            payload.error ?? "Nao foi possivel carregar documentos.",
+          );
+        }
+
+        setDocumentosVinculo(payload.registros ?? []);
+      } catch (err) {
+        setDocumentosError(
+          err instanceof Error
+            ? err.message
+            : "Nao foi possivel carregar documentos.",
+        );
+        setDocumentosVinculo([]);
+      } finally {
+        setDocumentosLoading(false);
+      }
+    },
+    [user],
+  );
+
   useEffect(() => {
     if (user && !prestadoresLoading) {
       void carregarRegras();
     }
   }, [user, prestadoresLoading, carregarRegras]);
+
+  useEffect(() => {
+    if (!isVinculoOpen || !selectedPrestador?.id) {
+      return;
+    }
+    void carregarVinculos(selectedPrestador.id);
+    void carregarDocumentosVinculo(selectedPrestador.id);
+  }, [
+    isVinculoOpen,
+    selectedPrestador?.id,
+    carregarVinculos,
+    carregarDocumentosVinculo,
+  ]);
 
   const regrasPorPrestador = useMemo(() => {
     return regras.reduce<Record<string, PrestadorRegra[]>>((acc, regra) => {
@@ -187,6 +359,29 @@ export default function PrestadoresPage() {
       return acc;
     }, {});
   }, [regras]);
+
+  const regraSelecionada = useMemo(() => {
+    if (!selectedPrestadorId || !vinculoRegraId) {
+      return null;
+    }
+    return (
+      regrasPorPrestador[selectedPrestadorId]?.find(
+        (regra) => regra.id === vinculoRegraId,
+      ) ?? null
+    );
+  }, [regrasPorPrestador, selectedPrestadorId, vinculoRegraId]);
+
+  const documentosFiltrados = useMemo(() => {
+    const termo = documentoSearch.trim().toLowerCase();
+    if (!termo) {
+      return documentosVinculo;
+    }
+    return documentosVinculo.filter((doc) => {
+      const tipo = doc.tipo?.toLowerCase() ?? "";
+      const createdAt = doc.created_at ?? "";
+      return tipo.includes(termo) || createdAt.includes(termo);
+    });
+  }, [documentosVinculo, documentoSearch]);
 
 
   if (isLoading || !user) {
@@ -305,6 +500,7 @@ export default function PrestadoresPage() {
     setRegraForm((prev) => ({
       ...prev,
       [field]: value,
+      ...(field === "tipo_regra" ? { alvo: "" } : null),
     }));
     setRegraFeedback({ error: null, success: null });
   };
@@ -323,6 +519,8 @@ export default function PrestadoresPage() {
 
     const alvo = regraForm.alvo.trim();
     const quantidade = Number(regraForm.quantidade);
+    const aplicaAnteriores = regraForm.aplica_anteriores === "true";
+    const aplicaDesde = regraForm.aplica_desde.trim();
 
     if (!alvo) {
       setRegraFeedback({
@@ -334,6 +532,13 @@ export default function PrestadoresPage() {
     if (!Number.isFinite(quantidade) || quantidade <= 0) {
       setRegraFeedback({
         error: "Informe uma quantidade válida.",
+        success: null,
+      });
+      return;
+    }
+    if (!aplicaAnteriores && !aplicaDesde) {
+      setRegraFeedback({
+        error: "Informe uma data inicial para aplicar a regra.",
         success: null,
       });
       return;
@@ -357,11 +562,14 @@ export default function PrestadoresPage() {
         },
         body: JSON.stringify({
           prestador_id: selectedPrestadorId,
-          tipo_regra: "formulario",
+          tipo_regra: regraForm.tipo_regra,
           alvo,
           periodo: regraForm.periodo,
           quantidade,
           label: regraForm.label.trim() || null,
+          aplica_anteriores: aplicaAnteriores,
+          aplica_desde: aplicaAnteriores ? null : aplicaDesde,
+          modo_conflito: regraForm.modo_conflito,
         }),
       });
 
@@ -382,6 +590,7 @@ export default function PrestadoresPage() {
         ...prev,
         label: "",
         quantidade: prev.quantidade || "12",
+        aplica_desde: "",
       }));
       await carregarRegras();
       setIsCreateRegraOpen(false);
@@ -428,6 +637,13 @@ export default function PrestadoresPage() {
     ) {
       return;
     }
+    if (!aplicaAnteriores && !aplicaDesde) {
+      setRegraFeedback({
+        error: "Informe uma data inicial para aplicar a regra.",
+        success: null,
+      });
+      return;
+    }
 
     try {
       const { data, error: sessionError } = await supabase.auth.getSession();
@@ -446,8 +662,15 @@ export default function PrestadoresPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          id: selectedPrestadorId,
-          emails,
+          prestador_id: selectedPrestadorId,
+          tipo_regra: regraForm.tipo_regra,
+          alvo,
+          periodo: regraForm.periodo,
+          quantidade,
+          label: regraForm.label.trim() || null,
+          aplica_anteriores: aplicaAnteriores,
+          aplica_desde: aplicaAnteriores ? null : aplicaDesde,
+          modo_conflito: regraForm.modo_conflito,
         }),
       });
 
@@ -484,6 +707,13 @@ export default function PrestadoresPage() {
     if (!window.confirm(`Remover o e-mail ${emailToRemove}?`)) {
       return;
     }
+    if (!aplicaAnteriores && !aplicaDesde) {
+      setRegraFeedback({
+        error: "Informe uma data inicial para aplicar a regra.",
+        success: null,
+      });
+      return;
+    }
 
     try {
       const { data, error: sessionError } = await supabase.auth.getSession();
@@ -502,8 +732,15 @@ export default function PrestadoresPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          id: selectedPrestadorId,
-          remove_emails: [emailToRemove],
+          prestador_id: selectedPrestadorId,
+          tipo_regra: regraForm.tipo_regra,
+          alvo,
+          periodo: regraForm.periodo,
+          quantidade,
+          label: regraForm.label.trim() || null,
+          aplica_anteriores: aplicaAnteriores,
+          aplica_desde: aplicaAnteriores ? null : aplicaDesde,
+          modo_conflito: regraForm.modo_conflito,
         }),
       });
 
@@ -537,6 +774,13 @@ export default function PrestadoresPage() {
     }
     setPrestadorFeedback({ error: null, success: null });
     if (!window.confirm("Remover este prestador e suas regras?")) {
+      return;
+    }
+    if (!aplicaAnteriores && !aplicaDesde) {
+      setRegraFeedback({
+        error: "Informe uma data inicial para aplicar a regra.",
+        success: null,
+      });
       return;
     }
 
@@ -614,6 +858,155 @@ export default function PrestadoresPage() {
           err instanceof Error ? err.message : "Não foi possível remover a regra.",
         success: null,
       });
+    }
+  };
+
+  const handleAplicarRegra = async (regraId: string) => {
+    if (!regraId) {
+      return;
+    }
+    if (!aplicaAnteriores && !aplicaDesde) {
+      setRegraFeedback({
+        error: "Informe uma data inicial para aplicar a regra.",
+        success: null,
+      });
+      return;
+    }
+
+    try {
+      setApplyRegraId(regraId);
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        throw sessionError;
+      }
+      const token = data.session?.access_token;
+      if (!token) {
+        throw new Error("Sessao expirada. Faca login novamente.");
+      }
+
+      const response = await fetch("/api/prestador-regras-vinculos/apply", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          prestador_id: selectedPrestadorId,
+          tipo_regra: regraForm.tipo_regra,
+          alvo,
+          periodo: regraForm.periodo,
+          quantidade,
+          label: regraForm.label.trim() || null,
+          aplica_anteriores: aplicaAnteriores,
+          aplica_desde: aplicaAnteriores ? null : aplicaDesde,
+          modo_conflito: regraForm.modo_conflito,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        inserted?: number;
+        skipped?: number;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Nao foi possivel aplicar a regra.");
+      }
+
+      setRegraFeedback({
+        error: null,
+        success: `Regra aplicada. Vinculos novos: ${payload.inserted ?? 0}.`,
+      });
+      if (selectedPrestadorId) {
+        await carregarVinculos(selectedPrestadorId);
+      }
+    } catch (err) {
+      setRegraFeedback({
+        error:
+          err instanceof Error
+            ? err.message
+            : "Nao foi possivel aplicar a regra.",
+        success: null,
+      });
+    } finally {
+      setApplyRegraId(null);
+    }
+  };
+
+  const isDocumentoVinculado = useCallback(
+    (documentoId: string, regraId: string) => {
+      const list = vinculos[documentoId] ?? [];
+      return list.some((item) => item.regra_id === regraId);
+    },
+    [vinculos],
+  );
+
+  const handleToggleVinculo = async (
+    documentoId: string,
+    regraId: string,
+    nextValue: boolean,
+  ) => {
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        throw sessionError;
+      }
+      const token = data.session?.access_token;
+      if (!token) {
+        throw new Error("Sessao expirada. Faca login novamente.");
+      }
+
+      if (nextValue) {
+        const response = await fetch("/api/prestador-regras-vinculos", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+          prestador_id: selectedPrestadorId,
+          tipo_regra: regraForm.tipo_regra,
+          alvo,
+          periodo: regraForm.periodo,
+          quantidade,
+          label: regraForm.label.trim() || null,
+          aplica_anteriores: aplicaAnteriores,
+          aplica_desde: aplicaAnteriores ? null : aplicaDesde,
+          modo_conflito: regraForm.modo_conflito,
+        }),
+        });
+        const payload = (await response.json()) as { error?: string };
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Nao foi possivel criar o vinculo.");
+        }
+      } else {
+        const params = new URLSearchParams();
+        params.set("regraId", regraId);
+        params.set("documentoId", documentoId);
+        const response = await fetch(
+          `/api/prestador-regras-vinculos?${params.toString()}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+        const payload = (await response.json()) as { error?: string };
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Nao foi possivel remover o vinculo.");
+        }
+      }
+
+      if (selectedPrestadorId) {
+        await carregarVinculos(selectedPrestadorId);
+      }
+    } catch (err) {
+      setVinculosError(
+        err instanceof Error
+          ? err.message
+          : "Nao foi possivel atualizar o vinculo.",
+      );
     }
   };
 
@@ -940,21 +1333,66 @@ export default function PrestadoresPage() {
                               key={regra.id}
                               className="rounded-xl bg-slate-50/60 px-3 py-2"
                             >
-                              <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
                                 <span className="font-semibold text-slate-700">
                                   {label}
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() => void handleRegraDelete(regra.id)}
-                                  className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] text-slate-500 transition hover:border-red-200 hover:text-red-600"
-                                >
-                                  Remover
-                                </button>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleAplicarRegra(regra.id)}
+                                    disabled={applyRegraId === regra.id}
+                                    className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    {applyRegraId === regra.id
+                                      ? "Aplicando..."
+                                      : "Aplicar"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setVinculoRegraId(regra.id);
+                                      setDocumentoSearch("");
+                                      setIsVinculoOpen(true);
+                                    }}
+                                    className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                                  >
+                                    Vincular docs
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleRegraDelete(regra.id)}
+                                    className="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] text-slate-500 transition hover:border-red-200 hover:text-red-600"
+                                  >
+                                    Remover
+                                  </button>
+                                </div>
                               </div>
                               <p className="mt-1 text-[11px] text-slate-500">
-                                Meta: {regra.quantidade} no período{" "}
+                                Meta: {regra.quantidade} no per︽do{" "}
                                 {regra.periodo === "mensal" ? "mensal" : "anual"}
+                              </p>
+                              <p className="mt-1 text-[11px] text-slate-500">
+                                Tipo:{" "}
+                                {regra.tipo_regra === "tipo_servico"
+                                  ? "Servico"
+                                  : "Formulario"}
+                              </p>
+                              <p className="mt-1 text-[11px] text-slate-500">
+                                Aplicacao:{" "}
+                                {regra.aplica_anteriores === false
+                                  ? `A partir de ${regra.aplica_desde
+                                      ? new Date(regra.aplica_desde).toLocaleDateString(
+                                          "pt-BR",
+                                        )
+                                      : "data nao definida"}`
+                                  : "Inclui documentos antigos"}
+                              </p>
+                              <p className="mt-1 text-[11px] text-slate-500">
+                                Conflito:{" "}
+                                {regra.modo_conflito === "single"
+                                  ? "Uma regra por documento"
+                                  : "Multiplas regras por documento"}
                               </p>
                             </div>
                           );
@@ -1144,6 +1582,24 @@ export default function PrestadoresPage() {
 
             <form onSubmit={handleRegraSubmit} className="mt-4 space-y-4">
               <div className="grid gap-3">
+                                <label className="text-xs font-semibold text-slate-600">
+                  Tipo de regra
+                  <select
+                    value={regraForm.tipo_regra}
+                    onChange={(event) =>
+                      handleRegraFieldChange("tipo_regra", event.target.value)
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                  >
+                    <option value="formulario">Tipo de formulario</option>
+                    <option value="tipo_servico">Tipo de servico</option>
+                  </select>
+                  <span className="mt-1 block text-[11px] font-normal text-slate-500">
+                    Use formulario para tipos (ex.: notas_fiscais) ou servico
+                    para laudos.
+                  </span>
+                </label>
+
                 <label className="text-xs font-semibold text-slate-600">
                   Alvo da regra
                   <input
@@ -1175,6 +1631,52 @@ export default function PrestadoresPage() {
                     <option value="mensal">Mensal</option>
                     <option value="anual">Anual</option>
                   </select>
+                                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Aplicar documentos antigos?
+                  <select
+                    value={regraForm.aplica_anteriores}
+                    onChange={(event) =>
+                      handleRegraFieldChange("aplica_anteriores", event.target.value)
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                  >
+                    <option value="true">Sim, incluir antigos</option>
+                    <option value="false">Nao, aplicar a partir de data</option>
+                  </select>
+                  <span className="mt-1 block text-[11px] font-normal text-slate-500">
+                    Se escolher nao, a regra considera apenas documentos a partir
+                    da data definida.
+                  </span>
+                </label>
+                {regraForm.aplica_anteriores === "false" && (
+                  <label className="text-xs font-semibold text-slate-600">
+                    Data inicial
+                    <input
+                      type="date"
+                      value={regraForm.aplica_desde}
+                      onChange={(event) =>
+                        handleRegraFieldChange("aplica_desde", event.target.value)
+                      }
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                    />
+                  </label>
+                )}
+                <label className="text-xs font-semibold text-slate-600">
+                  Conflito entre regras
+                  <select
+                    value={regraForm.modo_conflito}
+                    onChange={(event) =>
+                      handleRegraFieldChange("modo_conflito", event.target.value)
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                  >
+                    <option value="multi">Permitir varias regras por documento</option>
+                    <option value="single">Apenas uma regra por documento</option>
+                  </select>
+                  <span className="mt-1 block text-[11px] font-normal text-slate-500">
+                    Em modo unico, um documento so pode estar ligado a uma regra.
+                  </span>
                 </label>
                 <label className="text-xs font-semibold text-slate-600">
                   Quantidade esperada
@@ -1222,7 +1724,165 @@ export default function PrestadoresPage() {
         </div>
       )}
 
+      {isVinculoOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-100/80 px-4 py-6"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-5xl rounded-3xl bg-white p-6 text-slate-900 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Vincular documentos
+                </p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">
+                  Selecione os documentos para a regra
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsVinculoOpen(false);
+                  setVinculoRegraId(null);
+                }}
+                className="rounded-full bg-slate-100 p-2 text-slate-600 transition hover:bg-slate-200"
+                aria-label="Fechar vinculos"
+              >
+                ?
+              </button>
+            </div>
+
+            <div className="mt-3 space-y-1 text-[11px] text-slate-500">
+              <p>
+                Prestador:{" "}
+                <span className="font-semibold text-slate-700">
+                  {selectedPrestador?.nome ?? "Nenhum"}
+                </span>
+              </p>
+              <p>
+                Regra:{" "}
+                <span className="font-semibold text-slate-700">
+                  {regraSelecionada
+                    ? resolveRegraLabel(
+                        regraSelecionada.alvo,
+                        regraSelecionada.label,
+                      )
+                    : "Selecione uma regra"}
+                </span>
+              </p>
+            </div>
+
+            {(vinculosError || documentosError) && (
+              <div className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-[11px] text-red-700">
+                {vinculosError || documentosError}
+              </div>
+            )}
+
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <input
+                type="search"
+                value={documentoSearch}
+                onChange={(event) => setDocumentoSearch(event.target.value)}
+                placeholder="Buscar por tipo ou data..."
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400 md:max-w-sm"
+              />
+              {documentosVinculo.length >= 200 && (
+                <span className="text-[11px] text-slate-400">
+                  Mostrando ate 200 documentos.
+                </span>
+              )}
+            </div>
+
+            <div className="mt-4 max-h-[420px] overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50/40 p-2">
+              {documentosLoading || vinculosLoading ? (
+                <p className="py-6 text-center text-xs text-slate-500">
+                  Carregando documentos...
+                </p>
+              ) : documentosFiltrados.length === 0 ? (
+                <p className="py-6 text-center text-xs text-slate-500">
+                  Nenhum documento encontrado.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {documentosFiltrados.map((doc) => {
+                    const isChecked =
+                      vinculoRegraId &&
+                      isDocumentoVinculado(doc.id, vinculoRegraId);
+                    const servico =
+                      typeof doc.dados?.tipo_laudo === "string"
+                        ? doc.dados.tipo_laudo
+                        : "";
+                    return (
+                      <label
+                        key={doc.id}
+                        className="flex items-start justify-between gap-3 rounded-xl bg-white px-3 py-2 text-xs text-slate-600 shadow-sm"
+                      >
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(isChecked)}
+                            disabled={!vinculoRegraId}
+                            onChange={(event) => {
+                              if (!vinculoRegraId) {
+                                return;
+                              }
+                              void handleToggleVinculo(
+                                doc.id,
+                                vinculoRegraId,
+                                event.target.checked,
+                              );
+                            }}
+                            className="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                          />
+                          <div>
+                            <p className="font-semibold text-slate-700">
+                              {doc.tipo}
+                            </p>
+                            {servico ? (
+                              <p className="text-[11px] text-slate-500">
+                                Servico: {servico}
+                              </p>
+                            ) : null}
+                            <p className="text-[11px] text-slate-400">
+                              {new Date(doc.created_at).toLocaleDateString("pt-BR")}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-slate-400">
+                          {doc.id.slice(0, 8)}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsVinculoOpen(false);
+                  setVinculoRegraId(null);
+                }}
+                className="rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-sky-500"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+
+
+
+
+
+
+
 

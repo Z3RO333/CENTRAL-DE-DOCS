@@ -9,6 +9,9 @@ export type PrestadorRegra = {
   periodo: RegraPeriodo;
   quantidade: number;
   label?: string | null;
+  aplica_anteriores?: boolean;
+  aplica_desde?: string | null;
+  modo_conflito?: "multi" | "single";
   ativo?: boolean;
   created_at?: string;
 };

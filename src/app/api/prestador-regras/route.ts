@@ -119,7 +119,9 @@ export async function GET(request: Request) {
 
     let query = supabaseAdmin
       .from("prestador_regras")
-      .select("id,prestador_id,tipo_regra,alvo,periodo,quantidade,label,ativo,created_at")
+      .select(
+        "id,prestador_id,tipo_regra,alvo,periodo,quantidade,label,ativo,created_at,aplica_anteriores,aplica_desde,modo_conflito",
+      )
       .order("created_at", { ascending: false });
 
     if (prestadorIds.length > 0) {
@@ -145,6 +147,9 @@ export async function GET(request: Request) {
         quantidade: item.quantidade as number,
         label: item.label as string | null,
         ativo: (item.ativo as boolean | null) ?? true,
+        aplica_anteriores: (item.aplica_anteriores as boolean | null) ?? true,
+        aplica_desde: (item.aplica_desde as string | null) ?? null,
+        modo_conflito: (item.modo_conflito as "multi" | "single") ?? "multi",
         created_at: item.created_at as string,
       })) ?? [];
 
@@ -183,6 +188,9 @@ export async function POST(request: Request) {
       periodo?: "mensal" | "anual";
       quantidade?: number;
       label?: string;
+      aplica_anteriores?: boolean;
+      aplica_desde?: string | null;
+      modo_conflito?: "multi" | "single";
     };
 
     const prestadorId = body.prestador_id?.trim();
@@ -191,6 +199,9 @@ export async function POST(request: Request) {
     const periodo = body.periodo;
     const quantidade = Number(body.quantidade);
     const label = body.label?.trim() ?? null;
+    const aplicaAnteriores = body.aplica_anteriores ?? true;
+    const aplicaDesdeRaw = body.aplica_desde ?? null;
+    const modoConflito = body.modo_conflito ?? "multi";
 
     if (!prestadorId) {
       throw new HttpError(400, "Informe o prestador.");
@@ -207,6 +218,21 @@ export async function POST(request: Request) {
     if (!Number.isFinite(quantidade) || quantidade <= 0) {
       throw new HttpError(400, "Informe a quantidade da regra.");
     }
+    if (!["multi", "single"].includes(modoConflito)) {
+      throw new HttpError(400, "Informe o modo de conflito da regra.");
+    }
+    if (!aplicaAnteriores) {
+      if (!aplicaDesdeRaw) {
+        throw new HttpError(
+          400,
+          "Informe a data inicial quando nao aplicar documentos antigos.",
+        );
+      }
+      const aplicaDesdeDate = new Date(aplicaDesdeRaw);
+      if (Number.isNaN(aplicaDesdeDate.getTime())) {
+        throw new HttpError(400, "Informe uma data inicial valida.");
+      }
+    }
 
     const { data, error } = await supabaseAdmin
       .from("prestador_regras")
@@ -218,10 +244,13 @@ export async function POST(request: Request) {
         quantidade,
         label,
         ativo: true,
+        aplica_anteriores: aplicaAnteriores,
+        aplica_desde: aplicaAnteriores ? null : aplicaDesdeRaw,
+        modo_conflito: modoConflito,
         created_by: user.id,
       })
       .select(
-        "id,prestador_id,tipo_regra,alvo,periodo,quantidade,label,ativo,created_at",
+        "id,prestador_id,tipo_regra,alvo,periodo,quantidade,label,ativo,created_at,aplica_anteriores,aplica_desde,modo_conflito",
       )
       .single();
 
@@ -241,6 +270,9 @@ export async function POST(request: Request) {
         quantidade: regra.quantidade,
         label: regra.label,
         ativo: regra.ativo ?? true,
+        aplica_anteriores: regra.aplica_anteriores ?? true,
+        aplica_desde: regra.aplica_desde ?? null,
+        modo_conflito: regra.modo_conflito ?? "multi",
         created_at: regra.created_at,
       },
     });
