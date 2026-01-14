@@ -637,13 +637,6 @@ export default function PrestadoresPage() {
     ) {
       return;
     }
-    if (!aplicaAnteriores && !aplicaDesde) {
-      setRegraFeedback({
-        error: "Informe uma data inicial para aplicar a regra.",
-        success: null,
-      });
-      return;
-    }
 
     try {
       const { data, error: sessionError } = await supabase.auth.getSession();
@@ -662,15 +655,8 @@ export default function PrestadoresPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          prestador_id: selectedPrestadorId,
-          tipo_regra: regraForm.tipo_regra,
-          alvo,
-          periodo: regraForm.periodo,
-          quantidade,
-          label: regraForm.label.trim() || null,
-          aplica_anteriores: aplicaAnteriores,
-          aplica_desde: aplicaAnteriores ? null : aplicaDesde,
-          modo_conflito: regraForm.modo_conflito,
+          id: selectedPrestadorId,
+          emails,
         }),
       });
 
@@ -707,13 +693,6 @@ export default function PrestadoresPage() {
     if (!window.confirm(`Remover o e-mail ${emailToRemove}?`)) {
       return;
     }
-    if (!aplicaAnteriores && !aplicaDesde) {
-      setRegraFeedback({
-        error: "Informe uma data inicial para aplicar a regra.",
-        success: null,
-      });
-      return;
-    }
 
     try {
       const { data, error: sessionError } = await supabase.auth.getSession();
@@ -732,15 +711,8 @@ export default function PrestadoresPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          prestador_id: selectedPrestadorId,
-          tipo_regra: regraForm.tipo_regra,
-          alvo,
-          periodo: regraForm.periodo,
-          quantidade,
-          label: regraForm.label.trim() || null,
-          aplica_anteriores: aplicaAnteriores,
-          aplica_desde: aplicaAnteriores ? null : aplicaDesde,
-          modo_conflito: regraForm.modo_conflito,
+          id: selectedPrestadorId,
+          remove_emails: [emailToRemove],
         }),
       });
 
@@ -774,13 +746,6 @@ export default function PrestadoresPage() {
     }
     setPrestadorFeedback({ error: null, success: null });
     if (!window.confirm("Remover este prestador e suas regras?")) {
-      return;
-    }
-    if (!aplicaAnteriores && !aplicaDesde) {
-      setRegraFeedback({
-        error: "Informe uma data inicial para aplicar a regra.",
-        success: null,
-      });
       return;
     }
 
@@ -865,13 +830,6 @@ export default function PrestadoresPage() {
     if (!regraId) {
       return;
     }
-    if (!aplicaAnteriores && !aplicaDesde) {
-      setRegraFeedback({
-        error: "Informe uma data inicial para aplicar a regra.",
-        success: null,
-      });
-      return;
-    }
 
     try {
       setApplyRegraId(regraId);
@@ -890,17 +848,7 @@ export default function PrestadoresPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          prestador_id: selectedPrestadorId,
-          tipo_regra: regraForm.tipo_regra,
-          alvo,
-          periodo: regraForm.periodo,
-          quantidade,
-          label: regraForm.label.trim() || null,
-          aplica_anteriores: aplicaAnteriores,
-          aplica_desde: aplicaAnteriores ? null : aplicaDesde,
-          modo_conflito: regraForm.modo_conflito,
-        }),
+        body: JSON.stringify({ regra_id: regraId }),
       });
 
       const payload = (await response.json()) as {
@@ -964,16 +912,10 @@ export default function PrestadoresPage() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-          prestador_id: selectedPrestadorId,
-          tipo_regra: regraForm.tipo_regra,
-          alvo,
-          periodo: regraForm.periodo,
-          quantidade,
-          label: regraForm.label.trim() || null,
-          aplica_anteriores: aplicaAnteriores,
-          aplica_desde: aplicaAnteriores ? null : aplicaDesde,
-          modo_conflito: regraForm.modo_conflito,
-        }),
+            regra_id: regraId,
+            documento_id: documentoId,
+            tipo_vinculo: "manual",
+          }),
         });
         const payload = (await response.json()) as { error?: string };
         if (!response.ok) {
