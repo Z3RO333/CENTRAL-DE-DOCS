@@ -356,12 +356,16 @@ export default function AssinaturaDocumentoPage() {
       setSuccess(null);
 
       try {
-        const { data, error: fetchError } = await supabase
+        let query = supabase
           .from("formularios")
           .select("*")
-          .eq("id", params.id)
-          .eq("user_id", user.id)
-          .single();
+          .eq("id", params.id);
+
+        if (!canAccessDocumentos) {
+          query = query.eq("user_id", user.id);
+        }
+
+        const { data, error: fetchError } = await query.single();
 
         if (fetchError || !data) {
           throw new Error("Documento não encontrado.");
