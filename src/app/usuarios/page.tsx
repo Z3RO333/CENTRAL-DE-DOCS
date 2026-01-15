@@ -45,11 +45,11 @@ const normalizeText = (value: string | null) =>
 
 const getNameFromEmail = (email: string | null) => {
   if (!email) {
-    return "Usu·rio";
+    return "Usu√°rio";
   }
   const handle = email.split("@")[0] ?? "";
   if (!handle) {
-    return "Usu·rio";
+    return "Usu√°rio";
   }
   return handle
     .split(/[._-]+/)
@@ -391,7 +391,7 @@ export default function UsuariosPage() {
       }
       const token = sessionData.session?.access_token;
       if (!token) {
-        throw new Error("Sess„o expirada. FaÁa login novamente.");
+        throw new Error("Sess√£o expirada. Fa√ßa login novamente.");
       }
       const response = await fetch("/api/admin/users", {
         headers: {
@@ -403,13 +403,13 @@ export default function UsuariosPage() {
         error?: string;
       };
       if (!response.ok) {
-        throw new Error(payload.error ?? "Falha ao carregar usu·rios.");
+        throw new Error(payload.error ?? "Falha ao carregar usu√°rios.");
       }
       setUsers(payload.users ?? []);
     } catch (err) {
       setUsers([]);
       setUsersError(
-        err instanceof Error ? err.message : "Falha ao carregar usu·rios.",
+        err instanceof Error ? err.message : "Falha ao carregar usu√°rios.",
       );
     } finally {
       setUsersLoading(false);
@@ -553,7 +553,7 @@ export default function UsuariosPage() {
   if (authLoading || accessLoading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
-        Carregando usu·rios...
+        Carregando usu√°rios...
       </div>
     );
   }
@@ -570,11 +570,11 @@ export default function UsuariosPage() {
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6">
       <header>
         <h1 className="text-2xl font-semibold text-slate-900">
-          Gerenciamento de usu·rios
+          Gerenciamento de usu√°rios
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Aqui vocÍ pode gerenciar os usu·rios da aplicaÁ„o. Altere as funÁıes
-          e permissıes de cada usu·rio.
+          Aqui voc√™ pode gerenciar os usu√°rios da aplica√ß√£o. Altere as fun√ß√µes
+          e permiss√µes de cada usu√°rio.
         </p>
       </header>
 
@@ -623,7 +623,7 @@ export default function UsuariosPage() {
               <tr>
                 <th className="px-5 py-3 text-left">Nome</th>
                 <th className="px-5 py-3 text-left">E-mail</th>
-                <th className="px-5 py-3 text-left">FunÁ„o</th>
+                <th className="px-5 py-3 text-left">Fun√ß√£o</th>
                 <th className="px-5 py-3 text-left">Status</th>
                 <th className="px-5 py-3 text-right"></th>
               </tr>
@@ -632,13 +632,13 @@ export default function UsuariosPage() {
               {usersLoading || permissionsLoading || gerenteEntriesLoading ? (
                 <tr>
                   <td className="px-5 py-6 text-center text-slate-500" colSpan={5}>
-                    Carregando usu·rios...
+                    Carregando usu√°rios...
                   </td>
                 </tr>
               ) : visibleUsers.length === 0 ? (
                 <tr>
                   <td className="px-5 py-6 text-center text-slate-500" colSpan={5}>
-                    Nenhum usu·rio encontrado.
+                    Nenhum usu√°rio encontrado.
                   </td>
                 </tr>
               ) : (
@@ -669,7 +669,7 @@ export default function UsuariosPage() {
                           onClick={() => openEditor(entry)}
                           disabled={!entry.email}
                           className="rounded-full border border-slate-200 p-2 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          aria-label="Editar usu·rio"
+                          aria-label="Editar usu√°rio"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
@@ -688,7 +688,7 @@ export default function UsuariosPage() {
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Editar usu·rio
+                Editar usu√°rio
               </p>
               <p className="mt-1 text-lg font-semibold text-slate-900">
                 {getDisplayName(editingUser)}
@@ -697,7 +697,7 @@ export default function UsuariosPage() {
             </div>
             <div className="mt-4">
               <label className="text-xs font-semibold text-slate-600">
-                FunÁ„o
+                Fun√ß√£o
                 <select
                   value={editingRole}
                   onChange={(event) => {
