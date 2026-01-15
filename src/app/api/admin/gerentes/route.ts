@@ -14,6 +14,15 @@ type Payload = {
   access?: GerenteAccessInput[];
 };
 
+type GerenteAccessRow = {
+  scope: "gerente";
+  user_id: string | null;
+  email: string | null;
+  loja_id: string;
+  prestador_id: string | null;
+  can_view_all: boolean;
+};
+
 const ADMIN_MODULES = ["admin", "documentos", "dashboards", "perfil"];
 
 const sanitizeId = (value: string) => value.replace(/[^a-zA-Z0-9-]/g, "");
@@ -183,10 +192,10 @@ export async function POST(request: Request) {
     }
 
     const accessList = body.access ?? [];
-    const rows = accessList.flatMap((access) => {
+    const rows: GerenteAccessRow[] = accessList.flatMap((access) => {
       const lojaId = sanitizeId(access.lojaId ?? "");
       if (!lojaId) {
-        return [];
+        return [] as GerenteAccessRow[];
       }
       if (access.canViewAll) {
         return [
@@ -202,7 +211,7 @@ export async function POST(request: Request) {
       }
 
       const prestadores = normalizeIds(access.prestadorIds ?? []);
-      return prestadores.map((prestadorId) => ({
+      return prestadores.map((prestadorId): GerenteAccessRow => ({
         scope: "gerente",
         user_id: userId || null,
         email: normalizedEmail || null,
