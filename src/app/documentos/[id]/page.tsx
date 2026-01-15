@@ -641,7 +641,7 @@ export default function AssinaturaDocumentoPage() {
             : 1;
         const larguraAssinatura = assinaturaImagem.width * escala;
         const alturaAssinatura = assinaturaImagem.height * escala;
-        const posicaoX = (width - larguraAssinatura) / 2;
+        const posicaoX = width - margem - larguraAssinatura;
         const posicaoY = margem;
 
         paginaAlvo.drawImage(assinaturaImagem, {
