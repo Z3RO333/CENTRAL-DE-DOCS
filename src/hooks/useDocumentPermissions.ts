@@ -76,22 +76,52 @@ export function useDocumentPermissions(
 
     setLoading(true);
     try {
-      const { data, error: queryError } = await supabase
+      let { data, error: queryError } = await supabase
         .from("documentos_acesso")
         .select("id,user_id,email,modulo,created_at")
+        .eq("scope", "admin")
         .order("created_at", { ascending: false });
 
       if (queryError) {
-        if (queryError.message?.toLowerCase().includes("modulo")) {
+        if (queryError.message?.toLowerCase().includes("scope")) {
+          const fallbackWithoutScope = await supabase
+            .from("documentos_acesso")
+            .select("id,user_id,email,modulo,created_at")
+            .order("created_at", { ascending: false });
+          data = fallbackWithoutScope.data;
+          queryError = fallbackWithoutScope.error;
+        }
+        if (queryError && queryError.message?.toLowerCase().includes("modulo")) {
           const {
             data: fallbackData,
             error: fallbackError,
           } = await supabase
             .from("documentos_acesso")
             .select("id,user_id,email,created_at")
+            .eq("scope", "admin")
             .order("created_at", { ascending: false });
 
           if (fallbackError) {
+            if (fallbackError.message?.toLowerCase().includes("scope")) {
+              const scopeFallback = await supabase
+                .from("documentos_acesso")
+                .select("id,user_id,email,created_at")
+                .order("created_at", { ascending: false });
+              if (scopeFallback.error) {
+                throw scopeFallback.error;
+              }
+              setPermissions(
+                scopeFallback.data?.map((item) => ({
+                  id: item.id as string,
+                  user_id: item.user_id as string | null,
+                  email: item.email as string | null,
+                  module: "admin",
+                  created_at: item.created_at as string,
+                })) ?? [],
+              );
+              setError(null);
+              return;
+            }
             throw fallbackError;
           }
 
@@ -107,7 +137,9 @@ export function useDocumentPermissions(
           setError(null);
           return;
         }
-        throw queryError;
+        if (queryError) {
+          throw queryError;
+        }
       }
 
       setPermissions(

@@ -61,6 +61,7 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         return supabase
           .from("documentos_acesso")
           .select("id,modulo")
+          .eq("scope", "admin")
           .eq(column, value);
       };
 
@@ -71,6 +72,18 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         return supabase
           .from("documentos_acesso")
           .select("id")
+          .eq("scope", "admin")
+          .eq(column, value);
+      };
+
+      const selectGerenteAccess = async (
+        column: "user_id" | "email",
+        value: string,
+      ) => {
+        return supabase
+          .from("documentos_acesso")
+          .select("id")
+          .eq("scope", "gerente")
           .eq(column, value);
       };
 
@@ -106,6 +119,14 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
           })) ?? null;
         error = fallback.error;
       }
+      if (error && error.message?.toLowerCase().includes("scope")) {
+        const fallback = await supabase
+          .from("documentos_acesso")
+          .select("id,modulo")
+          .eq("user_id", user.id);
+        data = fallback.data ?? null;
+        error = fallback.error;
+      }
       if (error) {
         throw error;
       }
@@ -130,6 +151,14 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
             })) ?? null;
           emailError = fallback.error;
         }
+        if (emailError && emailError.message?.toLowerCase().includes("scope")) {
+          const fallback = await supabase
+            .from("documentos_acesso")
+            .select("id,modulo")
+            .eq("email", normalizedEmail);
+          emailData = fallback.data ?? null;
+          emailError = fallback.error;
+        }
         if (emailError) {
           throw emailError;
         }
@@ -137,16 +166,23 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
       }
 
       let isGerenteLoja = false;
-
-      if (!resolvedIsAdmin && normalizedEmail) {
-        const { data: lojaData, error: lojaError } = await supabase
-          .from("lojas")
-          .select("id,usuarios")
-          .contains("usuarios", [normalizedEmail]);
-        if (lojaError) {
-          console.error("Erro ao verificar lojas do usuário:", lojaError);
-        } else if ((lojaData ?? []).length > 0) {
+      if (!resolvedIsAdmin) {
+        const gerenteById = await selectGerenteAccess("user_id", user.id);
+        if (gerenteById.error?.message?.toLowerCase().includes("scope")) {
+          isGerenteLoja = false;
+        } else if (gerenteById.error) {
+          console.error("Erro ao verificar gerente por ID:", gerenteById.error);
+        } else if ((gerenteById.data ?? []).length > 0) {
           isGerenteLoja = true;
+        } else if (normalizedEmail) {
+          const gerenteByEmail = await selectGerenteAccess("email", normalizedEmail);
+          if (gerenteByEmail.error?.message?.toLowerCase().includes("scope")) {
+            isGerenteLoja = false;
+          } else if (gerenteByEmail.error) {
+            console.error("Erro ao verificar gerente por e-mail:", gerenteByEmail.error);
+          } else if ((gerenteByEmail.data ?? []).length > 0) {
+            isGerenteLoja = true;
+          }
         }
       }
 
@@ -202,3 +238,4 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
     refresh: fetchAccess,
   };
 }
+

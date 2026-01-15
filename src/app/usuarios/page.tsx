@@ -1,4 +1,4 @@
-Ôªø"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -10,6 +10,7 @@ import {
   type DocumentPermission,
 } from "@/hooks/useDocumentPermissions";
 import { useLojas } from "@/hooks/useLojas";
+import { usePrestadores } from "@/hooks/usePrestadores";
 import { supabase } from "@/lib/supabaseClient";
 
 const ADMIN_MODULES = new Set(["admin", "documentos", "dashboards", "perfil"]);
@@ -23,6 +24,20 @@ type AppUser = {
   phone: string | null;
 };
 
+type GerenteAccessEntry = {
+  id: string;
+  user_id: string | null;
+  email: string | null;
+  loja_id: string | null;
+  prestador_id: string | null;
+  can_view_all: boolean | null;
+};
+
+type LojaAccessConfig = {
+  canViewAll: boolean;
+  prestadorIds: string[];
+};
+
 const PAGE_SIZES = [10, 20, 50];
 
 const normalizeText = (value: string | null) =>
@@ -30,11 +45,11 @@ const normalizeText = (value: string | null) =>
 
 const getNameFromEmail = (email: string | null) => {
   if (!email) {
-    return "Usu√°rio";
+    return "Usu·rio";
   }
   const handle = email.split("@")[0] ?? "";
   if (!handle) {
-    return "Usu√°rio";
+    return "Usu·rio";
   }
   return handle
     .split(/[._-]+/)
@@ -60,7 +75,12 @@ export default function UsuariosPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
   const { isAdmin, loading: accessLoading } = useDocumentsAccess();
-  const { lojas, updateLoja } = useLojas({ enabled: isAdmin });
+  const { lojas } = useLojas({ enabled: isAdmin });
+  const {
+    prestadores,
+    loading: prestadoresLoading,
+    error: prestadoresError,
+  } = usePrestadores({ enabled: isAdmin });
   const {
     permissions,
     loading: permissionsLoading,
@@ -78,22 +98,39 @@ export default function UsuariosPage() {
   const [editingRole, setEditingRole] = useState<
     "admin" | "colaborador" | "gerente_loja"
   >("colaborador");
-  const [editingLojaId, setEditingLojaId] = useState<string>("");
+  const [selectedLojas, setSelectedLojas] = useState<string[]>([]);
+  const [lojaAccess, setLojaAccess] = useState<Record<string, LojaAccessConfig>>(
+    {},
+  );
   const [savingRole, setSavingRole] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [gerenteEntries, setGerenteEntries] = useState<GerenteAccessEntry[]>([]);
+  const [gerenteEntriesLoading, setGerenteEntriesLoading] = useState(false);
+  const [gerenteEntriesError, setGerenteEntriesError] = useState<string | null>(
+    null,
+  );
 
   const adminPermissions = useMemo(
     () => permissions.filter((permission) => ADMIN_MODULES.has(permission.module)),
     [permissions],
   );
+  const gerenteIds = useMemo(
+    () =>
+      new Set(
+        gerenteEntries
+          .map((entry) => entry.user_id)
+          .filter((value): value is string => Boolean(value)),
+      ),
+    [gerenteEntries],
+  );
   const gerenteEmails = useMemo(
     () =>
       new Set(
-        lojas.flatMap((loja) =>
-          loja.usuarios.map((email) => email.toLowerCase()),
-        ),
+        gerenteEntries
+          .map((entry) => entry.email?.toLowerCase())
+          .filter((value): value is string => Boolean(value)),
       ),
-    [lojas],
+    [gerenteEntries],
   );
 
   const isUserAdmin = useCallback(
@@ -111,12 +148,15 @@ export default function UsuariosPage() {
   const isUserGerente = useCallback(
     (target: AppUser) => {
       const normalizedEmail = target.email?.toLowerCase().trim() ?? null;
+      if (gerenteIds.has(target.id)) {
+        return true;
+      }
       if (!normalizedEmail) {
         return false;
       }
       return gerenteEmails.has(normalizedEmail);
     },
-    [gerenteEmails],
+    [gerenteEmails, gerenteIds],
   );
 
   const getUserRole = useCallback(
@@ -144,6 +184,202 @@ export default function UsuariosPage() {
     [adminPermissions],
   );
 
+  const getAccessToken = useCallback(async () => {
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+    if (sessionError) {
+      throw sessionError;
+    }
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      throw new Error("Sessao expirada. Faca login novamente.");
+    }
+    return token;
+  }, []);
+
+  const fetchGerenteEntries = useCallback(async () => {
+    if (!isAdmin) {
+      setGerenteEntries([]);
+      setGerenteEntriesLoading(false);
+      setGerenteEntriesError(null);
+      return;
+    }
+    setGerenteEntriesLoading(true);
+    setGerenteEntriesError(null);
+    try {
+      const token = await getAccessToken();
+      const response = await fetch("/api/admin/gerentes", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = (await response.json()) as {
+        entries?: GerenteAccessEntry[];
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Falha ao carregar gerentes.");
+      }
+      setGerenteEntries(payload.entries ?? []);
+    } catch (err) {
+      setGerenteEntries([]);
+      setGerenteEntriesError(
+        err instanceof Error ? err.message : "Falha ao carregar gerentes.",
+      );
+    } finally {
+      setGerenteEntriesLoading(false);
+    }
+  }, [getAccessToken, isAdmin]);
+
+  const getGerenteEntriesForUser = useCallback(
+    (target: AppUser) => {
+      const normalizedEmail = target.email?.toLowerCase().trim() ?? null;
+      return gerenteEntries.filter((entry) => {
+        const sameId = entry.user_id && entry.user_id === target.id;
+        const sameEmail =
+          normalizedEmail &&
+          entry.email?.toLowerCase().trim() === normalizedEmail;
+        return sameId || sameEmail;
+      });
+    },
+    [gerenteEntries],
+  );
+
+  const buildLojaAccessFromEntries = useCallback(
+    (entries: GerenteAccessEntry[]) => {
+      const access: Record<string, LojaAccessConfig> = {};
+      entries.forEach((entry) => {
+        const lojaId = entry.loja_id ?? "";
+        if (!lojaId) {
+          return;
+        }
+        const current = access[lojaId] ?? {
+          canViewAll: false,
+          prestadorIds: [],
+        };
+        if (entry.can_view_all) {
+          access[lojaId] = { canViewAll: true, prestadorIds: [] };
+          return;
+        }
+        if (current.canViewAll) {
+          return;
+        }
+        if (entry.prestador_id) {
+          current.prestadorIds.push(entry.prestador_id);
+          access[lojaId] = current;
+        }
+      });
+
+      Object.keys(access).forEach((lojaId) => {
+        access[lojaId] = {
+          ...access[lojaId],
+          prestadorIds: Array.from(new Set(access[lojaId].prestadorIds)),
+        };
+      });
+
+      return {
+        selected: Object.keys(access),
+        access,
+      };
+    },
+    [],
+  );
+
+  const saveGerenteAccess = useCallback(
+    async (
+      target: AppUser,
+      access: {
+        lojaId: string;
+        canViewAll: boolean;
+        prestadorIds: string[];
+      }[],
+    ) => {
+      const token = await getAccessToken();
+      const payload: {
+        email?: string;
+        userId?: string;
+        access: {
+          lojaId: string;
+          canViewAll: boolean;
+          prestadorIds: string[];
+        }[];
+      } = { access };
+
+      if (target.email) {
+        payload.email = target.email;
+      }
+      if (target.id) {
+        payload.userId = target.id;
+      }
+
+      const response = await fetch("/api/admin/gerentes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(result.error ?? "Falha ao atualizar gerentes.");
+      }
+    },
+    [getAccessToken],
+  );
+  const toggleLojaSelection = useCallback((lojaId: string, enabled: boolean) => {
+    setSelectedLojas((prev) => {
+      if (enabled) {
+        return prev.includes(lojaId) ? prev : [...prev, lojaId];
+      }
+      return prev.filter((id) => id !== lojaId);
+    });
+    setLojaAccess((prev) => {
+      const next = { ...prev };
+      if (enabled) {
+        if (!next[lojaId]) {
+          next[lojaId] = { canViewAll: true, prestadorIds: [] };
+        }
+      } else {
+        delete next[lojaId];
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleLojaViewAll = useCallback((lojaId: string, enabled: boolean) => {
+    setLojaAccess((prev) => {
+      const current = prev[lojaId] ?? { canViewAll: true, prestadorIds: [] };
+      return {
+        ...prev,
+        [lojaId]: {
+          canViewAll: enabled,
+          prestadorIds: enabled ? [] : current.prestadorIds,
+        },
+      };
+    });
+  }, []);
+
+  const togglePrestadorForLoja = useCallback(
+    (lojaId: string, prestadorId: string, enabled: boolean) => {
+      setLojaAccess((prev) => {
+        const current = prev[lojaId] ?? { canViewAll: false, prestadorIds: [] };
+        const nextPrestadores = enabled
+          ? Array.from(new Set([...current.prestadorIds, prestadorId]))
+          : current.prestadorIds.filter((id) => id !== prestadorId);
+        return {
+          ...prev,
+          [lojaId]: {
+            canViewAll: false,
+            prestadorIds: nextPrestadores,
+          },
+        };
+      });
+    },
+    [],
+  );
+
   const fetchUsers = useCallback(async () => {
     setUsersLoading(true);
     setUsersError(null);
@@ -155,7 +391,7 @@ export default function UsuariosPage() {
       }
       const token = sessionData.session?.access_token;
       if (!token) {
-        throw new Error("Sess√£o expirada. Fa√ßa login novamente.");
+        throw new Error("Sess„o expirada. FaÁa login novamente.");
       }
       const response = await fetch("/api/admin/users", {
         headers: {
@@ -167,13 +403,13 @@ export default function UsuariosPage() {
         error?: string;
       };
       if (!response.ok) {
-        throw new Error(payload.error ?? "Falha ao carregar usu√°rios.");
+        throw new Error(payload.error ?? "Falha ao carregar usu·rios.");
       }
       setUsers(payload.users ?? []);
     } catch (err) {
       setUsers([]);
       setUsersError(
-        err instanceof Error ? err.message : "Falha ao carregar usu√°rios.",
+        err instanceof Error ? err.message : "Falha ao carregar usu·rios.",
       );
     } finally {
       setUsersLoading(false);
@@ -196,8 +432,9 @@ export default function UsuariosPage() {
   useEffect(() => {
     if (!authLoading && !accessLoading && isAdmin) {
       void fetchUsers();
+      void fetchGerenteEntries();
     }
-  }, [authLoading, accessLoading, isAdmin, fetchUsers]);
+  }, [authLoading, accessLoading, isAdmin, fetchUsers, fetchGerenteEntries]);
 
   const filteredUsers = useMemo(() => {
     if (!searchTerm.trim()) {
@@ -220,20 +457,22 @@ export default function UsuariosPage() {
     (target: AppUser) => {
       const admin = isUserAdmin(target);
       const gerente = isUserGerente(target);
-      const gerenteLoja =
-        gerente && target.email
-          ? lojas.find((loja) =>
-              loja.usuarios
-                .map((email) => email.toLowerCase())
-                .includes(target.email!.toLowerCase()),
-            ) ?? null
-          : null;
+      const gerenteEntriesForUser = gerente
+        ? getGerenteEntriesForUser(target)
+        : [];
+      const gerenteConfig = buildLojaAccessFromEntries(gerenteEntriesForUser);
       setEditingUser(target);
       setEditingRole(admin ? "admin" : gerente ? "gerente_loja" : "colaborador");
-      setEditingLojaId(gerenteLoja?.id ?? "");
+      setSelectedLojas(gerenteConfig.selected);
+      setLojaAccess(gerenteConfig.access);
       setFeedback(null);
     },
-    [isUserAdmin, isUserGerente, lojas],
+    [
+      buildLojaAccessFromEntries,
+      getGerenteEntriesForUser,
+      isUserAdmin,
+      isUserGerente,
+    ],
   );
 
   const handleSaveRole = useCallback(async () => {
@@ -243,13 +482,6 @@ export default function UsuariosPage() {
     setSavingRole(true);
     setFeedback(null);
     try {
-      const normalizedEmail = editingUser.email?.toLowerCase().trim() ?? "";
-      if (editingRole === "gerente_loja" && !editingLojaId) {
-        throw new Error("Selecione a loja do gerente.");
-      }
-      if (editingRole === "gerente_loja" && !normalizedEmail) {
-        throw new Error("Informe o e-mail do usu√°rio para virar gerente.");
-      }
       const admin = isUserAdmin(editingUser);
       if (editingRole === "admin" && !admin) {
         await grantPermission({
@@ -263,57 +495,42 @@ export default function UsuariosPage() {
         await Promise.all(entries.map((entry) => revokePermission(entry.id)));
       }
 
-      if (normalizedEmail) {
-        if (editingRole === "gerente_loja") {
-          await Promise.all(
-            lojas.map((loja) => {
-              const hasEmail = loja.usuarios
-                .map((email) => email.toLowerCase())
-                .includes(normalizedEmail);
-              if (loja.id === editingLojaId && !hasEmail) {
-                return updateLoja({
-                  id: loja.id,
-                  usuarios: [...loja.usuarios, normalizedEmail],
-                });
-              }
-              if (loja.id !== editingLojaId && hasEmail) {
-                return updateLoja({
-                  id: loja.id,
-                  usuarios: loja.usuarios.filter(
-                    (email) => email.toLowerCase() !== normalizedEmail,
-                  ),
-                });
-              }
-              return Promise.resolve(null);
-            }),
-          );
-        } else {
-          await Promise.all(
-            lojas.map((loja) => {
-              if (
-                loja.usuarios
-                  .map((email) => email.toLowerCase())
-                  .includes(normalizedEmail)
-              ) {
-                return updateLoja({
-                  id: loja.id,
-                  usuarios: loja.usuarios.filter(
-                    (email) => email.toLowerCase() !== normalizedEmail,
-                  ),
-                });
-              }
-              return Promise.resolve(null);
-            }),
-          );
+      if (editingRole === "gerente_loja") {
+        if (selectedLojas.length === 0) {
+          throw new Error("Selecione ao menos uma loja para o gerente.");
         }
+
+        const accessList = selectedLojas.map((lojaId) => {
+          const config = lojaAccess[lojaId] ?? {
+            canViewAll: true,
+            prestadorIds: [],
+          };
+          if (!config.canViewAll && config.prestadorIds.length === 0) {
+            throw new Error(
+              "Selecione prestadores ou habilite o acesso total da loja.",
+            );
+          }
+          return {
+            lojaId,
+            canViewAll: config.canViewAll,
+            prestadorIds: config.prestadorIds,
+          };
+        });
+
+        await saveGerenteAccess(editingUser, accessList);
+      } else if (isUserGerente(editingUser)) {
+        await saveGerenteAccess(editingUser, []);
       }
 
       await refreshPermissions();
+      await fetchGerenteEntries();
       setEditingUser(null);
-      setFeedback("Fun√ß√£o atualizada com sucesso.");
+      setFeedback("Funcao atualizada com sucesso.");
     } catch (err) {
       setFeedback(
-        err instanceof Error ? err.message : "Falha ao atualizar a fun√ß√£o.",
+        err instanceof Error
+          ? err.message
+          : "Falha ao atualizar a funcao.",
       );
     } finally {
       setSavingRole(false);
@@ -321,20 +538,22 @@ export default function UsuariosPage() {
   }, [
     editingUser,
     editingRole,
-    editingLojaId,
+    fetchGerenteEntries,
     getAdminEntriesForUser,
     grantPermission,
     isUserAdmin,
-    lojas,
+    isUserGerente,
+    lojaAccess,
     refreshPermissions,
     revokePermission,
-    updateLoja,
+    saveGerenteAccess,
+    selectedLojas,
   ]);
 
   if (authLoading || accessLoading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
-        Carregando usu√°rios...
+        Carregando usu·rios...
       </div>
     );
   }
@@ -351,17 +570,17 @@ export default function UsuariosPage() {
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6">
       <header>
         <h1 className="text-2xl font-semibold text-slate-900">
-          Gerenciamento de usu√°rios
+          Gerenciamento de usu·rios
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Aqui voc√™ pode gerenciar os usu√°rios da aplica√ß√£o. Altere as fun√ß√µes
-          e permiss√µes de cada usu√°rio.
+          Aqui vocÍ pode gerenciar os usu·rios da aplicaÁ„o. Altere as funÁıes
+          e permissıes de cada usu·rio.
         </p>
       </header>
 
-      {(usersError || permissionsError || feedback) && (
+      {(usersError || permissionsError || gerenteEntriesError || prestadoresError || feedback) && (
         <div className="rounded-2xl bg-red-50 px-4 py-3 text-xs text-red-700">
-          {usersError || permissionsError || feedback}
+          {usersError || permissionsError || gerenteEntriesError || prestadoresError || feedback}
         </div>
       )}
 
@@ -404,22 +623,22 @@ export default function UsuariosPage() {
               <tr>
                 <th className="px-5 py-3 text-left">Nome</th>
                 <th className="px-5 py-3 text-left">E-mail</th>
-                <th className="px-5 py-3 text-left">Fun√ß√£o</th>
+                <th className="px-5 py-3 text-left">FunÁ„o</th>
                 <th className="px-5 py-3 text-left">Status</th>
                 <th className="px-5 py-3 text-right"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {usersLoading || permissionsLoading ? (
+              {usersLoading || permissionsLoading || gerenteEntriesLoading ? (
                 <tr>
                   <td className="px-5 py-6 text-center text-slate-500" colSpan={5}>
-                    Carregando usu√°rios...
+                    Carregando usu·rios...
                   </td>
                 </tr>
               ) : visibleUsers.length === 0 ? (
                 <tr>
                   <td className="px-5 py-6 text-center text-slate-500" colSpan={5}>
-                    Nenhum usu√°rio encontrado.
+                    Nenhum usu·rio encontrado.
                   </td>
                 </tr>
               ) : (
@@ -450,7 +669,7 @@ export default function UsuariosPage() {
                           onClick={() => openEditor(entry)}
                           disabled={!entry.email}
                           className="rounded-full border border-slate-200 p-2 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          aria-label="Editar usu√°rio"
+                          aria-label="Editar usu·rio"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
@@ -469,7 +688,7 @@ export default function UsuariosPage() {
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Editar usu√°rio
+                Editar usu·rio
               </p>
               <p className="mt-1 text-lg font-semibold text-slate-900">
                 {getDisplayName(editingUser)}
@@ -478,7 +697,7 @@ export default function UsuariosPage() {
             </div>
             <div className="mt-4">
               <label className="text-xs font-semibold text-slate-600">
-                Fun√ß√£o
+                FunÁ„o
                 <select
                   value={editingRole}
                   onChange={(event) => {
@@ -488,7 +707,8 @@ export default function UsuariosPage() {
                       | "gerente_loja";
                     setEditingRole(value);
                     if (value !== "gerente_loja") {
-                      setEditingLojaId("");
+                      setSelectedLojas([]);
+                      setLojaAccess({});
                     }
                   }}
                   className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
@@ -500,31 +720,118 @@ export default function UsuariosPage() {
               </label>
               <p className="mt-2 text-[11px] text-slate-500">
                 Administradores veem todas as telas. Colaboradores veem apenas os
-                documentos do grupo vinculado ao e-mail. Gerentes veem os
-                documentos da sua loja.
+                documentos do grupo vinculado ao e-mail. Gerentes veem apenas os
+                documentos das lojas autorizadas e, se configurado, apenas dos
+                prestadores selecionados.
               </p>
               {editingRole === "gerente_loja" && (
-                <label className="mt-4 block text-xs font-semibold text-slate-600">
-                  Loja
-                  <select
-                    value={editingLojaId}
-                    onChange={(event) => setEditingLojaId(event.target.value)}
-                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
-                  >
-                    <option value="">Selecione uma loja</option>
-                    {lojas.map((loja) => (
-                      <option key={loja.id} value={loja.id}>
-                        {loja.nome}
-                        {loja.codigo ? ` - ${loja.codigo}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  {lojas.length === 0 && (
+                <div className="mt-4 space-y-3">
+                  <p className="text-xs font-semibold text-slate-600">Lojas</p>
+                  {lojas.length === 0 ? (
                     <span className="mt-2 block text-[11px] font-normal text-slate-500">
                       Cadastre uma loja antes de atribuir o gerente.
                     </span>
+                  ) : (
+                    <div className="grid gap-2">
+                      {lojas.map((loja) => {
+                        const checked = selectedLojas.includes(loja.id);
+                        return (
+                          <label
+                            key={loja.id}
+                            className="flex items-center gap-2 text-xs text-slate-600"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(event) =>
+                                toggleLojaSelection(loja.id, event.target.checked)
+                              }
+                              className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                            />
+                            <span>
+                              {loja.nome}
+                              {loja.codigo ? ` - ${loja.codigo}` : ""}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   )}
-                </label>
+
+                  {selectedLojas.map((lojaId) => {
+                    const loja = lojas.find((item) => item.id === lojaId);
+                    const config = lojaAccess[lojaId] ?? {
+                      canViewAll: true,
+                      prestadorIds: [],
+                    };
+
+                    return (
+                      <div
+                        key={lojaId}
+                        className="rounded-2xl border border-slate-200 p-3 text-xs text-slate-600"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-slate-700">
+                            {loja?.nome ?? "Loja"}
+                          </span>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={config.canViewAll}
+                              onChange={(event) =>
+                                toggleLojaViewAll(lojaId, event.target.checked)
+                              }
+                              className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                            />
+                            Ver todos os prestadores
+                          </label>
+                        </div>
+
+                        {!config.canViewAll && (
+                          <div className="mt-3 space-y-2">
+                            {prestadoresLoading ? (
+                              <span className="text-[11px] text-slate-500">
+                                Carregando prestadores...
+                              </span>
+                            ) : prestadores.length === 0 ? (
+                              <span className="text-[11px] text-slate-500">
+                                Nenhum prestador cadastrado.
+                              </span>
+                            ) : (
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                {prestadores.map((prestador) => {
+                                  const checked = config.prestadorIds.includes(
+                                    prestador.id,
+                                  );
+                                  return (
+                                    <label
+                                      key={prestador.id}
+                                      className="flex items-center gap-2 text-[11px] text-slate-600"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={(event) =>
+                                          togglePrestadorForLoja(
+                                            lojaId,
+                                            prestador.id,
+                                            event.target.checked,
+                                          )
+                                        }
+                                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                      />
+                                      <span>{prestador.nome}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
             <div className="mt-6 flex justify-end gap-2 text-xs">
@@ -550,6 +857,15 @@ export default function UsuariosPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
 
 
 

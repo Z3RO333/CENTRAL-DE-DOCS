@@ -61,6 +61,7 @@ export async function GET(request: Request) {
         .from("documentos_acesso")
         .select("id")
         .eq("user_id", requesterId)
+        .eq("scope", "admin")
         .in("modulo", adminModules)
         .limit(1)
         .maybeSingle();
@@ -76,6 +77,7 @@ export async function GET(request: Request) {
           .from("documentos_acesso")
           .select("id")
           .eq("email", requesterEmail)
+          .eq("scope", "admin")
           .in("modulo", adminModules)
           .limit(1)
           .maybeSingle();

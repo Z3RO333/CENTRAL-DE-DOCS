@@ -78,6 +78,7 @@ async function hasDocumentosAccess(
     .from("documentos_acesso")
     .select("id")
     .eq("user_id", userId)
+    .eq("scope", "admin")
     .in("modulo", adminModules)
     .limit(1)
     .maybeSingle();
@@ -101,6 +102,7 @@ async function hasDocumentosAccess(
     .from("documentos_acesso")
     .select("id")
     .eq("email", email)
+    .eq("scope", "admin")
     .in("modulo", adminModules)
     .limit(1)
     .maybeSingle();
@@ -136,29 +138,59 @@ async function getAuthorizedPrestadorIds(
     .map((item) => item.id);
 }
 
-async function getAuthorizedLojaIds(
+type GerenteAccessRow = {
+  loja_id: string | null;
+  prestador_id: string | null;
+  can_view_all: boolean | null;
+};
+
+async function getGerenteAccessEntries(
+  userId: string,
   email: string | null,
   supabaseAdmin = createSupabaseAdminClient(),
 ) {
-  if (!email) {
-    return [];
+  const entries: GerenteAccessRow[] = [];
+
+  const { data: byId, error: byIdError } = await supabaseAdmin
+    .from("documentos_acesso")
+    .select("loja_id,prestador_id,can_view_all")
+    .eq("scope", "gerente")
+    .eq("user_id", userId);
+
+  if (byIdError) {
+    throw byIdError;
   }
-  const { data, error } = await supabaseAdmin
-    .from("lojas")
-    .select("id,usuarios")
-    .contains("usuarios", [email]);
-  if (error) {
-    throw error;
+  if (byId) {
+    entries.push(...(byId as GerenteAccessRow[]));
   }
-  return (
-    data?.map((item) => ({
-      id: item.id as string,
-      usuarios: (item.usuarios as string[] | null) ?? [],
-    })) ?? []
-  )
-    .filter((item) => item.usuarios.some((usuario) => usuario === email))
-    .map((item) => item.id);
+
+  if (email) {
+    const { data: byEmail, error: byEmailError } = await supabaseAdmin
+      .from("documentos_acesso")
+      .select("loja_id,prestador_id,can_view_all")
+      .eq("scope", "gerente")
+      .eq("email", email);
+
+    if (byEmailError) {
+      throw byEmailError;
+    }
+    if (byEmail) {
+      entries.push(...(byEmail as GerenteAccessRow[]));
+    }
+  }
+
+  const unique = new Map<string, GerenteAccessRow>();
+  entries.forEach((entry) => {
+    const key = `${entry.loja_id ?? ""}:${entry.prestador_id ?? ""}:${entry.can_view_all ? "1" : "0"}`;
+    unique.set(key, entry);
+  });
+  return Array.from(unique.values());
 }
+
+const sanitizeId = (value: string) => value.replace(/[^a-zA-Z0-9-]/g, "");
+
+const normalizeIds = (values: string[]) =>
+  Array.from(new Set(values.map((value) => sanitizeId(value.trim())).filter(Boolean)));
 
 function mapRows(rows: FormularioRow[]): DocumentRecord[] {
   return rows.map((item) => ({
@@ -187,19 +219,27 @@ export async function GET(request: Request) {
       email,
       supabaseAdmin,
     );
-    const allowedLojas = await getAuthorizedLojaIds(email, supabaseAdmin);
+    const gerenteEntries = await getGerenteAccessEntries(
+      user.id,
+      email,
+      supabaseAdmin,
+    );
 
     const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
     const { searchParams } = new URL(request.url);
     const filterUserId = searchParams.get("userId");
-    const filterPrestadores = searchParams
-      .getAll("prestadorId")
-      .map((value) => value.trim())
-      .filter(Boolean);
-    const filterLojas = searchParams
-      .getAll("lojaId")
-      .map((value) => value.trim())
-      .filter(Boolean);
+    const filterPrestadores = normalizeIds(
+      searchParams
+        .getAll("prestadorId")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    );
+    const filterLojas = normalizeIds(
+      searchParams
+        .getAll("lojaId")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    );
     const tipoFilter = searchParams.get("tipo");
     const tipoLaudoFilter = searchParams.get("tipoLaudo");
     const statusFilter = searchParams.get("status");
@@ -216,15 +256,13 @@ export async function GET(request: Request) {
       ? Math.min(Math.max(limitParam, 1), 200)
       : null;
     const offset = Number.isFinite(offsetParam) ? Math.max(offsetParam, 0) : 0;
-    let prestadoresPermitidos = filterPrestadores;
-    let lojasPermitidas = filterLojas;
     let userFilter = filterUserId;
 
     const hasPrestadorAccess = allowedPrestadores.length > 0;
-    const hasLojaAccess = allowedLojas.length > 0;
+    const hasGerenteAccess = gerenteEntries.length > 0;
     const isSelfFilter = userFilter && userFilter === user.id;
 
-    if (!canAccess && !hasPrestadorAccess && !hasLojaAccess && !isSelfFilter) {
+    if (!canAccess && !hasPrestadorAccess && !hasGerenteAccess && !isSelfFilter) {
       throw new HttpError(
         403,
         "Voce nao possui permissao para remover este documento.",
@@ -243,36 +281,133 @@ export async function GET(request: Request) {
       query = query.eq("user_id", userFilter);
     }
 
-    if (!canAccess && hasPrestadorAccess) {
-      if (prestadoresPermitidos.length > 0) {
-        prestadoresPermitidos = prestadoresPermitidos.filter((id) =>
-          allowedPrestadores.includes(id),
-        );
-      } else {
-        prestadoresPermitidos = allowedPrestadores;
+    if (!canAccess) {
+      const accessOr: string[] = [];
+
+      if (hasPrestadorAccess) {
+        const allowedPrestadorSet = new Set(allowedPrestadores);
+        const prestadoresPermitidos =
+          filterPrestadores.length > 0
+            ? filterPrestadores.filter((id) => allowedPrestadorSet.has(id))
+            : allowedPrestadores;
+
+        if (filterPrestadores.length > 0 && prestadoresPermitidos.length === 0) {
+          throw new HttpError(
+            403,
+            "Voce nao possui permissao para consultar prestadores.",
+          );
+        }
+
+        if (prestadoresPermitidos.length === 1) {
+          accessOr.push(`prestador_id.eq.${prestadoresPermitidos[0]}`);
+        } else if (prestadoresPermitidos.length > 1) {
+          accessOr.push(
+            `prestador_id.in.(${prestadoresPermitidos.join(",")})`,
+          );
+        }
       }
-    }
 
-    if (!canAccess && hasLojaAccess) {
-      if (lojasPermitidas.length > 0) {
-        lojasPermitidas = lojasPermitidas.filter((id) =>
-          allowedLojas.includes(id),
-        );
-      } else {
-        lojasPermitidas = allowedLojas;
+      if (hasGerenteAccess) {
+        const lojasAll = new Set<string>();
+        const lojasLimited = new Map<string, Set<string>>();
+
+        gerenteEntries.forEach((entry) => {
+          const lojaId = entry.loja_id ? sanitizeId(entry.loja_id) : "";
+          if (!lojaId) {
+            return;
+          }
+          if (entry.can_view_all) {
+            lojasAll.add(lojaId);
+            lojasLimited.delete(lojaId);
+            return;
+          }
+          if (!entry.prestador_id) {
+            return;
+          }
+          if (lojasAll.has(lojaId)) {
+            return;
+          }
+          const set = lojasLimited.get(lojaId) ?? new Set<string>();
+          set.add(sanitizeId(entry.prestador_id));
+          lojasLimited.set(lojaId, set);
+        });
+
+        const filterLojaSet = new Set(filterLojas);
+        const filterPrestadorSet = new Set(filterPrestadores);
+
+        const lojasAllList =
+          filterLojas.length > 0
+            ? Array.from(lojasAll).filter((id) => filterLojaSet.has(id))
+            : Array.from(lojasAll);
+
+        const lojasLimitedList =
+          filterLojas.length > 0
+            ? Array.from(lojasLimited.keys()).filter((id) =>
+                filterLojaSet.has(id),
+              )
+            : Array.from(lojasLimited.keys());
+
+        if (
+          filterLojas.length > 0 &&
+          lojasAllList.length === 0 &&
+          lojasLimitedList.length === 0
+        ) {
+          throw new HttpError(
+            403,
+            "Voce nao possui permissao para acessar essa loja.",
+          );
+        }
+
+        const buildCondition = (lojaId: string, prestadores?: string[]) => {
+          if (prestadores && prestadores.length > 0) {
+            if (prestadores.length === 1) {
+              return `and(dados->>loja_id.eq.${lojaId},prestador_id.eq.${prestadores[0]})`;
+            }
+            return `and(dados->>loja_id.eq.${lojaId},prestador_id.in.(${prestadores.join(",")}))`;
+          }
+          return `dados->>loja_id.eq.${lojaId}`;
+        };
+
+        lojasAllList.forEach((lojaId) => {
+          if (filterPrestadores.length > 0) {
+            accessOr.push(buildCondition(lojaId, filterPrestadores));
+          } else {
+            accessOr.push(buildCondition(lojaId));
+          }
+        });
+
+        lojasLimitedList.forEach((lojaId) => {
+          const allowedPrestadores = Array.from(lojasLimited.get(lojaId) ?? []);
+          const filteredPrestadores =
+            filterPrestadores.length > 0
+              ? allowedPrestadores.filter((id) => filterPrestadorSet.has(id))
+              : allowedPrestadores;
+
+          if (filteredPrestadores.length > 0) {
+            accessOr.push(buildCondition(lojaId, filteredPrestadores));
+          }
+        });
+
+        if (filterPrestadores.length > 0 && accessOr.length === 0) {
+          throw new HttpError(
+            403,
+            "Voce nao possui permissao para acessar esses documentos.",
+          );
+        }
       }
-    }
 
-    if (prestadoresPermitidos.length === 1) {
-      query = query.eq("prestador_id", prestadoresPermitidos[0]);
-    } else if (prestadoresPermitidos.length > 1) {
-      query = query.in("prestador_id", prestadoresPermitidos);
-    }
+      if (isSelfFilter) {
+        accessOr.push(`user_id.eq.${user.id}`);
+      }
 
-    if (lojasPermitidas.length === 1) {
-      query = query.eq("dados->>loja_id", lojasPermitidas[0]);
-    } else if (lojasPermitidas.length > 1) {
-      query = query.in("dados->>loja_id", lojasPermitidas);
+      if (accessOr.length === 0) {
+        throw new HttpError(
+          403,
+          "Voce nao possui permissao para acessar esses documentos.",
+        );
+      }
+
+      query = query.or(accessOr.join(","));
     }
 
     if (tipoFilter && tipoFilter !== "todos") {
@@ -364,10 +499,6 @@ export async function DELETE(request: Request) {
     const email = user.email?.toLowerCase().trim() ?? null;
     const supabaseAdmin = createSupabaseAdminClient();
     const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
-    const allowedPrestadores = await getAuthorizedPrestadorIds(
-      email,
-      supabaseAdmin,
-    );
 
     const { searchParams } = new URL(request.url);
     const ids = searchParams.getAll("id").map((value) => value.trim());

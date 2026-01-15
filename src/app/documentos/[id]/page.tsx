@@ -82,6 +82,44 @@ async function getSignedFileUrl(
   return data.signedUrl;
 }
 
+type SignatureFormat = "png" | "jpg";
+
+const normalizeSignatureDataUrl = async (
+  dataUrl: string,
+): Promise<{ dataUrl: string; format: SignatureFormat }> => {
+  if (dataUrl.includes("image/png")) {
+    return { dataUrl, format: "png" };
+  }
+  if (dataUrl.includes("image/jpeg") || dataUrl.includes("image/jpg")) {
+    return { dataUrl, format: "jpg" };
+  }
+  if (dataUrl.includes("image/svg+xml")) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const width = img.naturalWidth || 800;
+        const height = img.naturalHeight || 300;
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Nao foi possivel processar a assinatura SVG."));
+          return;
+        }
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve({ dataUrl: canvas.toDataURL("image/png"), format: "png" });
+      };
+      img.onerror = () => {
+        reject(new Error("Nao foi possivel processar a assinatura SVG."));
+      };
+      img.src = dataUrl;
+    });
+  }
+  throw new Error("Formato de assinatura nao suportado.");
+};
+
 export default function AssinaturaDocumentoPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -529,11 +567,21 @@ export default function AssinaturaDocumentoPage() {
       const originalBuffer = await originalResponse.arrayBuffer();
       const pathLower = originalPath.toLowerCase();
       const contentLower = originalContentType.toLowerCase();
-      const documentoEhPdf =
-        contentLower.includes("pdf") || pathLower.endsWith(".pdf");
+      let pdfDoc: PDFDocument | null = null;
+      let documentoEhPdf = false;
+
+      try {
+        pdfDoc = await PDFDocument.load(originalBuffer);
+        documentoEhPdf = true;
+      } catch {
+        pdfDoc = null;
+        documentoEhPdf = false;
+      }
+
       const documentoEhImagem =
-        contentLower.startsWith("image/") ||
-        /\.(png|jpe?g|webp|gif)$/i.test(pathLower);
+        !documentoEhPdf &&
+        (contentLower.startsWith("image/") ||
+          /\.(png|jpe?g|webp|gif)$/i.test(pathLower));
 
       if (!documentoEhPdf && !documentoEhImagem) {
         resetSignProgress();
@@ -543,24 +591,24 @@ export default function AssinaturaDocumentoPage() {
         return;
       }
 
-      const assinaturaBytes = await fetch(assinaturaAtual).then((res) =>
+      const { dataUrl: assinaturaNormalizada, format: assinaturaFormato } =
+        await normalizeSignatureDataUrl(assinaturaAtual);
+      const assinaturaBytes = await fetch(assinaturaNormalizada).then((res) =>
         res.arrayBuffer(),
       );
 
-      const pdfDoc = documentoEhPdf
-        ? await PDFDocument.load(originalBuffer)
-        : await PDFDocument.create();
+      const resolvedPdfDoc = pdfDoc ?? (await PDFDocument.create());
 
       if (documentoEhImagem) {
         const imageIsPng =
           contentLower.includes("png") || pathLower.endsWith(".png");
         const embeddedImage = imageIsPng
-          ? await pdfDoc.embedPng(originalBuffer)
-          : await pdfDoc.embedJpg(originalBuffer);
+          ? await resolvedPdfDoc.embedPng(originalBuffer)
+          : await resolvedPdfDoc.embedJpg(originalBuffer);
         const assinaturaPadding = 180;
         const pageWidth = embeddedImage.width;
         const pageHeight = embeddedImage.height + assinaturaPadding;
-        const page = pdfDoc.addPage([pageWidth, pageHeight]);
+        const page = resolvedPdfDoc.addPage([pageWidth, pageHeight]);
         page.drawImage(embeddedImage, {
           x: 0,
           y: assinaturaPadding,
@@ -568,13 +616,14 @@ export default function AssinaturaDocumentoPage() {
           height: embeddedImage.height,
         });
       }
-      const assinaturaImagem = assinaturaAtual.includes("image/png")
-        ? await pdfDoc.embedPng(assinaturaBytes)
-        : await pdfDoc.embedJpg(assinaturaBytes);
+      const assinaturaImagem =
+        assinaturaFormato === "png"
+          ? await resolvedPdfDoc.embedPng(assinaturaBytes)
+          : await resolvedPdfDoc.embedJpg(assinaturaBytes);
 
-      const paginas = pdfDoc.getPages();
+      const paginas = resolvedPdfDoc.getPages();
       const margem = 40;
-      const fonte = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fonte = await resolvedPdfDoc.embedFont(StandardFonts.Helvetica);
       const textoAssinatura = `Assinado digitalmente por ${
         user.email ?? "usuário"
       } em ${new Date().toLocaleString("pt-BR")}`;
@@ -607,8 +656,8 @@ export default function AssinaturaDocumentoPage() {
         });
       });
 
-      const pdfBytes = await pdfDoc.save();
-      const pdfBlob = new Blob([pdfBytes.buffer as ArrayBuffer], {
+      const pdfBytes = await resolvedPdfDoc.save();
+      const pdfBlob = new Blob([pdfBytes], {
         type: "application/pdf",
       });
       const fileBasePath = `${user.id}/${registro.tipo}/assinados/${registro.id}-${Date.now()}`;
@@ -671,7 +720,7 @@ export default function AssinaturaDocumentoPage() {
     <section class="signature-section">
       <h2>Assinatura aplicada</h2>
       <div class="signature-box">
-        <img src="${assinaturaAtual}" alt="Assinatura aplicada" />
+        <img src="${assinaturaNormalizada}" alt="Assinatura aplicada" />
         <p class="signature-footer">Assinado por ${user.email ?? "usuário"} em ${new Date().toLocaleString("pt-BR")}</p>
       </div>
     </section>

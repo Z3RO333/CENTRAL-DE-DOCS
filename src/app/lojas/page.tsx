@@ -178,7 +178,7 @@ export default function LojasPage() {
             Gerenciamento de lojas
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Cadastre lojas e defina os gerentes responsáveis por cada unidade.
+            Cadastre lojas e mantenha os dados das unidades.
           </p>
         </div>
         <button
@@ -235,7 +235,7 @@ export default function LojasPage() {
               <tr>
                 <th className="px-5 py-3 text-left">Loja</th>
                 <th className="px-5 py-3 text-left">Código</th>
-                <th className="px-5 py-3 text-left">Gerentes</th>
+                <th className="px-5 py-3 text-left">Emails vinculados</th>
                 <th className="px-5 py-3 text-right"></th>
               </tr>
             </thead>
@@ -349,7 +349,7 @@ export default function LojasPage() {
                   />
                 </label>
                 <label className="text-xs font-semibold text-slate-600">
-                  Gerentes (e-mails)
+                  Emails vinculados
                   <textarea
                     value={formEmails}
                     onChange={(event) => setFormEmails(event.target.value)}
@@ -357,7 +357,7 @@ export default function LojasPage() {
                     placeholder="Ex.: gerente@empresa.com, outra@empresa.com"
                   />
                   <span className="text-[11px] text-slate-500">
-                    Os gerentes de loja só visualizarão documentos da própria
+                    A permissao de gerente e configurada em Usuarios.
                     loja.
                   </span>
                 </label>
@@ -390,3 +390,4 @@ export default function LojasPage() {
     </div>
   );
 }
+

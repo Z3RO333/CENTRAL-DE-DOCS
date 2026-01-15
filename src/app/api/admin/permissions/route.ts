@@ -51,6 +51,7 @@ async function getAuthorizedAdmin(accessToken: string) {
       .from("documentos_acesso")
       .select("id")
       .eq("user_id", requesterId)
+      .eq("scope", "admin")
       .in("modulo", ADMIN_MODULES)
       .limit(1)
       .maybeSingle();
@@ -66,6 +67,7 @@ async function getAuthorizedAdmin(accessToken: string) {
           .from("documentos_acesso")
           .select("id")
           .eq("email", requesterEmail)
+          .eq("scope", "admin")
         .in("modulo", ADMIN_MODULES)
         .limit(1)
         .maybeSingle();
@@ -164,6 +166,7 @@ export async function POST(request: Request) {
         email: normalizedEmail,
         modulo: body.module,
         user_id: resolvedUserId,
+        scope: "admin",
       };
 
       const { data, error: insertError } = await supabaseAdmin
