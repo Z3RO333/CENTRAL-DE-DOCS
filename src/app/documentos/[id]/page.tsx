@@ -1,4 +1,4 @@
-Ôªø"use client";
+"use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -29,7 +29,7 @@ type FormularioRecord = {
 };
 
 const tipoLabel: Record<string, string> = {
-  retencao_trabalhista: "Reten√ß√£o Trabalhista",
+  retencao_trabalhista: "RetenÁ„o Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
 };
@@ -76,7 +76,7 @@ async function getSignedFileUrl(
     .createSignedUrl(path, expiresIn);
 
   if (error || !data?.signedUrl) {
-    throw error ?? new Error("N√£o foi poss√≠vel gerar o link do arquivo.");
+    throw error ?? new Error("N„o foi possÌvel gerar o link do arquivo.");
   }
 
   return data.signedUrl;
@@ -169,7 +169,7 @@ export default function AssinaturaDocumentoPage() {
   const gerarLinkDoArquivoVisualizacao = useCallback(async () => {
     const path = getArquivoVisualizacaoPath();
     if (!path) {
-      setError("Arquivo indispon√≠vel no momento.");
+      setError("Arquivo indisponÌvel no momento.");
       return null;
     }
     try {
@@ -177,7 +177,7 @@ export default function AssinaturaDocumentoPage() {
       return signedUrl;
     } catch (err) {
       console.error("Erro ao gerar link do arquivo:", err);
-      setError("N√£o foi poss√≠vel gerar o link do arquivo. Tente novamente.");
+      setError("N„o foi possÌvel gerar o link do arquivo. Tente novamente.");
       return null;
     }
   }, [getArquivoVisualizacaoPath]);
@@ -192,7 +192,7 @@ export default function AssinaturaDocumentoPage() {
   const abrirEmNovaAba = useCallback(async () => {
     const path = getArquivoVisualizacaoPath();
     if (!path) {
-      setError("Arquivo indispon√≠vel no momento.");
+      setError("Arquivo indisponÌvel no momento.");
       return;
     }
 
@@ -213,7 +213,7 @@ export default function AssinaturaDocumentoPage() {
   const baixarArquivoAtual = useCallback(async () => {
     const path = getArquivoDownloadPath();
     if (!path) {
-      setError("Arquivo indispon√≠vel para download.");
+      setError("Arquivo indisponÌvel para download.");
       return;
     }
     const signedUrl = await getSignedFileUrl(path);
@@ -364,7 +364,7 @@ export default function AssinaturaDocumentoPage() {
           .single();
 
         if (fetchError || !data) {
-          throw new Error("Documento n√£o encontrado.");
+          throw new Error("Documento n„o encontrado.");
         }
 
         const record: FormularioRecord = {
@@ -406,7 +406,7 @@ export default function AssinaturaDocumentoPage() {
           setError(
             err instanceof Error
               ? err.message
-              : "N√£o foi poss√≠vel carregar o documento.",
+              : "N„o foi possÌvel carregar o documento.",
           );
           setRegistro(null);
         }
@@ -488,7 +488,7 @@ export default function AssinaturaDocumentoPage() {
       }
     };
     reader.onerror = () => {
-      setError("N√£o foi poss√≠vel ler o arquivo selecionado.");
+      setError("N„o foi possÌvel ler o arquivo selecionado.");
     };
     reader.readAsDataURL(file);
   };
@@ -528,7 +528,7 @@ export default function AssinaturaDocumentoPage() {
 
     try {
       if (!registro) {
-        setError("Documento n√£o encontrado.");
+        setError("Documento n„o encontrado.");
         return;
       }
 
@@ -548,7 +548,7 @@ export default function AssinaturaDocumentoPage() {
 
       const originalPath = getArquivoOriginalPath();
       if (!originalPath) {
-        setError("Arquivo original indispon√≠vel.");
+        setError("Arquivo original indisponÌvel.");
         return;
       }
 
@@ -558,7 +558,7 @@ export default function AssinaturaDocumentoPage() {
       const originalResponse = await fetch(signedOriginalUrl);
       if (!originalResponse.ok) {
         resetSignProgress();
-        setError("N√£o foi poss√≠vel baixar o documento original.");
+        setError("N„o foi possÌvel baixar o documento original.");
         return;
       }
 
@@ -625,7 +625,7 @@ export default function AssinaturaDocumentoPage() {
       const margem = 40;
       const fonte = await resolvedPdfDoc.embedFont(StandardFonts.Helvetica);
       const textoAssinatura = `Assinado digitalmente por ${
-        user.email ?? "usu√°rio"
+        user.email ?? "usu·rio"
       } em ${new Date().toLocaleString("pt-BR")}`;
 
       paginas.forEach((paginaAlvo) => {
@@ -681,79 +681,11 @@ export default function AssinaturaDocumentoPage() {
 
       const signedPdfPath = uploadData.path ?? pdfStoragePath;
 
-      const { data: pdfPublicData } = supabase.storage
-        .from("formularios")
-        .getPublicUrl(signedPdfPath);
-      const signedPdfPublicUrl = pdfPublicData?.publicUrl ?? null;
-
-      const htmlPath = `${fileBasePath}-view.html`;
-      const tipoDescricao = tipoLabel[registro.tipo] ?? registro.tipo;
-      const htmlContent = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <title>Documento assinado - ${registro.id}</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 32px; }
-    .wrapper { max-width: 960px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 32px; }
-    h1 { font-size: 22px; margin: 0 0 4px; }
-    .meta { font-size: 13px; color: #475569; margin-bottom: 24px; }
-    iframe { width: 100%; height: 640px; border: 1px solid #e2e8f0; border-radius: 12px; background: #1e293b08; }
-    .signature-section { margin-top: 32px; }
-    .signature-box { border: 1px dashed #94a3b8; padding: 24px; border-radius: 12px; background: #f1f5f9; text-align: center; }
-    .signature-box img { max-width: 100%; max-height: 230px; display: inline-block; }
-    .signature-footer { font-size: 13px; color: #475569; margin-top: 16px; }
-  </style>
-</head>
-<body>
-  <div class="wrapper">
-    <h1>Documento assinado</h1>
-    <p class="meta">${tipoDescricao}</p>
-    <section>
-      <h2>Arquivo assinado</h2>
-      ${
-        signedPdfPublicUrl
-          ? `<iframe src="${signedPdfPublicUrl}" title="Documento assinado"></iframe>`
-          : `<p style="font-size:13px;color:#ef4444;">N√£o foi poss√≠vel embutir o PDF assinado automaticamente. Fa√ßa o download pelo portal para visualizar.</p>`
-      }
-    </section>
-    <section class="signature-section">
-      <h2>Assinatura aplicada</h2>
-      <div class="signature-box">
-        <img src="${assinaturaNormalizada}" alt="Assinatura aplicada" />
-        <p class="signature-footer">Assinado por ${user.email ?? "usu√°rio"} em ${new Date().toLocaleString("pt-BR")}</p>
-      </div>
-    </section>
-  </div>
-</body>
-</html>`;
-
-      const htmlBlob = new Blob([htmlContent], { type: "text/html" });
-
-      const { data: htmlUploadData, error: htmlUploadError } =
-        await supabase.storage
-          .from("formularios")
-          .upload(htmlPath, htmlBlob, {
-            contentType: "text/html",
-          });
-
-      if (htmlUploadError || !htmlUploadData) {
-        resetSignProgress();
-        setError(
-          htmlUploadError?.message ||
-            "Erro ao criar a visualiza√ß√£o HTML do documento assinado.",
-        );
-        return;
-      }
-
-      const signedHtmlPath = htmlUploadData.path ?? htmlPath;
-
       const { error: updateError } = await supabase
         .from("formularios")
         .update({
           status: "assinado",
-          arquivo_assinado_path: signedHtmlPath,
+          arquivo_assinado_path: signedPdfPath,
           assinado_por: user.email ?? null,
         })
         .eq("id", registro.id);
@@ -769,14 +701,14 @@ export default function AssinaturaDocumentoPage() {
           ? {
               ...prev,
               status: "assinado",
-              arquivo_assinado_path: signedHtmlPath,
+              arquivo_assinado_path: signedPdfPath,
               assinado_por: user.email ?? null,
             }
           : prev,
       );
 
       try {
-        const signedUrl = await getSignedFileUrl(signedHtmlPath);
+        const signedUrl = await getSignedFileUrl(signedPdfPath);
         setPublicUrl(signedUrl);
       } catch (linkErr) {
         console.error("Erro ao gerar link do arquivo assinado:", linkErr);
@@ -784,16 +716,13 @@ export default function AssinaturaDocumentoPage() {
 
       completeSignProgress();
       setSuccess("Documento assinado enviado com sucesso!");
-      if (batchActive) {
-        const queueAfterSubmit = [...remainingAfterCurrent];
-        setTimeout(() => {
-          goToQueue(queueAfterSubmit);
-        }, 1200);
-      }
+      setTimeout(() => {
+        router.push("/documentos");
+      }, 1200);
     } catch (err) {
       console.error("Erro ao salvar documento assinado:", err);
       resetSignProgress();
-      setError("N√£o foi poss√≠vel salvar o documento assinado.");
+      setError("N„o foi possÌvel salvar o documento assinado.");
     } finally {
       setSaving(false);
     }
@@ -835,7 +764,7 @@ export default function AssinaturaDocumentoPage() {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-slate-300">
         <p className="text-slate-700">
-          {error ?? authError ?? "Documento n√£o encontrado."}
+          {error ?? authError ?? "Documento n„o encontrado."}
         </p>
         <button
           type="button"
@@ -886,7 +815,7 @@ export default function AssinaturaDocumentoPage() {
       {exibirInfosFormulario && (
         <div className="rounded-2xl bg-white/80 p-4 text-xs text-slate-600 shadow-sm shadow-slate-200">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Informa√ß√µes do formul√°rio
+            InformaÁıes do formul·rio
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {tipoLaudo && (
@@ -902,7 +831,7 @@ export default function AssinaturaDocumentoPage() {
             {observacoes && (
               <div className="sm:col-span-2">
                 <p className="text-[11px] font-semibold text-slate-500">
-                  Observa√ß√µes
+                  ObservaÁıes
                 </p>
                 <p className="text-sm text-slate-600">{observacoes}</p>
               </div>
@@ -924,7 +853,7 @@ export default function AssinaturaDocumentoPage() {
                 </p>
               ) : (
                 <p className="text-[11px] text-amber-600">
-                  Este documento n√£o estava na fila; selecione abaixo para
+                  Este documento n„o estava na fila; selecione abaixo para
                   reorganizar.
                 </p>
               )}
@@ -937,8 +866,8 @@ export default function AssinaturaDocumentoPage() {
                 className="rounded-full border border-slate-300 px-3 py-1 text-[11px] text-slate-700 transition hover:border-slate-400 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {remainingAfterCurrent.length === 0
-                  ? "Fila conclu√≠da"
-                  : "Ir para pr√≥ximo"}
+                  ? "Fila concluÌda"
+                  : "Ir para prÛximo"}
               </button>
               <button
                 type="button"
@@ -998,7 +927,7 @@ export default function AssinaturaDocumentoPage() {
             />
           </div>
           <p className="mt-2 text-[11px] text-slate-500">
-            Mantemos o documento aberto para revis√£o enquanto aplicamos sua
+            Mantemos o documento aberto para revis„o enquanto aplicamos sua
             assinatura.
           </p>
         </div>
@@ -1035,14 +964,14 @@ export default function AssinaturaDocumentoPage() {
                   onClick={() => void refreshPublicUrl()}
                   className="rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
                 >
-                  Atualizar visualiza√ß√£o
+                  Atualizar visualizaÁ„o
                 </button>
               </div>
             </>
           ) : (
             <p className="text-xs text-slate-500">
-              N√£o foi poss√≠vel gerar a visualiza√ß√£o do arquivo. Voc√™ ainda pode
-              baix√°-lo pela p√°gina de documentos.
+              N„o foi possÌvel gerar a visualizaÁ„o do arquivo. VocÍ ainda pode
+              baix·-lo pela p·gina de documentos.
             </p>
           )}
         </div>
@@ -1064,8 +993,8 @@ export default function AssinaturaDocumentoPage() {
                 />
                 <p className="text-[11px] text-slate-500">
                   {signatureSource === "upload"
-                    ? "Arquivo enviado nesta tela. Ele √© usado apenas neste documento."
-                    : "Assinatura vinda da aba Perfil. Atualize por l√° se precisar alterar permanentemente."}
+                    ? "Arquivo enviado nesta tela. Ele È usado apenas neste documento."
+                    : "Assinatura vinda da aba Perfil. Atualize por l· se precisar alterar permanentemente."}
                 </p>
                 <div className="flex flex-wrap justify-center gap-2 text-[11px]">
                   <button
@@ -1096,7 +1025,7 @@ export default function AssinaturaDocumentoPage() {
               <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-center">
                 <p>
                   Nenhuma assinatura carregada. Envie um arquivo abaixo ou abra a
-                  aba Perfil para criar uma assinatura padr√£o.
+                  aba Perfil para criar uma assinatura padr„o.
                 </p>
                 <button
                   type="button"
@@ -1110,7 +1039,7 @@ export default function AssinaturaDocumentoPage() {
                   <span className="font-mono text-slate-600">
                     signature-root
                   </span>{" "}
-                  para integra√ß√µes customizadas se voc√™ usar um script pr√≥prio.
+                  para integraÁıes customizadas se vocÍ usar um script prÛprio.
                 </p>
               </div>
             )}
@@ -1121,7 +1050,7 @@ export default function AssinaturaDocumentoPage() {
               Como deseja aplicar a assinatura?
             </p>
             <p>
-              Voc√™ pode escolher a assinatura salva no Perfil ou enviar um arquivo
+              VocÍ pode escolher a assinatura salva no Perfil ou enviar um arquivo
               (PNG, JPG ou SVG) exclusivo para este documento.
             </p>
             <div className="flex flex-wrap gap-2 text-[11px]">
@@ -1162,7 +1091,7 @@ export default function AssinaturaDocumentoPage() {
             )}
             {!storedSignature && (
               <p className="text-[10px] text-slate-500">
-                Sem assinatura no Perfil ainda. Use o bot√£o acima para criar uma
+                Sem assinatura no Perfil ainda. Use o bot„o acima para criar uma
                 antes ou carregue um arquivo manualmente.
               </p>
             )}
@@ -1174,17 +1103,17 @@ export default function AssinaturaDocumentoPage() {
                 Upload do arquivo assinado
               </p>
               <p className="text-[11px] text-slate-500">
-                Usaremos a assinatura exibida acima para gerar o arquivo que ser√°
-                enviado ao Supabase. Garanta que a pr√©-visualiza√ß√£o esteja correta
+                Usaremos a assinatura exibida acima para gerar o arquivo que ser·
+                enviado ao Supabase. Garanta que a prÈ-visualizaÁ„o esteja correta
                 antes de enviar.
               </p>
               {activeSignature ? (
                 <p className="text-[11px] text-emerald-700">
-                  Pronto! Uma assinatura est√° carregada para este documento.
+                  Pronto! Uma assinatura est· carregada para este documento.
                 </p>
               ) : (
                 <p className="text-[11px] text-red-600">
-                  Nenhuma assinatura ativa. Fa√ßa upload ou use a op√ß√£o do Perfil
+                  Nenhuma assinatura ativa. FaÁa upload ou use a opÁ„o do Perfil
                   antes de continuar.
                 </p>
               )}
@@ -1215,7 +1144,7 @@ export default function AssinaturaDocumentoPage() {
                 className="rounded-full bg-sky-500 px-4 py-1.5 text-[11px] font-semibold text-white shadow-md shadow-sky-300/80 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {registro.status === "assinado"
-                  ? "Documento j√° assinado"
+                  ? "Documento j· assinado"
                   : saving
                     ? "Salvando..."
                     : "Enviar documento assinado"}
@@ -1227,6 +1156,14 @@ export default function AssinaturaDocumentoPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
 
 
 
