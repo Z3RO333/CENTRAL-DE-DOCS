@@ -657,7 +657,11 @@ export default function AssinaturaDocumentoPage() {
       });
 
       const pdfBytes = await resolvedPdfDoc.save();
-      const pdfBlob = new Blob([pdfBytes], {
+      const pdfArrayBuffer = pdfBytes.buffer.slice(
+        pdfBytes.byteOffset,
+        pdfBytes.byteOffset + pdfBytes.byteLength,
+      );
+      const pdfBlob = new Blob([pdfArrayBuffer], {
         type: "application/pdf",
       });
       const fileBasePath = `${user.id}/${registro.tipo}/assinados/${registro.id}-${Date.now()}`;
