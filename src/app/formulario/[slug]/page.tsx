@@ -207,7 +207,8 @@ export default function FormularioPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading: authLoading } = useAuth();
-  const { isAdmin, loading: accessLoading } = useDocumentsAccess();
+  const { modules, loading: accessLoading } = useDocumentsAccess();
+  const canAccessFormularios = modules.documentos;
 
   const config = useMemo(
     () => FORM_CONFIGS.find((f) => f.slug === params.slug),
@@ -267,10 +268,10 @@ export default function FormularioPage() {
       return;
     }
 
-    if (!isAdmin) {
+    if (!canAccessFormularios) {
       router.replace("/documentos");
     }
-  }, [authLoading, accessLoading, user, router, isAdmin]);
+  }, [authLoading, accessLoading, user, router, canAccessFormularios]);
 
   useEffect(() => {
     if (config) {

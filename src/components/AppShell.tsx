@@ -65,7 +65,7 @@ export default function AppShell({
       label: "Formulários",
       icon: LayoutDashboard,
       isActive: pathname === "/dashboard",
-      isVisible: isAdmin,
+      isVisible: canAccessDocuments,
     },
     {
       href: "/documentos",
@@ -86,7 +86,7 @@ export default function AppShell({
       label: "Prestadores",
       icon: Building2,
       isActive: pathname?.startsWith("/prestadores"),
-      isVisible: canAccessDocuments,
+      isVisible: isAdmin,
     },
     {
       href: "/dashboard/analises",

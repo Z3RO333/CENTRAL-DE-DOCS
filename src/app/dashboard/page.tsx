@@ -120,7 +120,8 @@ const getLocalDateLabel = (date: Date) => {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading, error: authError } = useAuth();
-  const { isAdmin, loading: accessLoading } = useDocumentsAccess();
+  const { isAdmin, modules, loading: accessLoading } = useDocumentsAccess();
+  const canAccessFormularios = modules.documentos;
   const canViewAllDocuments = isAdmin;
   const {
     prestadores: prestadoresDoUsuario,
@@ -160,10 +161,10 @@ export default function DashboardPage() {
       router.replace("/login");
       return;
     }
-    if (!isLoading && user && !accessLoading && !isAdmin) {
+    if (!isLoading && user && !accessLoading && !canAccessFormularios) {
       router.replace("/documentos");
     }
-  }, [isLoading, user, router, accessLoading, isAdmin]);
+  }, [isLoading, user, router, accessLoading, canAccessFormularios]);
   const isBlocked = isLoading || !user;
   const baseCards = BASE_CARDS;
 
@@ -1033,7 +1034,6 @@ export default function DashboardPage() {
     </div>
   );
 }
-
 
 
 
