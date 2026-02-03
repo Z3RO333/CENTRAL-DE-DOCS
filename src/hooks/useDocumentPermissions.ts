@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 export type PermissionModule = "admin" | "documentos" | "dashboards" | "perfil";
@@ -41,9 +41,17 @@ export function useDocumentPermissions(
   options: UseDocumentPermissionsOptions = {},
 ): UseDocumentPermissionsResult {
   const { enabled = true } = options;
+  const isMountedRef = useRef(true);
   const [permissions, setPermissions] = useState<DocumentPermission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
   const getAccessToken = useCallback(async () => {
     const { data: sessionData, error: sessionError } =
       await supabase.auth.getSession();
@@ -68,13 +76,17 @@ export function useDocumentPermissions(
 
   const fetchPermissions = useCallback(async () => {
     if (!enabled) {
-      setPermissions([]);
-      setLoading(false);
-      setError(null);
+      if (isMountedRef.current) {
+        setPermissions([]);
+        setLoading(false);
+        setError(null);
+      }
       return;
     }
 
-    setLoading(true);
+    if (isMountedRef.current) {
+      setLoading(true);
+    }
     try {
       let { data, error: queryError } = await supabase
         .from("documentos_acesso")
@@ -110,31 +122,35 @@ export function useDocumentPermissions(
               if (scopeFallback.error) {
                 throw scopeFallback.error;
               }
-              setPermissions(
-                scopeFallback.data?.map((item) => ({
-                  id: item.id as string,
-                  user_id: item.user_id as string | null,
-                  email: item.email as string | null,
-                  module: "admin",
-                  created_at: item.created_at as string,
-                })) ?? [],
-              );
-              setError(null);
+              if (isMountedRef.current) {
+                setPermissions(
+                  scopeFallback.data?.map((item) => ({
+                    id: item.id as string,
+                    user_id: item.user_id as string | null,
+                    email: item.email as string | null,
+                    module: "admin",
+                    created_at: item.created_at as string,
+                  })) ?? [],
+                );
+                setError(null);
+              }
               return;
             }
             throw fallbackError;
           }
 
-          setPermissions(
-            fallbackData?.map((item) => ({
-              id: item.id as string,
-              user_id: item.user_id as string | null,
-              email: item.email as string | null,
-              module: "admin",
-              created_at: item.created_at as string,
-            })) ?? [],
-          );
-          setError(null);
+          if (isMountedRef.current) {
+            setPermissions(
+              fallbackData?.map((item) => ({
+                id: item.id as string,
+                user_id: item.user_id as string | null,
+                email: item.email as string | null,
+                module: "admin",
+                created_at: item.created_at as string,
+              })) ?? [],
+            );
+            setError(null);
+          }
           return;
         }
         if (queryError) {
@@ -142,26 +158,32 @@ export function useDocumentPermissions(
         }
       }
 
-      setPermissions(
-        data?.map((item) => ({
-          id: item.id as string,
-          user_id: item.user_id as string | null,
-          email: item.email as string | null,
-          module: (item.modulo as PermissionModule | null) ?? "admin",
-          created_at: item.created_at as string,
-        })) ?? [],
-      );
-      setError(null);
+      if (isMountedRef.current) {
+        setPermissions(
+          data?.map((item) => ({
+            id: item.id as string,
+            user_id: item.user_id as string | null,
+            email: item.email as string | null,
+            module: (item.modulo as PermissionModule | null) ?? "admin",
+            created_at: item.created_at as string,
+          })) ?? [],
+        );
+        setError(null);
+      }
     } catch (err) {
       console.error("Erro ao carregar permissões:", err);
-      setPermissions([]);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Não foi possível carregar as permissões.",
-      );
+      if (isMountedRef.current) {
+        setPermissions([]);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Não foi possível carregar as permissões.",
+        );
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [enabled]);
 
@@ -228,7 +250,9 @@ export function useDocumentPermissions(
         throw new Error(payload.error ?? "Falha ao conceder permissão.");
       }
 
-      setPermissions((prev) => [payload.permission!, ...prev]);
+      if (isMountedRef.current) {
+        setPermissions((prev) => [payload.permission!, ...prev]);
+      }
     },
     [enabled, normalizedPermissions, getAccessToken],
   );
@@ -260,7 +284,11 @@ export function useDocumentPermissions(
         throw new Error(payload.error ?? "Falha ao remover permissão.");
       }
 
-      setPermissions((prev) => prev.filter((item) => item.id !== permissionId));
+      if (isMountedRef.current) {
+        setPermissions((prev) =>
+          prev.filter((item) => item.id !== permissionId),
+        );
+      }
     },
     [enabled, getAccessToken],
   );

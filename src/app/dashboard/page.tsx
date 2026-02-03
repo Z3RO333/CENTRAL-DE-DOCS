@@ -36,6 +36,7 @@ const TIPO_LABEL: Record<string, string> = {
 
 const STORAGE_BUCKET = "formularios";
 const SIGNED_URL_EXPIRES_IN = 60 * 30;
+const HISTORICO_PAGE_SIZE = 200;
 
 const BASE_CARDS: DashboardCard[] = [
   {
@@ -143,12 +144,14 @@ export default function DashboardPage() {
     }[]
   >([]);
   const [historicoLoading, setHistoricoLoading] = useState(true);
+  const [historicoLoadingMore, setHistoricoLoadingMore] = useState(false);
   const [historicoErro, setHistoricoErro] = useState<string | null>(null);
+  const [historicoTotal, setHistoricoTotal] = useState<number | null>(null);
+  const [historicoHasMore, setHistoricoHasMore] = useState(true);
   const [historicoTipoFilter, setHistoricoTipoFilter] = useState("todos");
   const [historicoStatusFilter, setHistoricoStatusFilter] = useState("todos");
   const [historicoPeriodoFilter, setHistoricoPeriodoFilter] =
     useState("ultimos_30_dias");
-  const [historicoVisibleCount, setHistoricoVisibleCount] = useState(20);
   const [regras, setRegras] = useState<PrestadorRegra[]>([]);
   const [regrasLoading, setRegrasLoading] = useState(true);
   const [regrasErro, setRegrasErro] = useState<string | null>(null);
@@ -221,75 +224,112 @@ export default function DashboardPage() {
     }
   };
 
-  const carregarHistorico = useCallback(async (signal?: AbortSignal) => {
-    if (!user) {
-      return;
-    }
-    setHistoricoLoading(true);
-    setHistoricoErro(null);
-    try {
-      const { data, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        throw sessionError;
+  const carregarHistorico = useCallback(
+    async ({
+      signal,
+      append = false,
+      offset = 0,
+    }: {
+      signal?: AbortSignal;
+      append?: boolean;
+      offset?: number;
+    } = {}) => {
+      if (!user) {
+        return;
       }
-      const token = data.session?.access_token;
-      if (!token) {
-        throw new Error("Sessão expirada. Faça login novamente.");
+      if (append) {
+        setHistoricoLoadingMore(true);
+      } else {
+        setHistoricoLoading(true);
+        setHistorico([]);
+        setHistoricoTotal(null);
+        setHistoricoHasMore(true);
       }
-      const params = new URLSearchParams();
-      if (!canViewAllDocuments) {
-        if (prestadoresDoUsuario.length > 0) {
-          prestadoresDoUsuario.forEach((prestador) =>
-            params.append("prestadorId", prestador.id),
+      setHistoricoErro(null);
+      try {
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          throw sessionError;
+        }
+        const token = data.session?.access_token;
+        if (!token) {
+          throw new Error("Sessão expirada. Faça login novamente.");
+        }
+        const params = new URLSearchParams();
+        if (!canViewAllDocuments) {
+          if (prestadoresDoUsuario.length > 0) {
+            prestadoresDoUsuario.forEach((prestador) =>
+              params.append("prestadorId", prestador.id),
+            );
+          } else {
+            params.set("userId", user.id);
+          }
+        }
+        params.set("limit", HISTORICO_PAGE_SIZE.toString());
+        params.set("offset", offset.toString());
+        const url =
+          params.size > 0
+            ? `/api/documentos?${params.toString()}`
+            : "/api/documentos";
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal,
+        });
+        const payload = (await response.json()) as {
+          registros?: {
+            id: string;
+            tipo: string;
+            status: string;
+            arquivo_path?: string | null;
+            arquivo_assinado_path?: string | null;
+            created_at: string;
+            dados: Record<string, unknown> | null;
+            prestador_id?: string | null;
+          }[];
+          total?: number;
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(
+            payload.error ?? "Não foi possível carregar o histórico.",
           );
+        }
+        if (signal?.aborted) {
+          return;
+        }
+        const registros = payload.registros ?? [];
+        setHistorico((prev) => (append ? [...prev, ...registros] : registros));
+        if (typeof payload.total === "number") {
+          setHistoricoTotal(payload.total);
+          const loaded = (append ? offset : 0) + registros.length;
+          setHistoricoHasMore(loaded < payload.total);
         } else {
-          params.set("userId", user.id);
+          setHistoricoHasMore(registros.length === HISTORICO_PAGE_SIZE);
+        }
+      } catch (err) {
+        if (signal?.aborted) {
+          return;
+        }
+        console.error("Erro ao carregar histórico:", err);
+        setHistoricoErro(
+          err instanceof Error
+            ? err.message
+            : "Não foi possível carregar o histórico.",
+        );
+      } finally {
+        if (!signal?.aborted) {
+          if (append) {
+            setHistoricoLoadingMore(false);
+          } else {
+            setHistoricoLoading(false);
+          }
         }
       }
-      const url =
-        params.size > 0 ? `/api/documentos?${params.toString()}` : "/api/documentos";
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        signal,
-      });
-      const payload = (await response.json()) as {
-        registros?: {
-          id: string;
-          tipo: string;
-          status: string;
-          arquivo_path?: string | null;
-          arquivo_assinado_path?: string | null;
-          created_at: string;
-          dados: Record<string, unknown> | null;
-          prestador_id?: string | null;
-        }[];
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(
-          payload.error ?? "Não foi possível carregar o histórico.",
-        );
-      }
-      if (signal?.aborted) {
-        return;
-      }
-      setHistorico(payload.registros ?? []);
-    } catch (err) {
-      if (signal?.aborted) {
-        return;
-      }
-      console.error("Erro ao carregar histórico:", err);
-      setHistoricoErro(
-        err instanceof Error ? err.message : "Não foi possível carregar o histórico.",
-      );
-    } finally {
-      if (!signal?.aborted) {
-        setHistoricoLoading(false);
-      }
-    }
-  }, [user, prestadoresDoUsuario, canViewAllDocuments]);
+    },
+    [user, prestadoresDoUsuario, canViewAllDocuments],
+  );
 
   const carregarRegras = useCallback(async (signal?: AbortSignal) => {
     if (!user) {
@@ -355,7 +395,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user && !accessLoading && (canViewAllDocuments || !prestadoresLoading)) {
       const controller = new AbortController();
-      void carregarHistorico(controller.signal);
+      void carregarHistorico({ signal: controller.signal });
       return () => controller.abort();
     }
     return undefined;
@@ -468,20 +508,18 @@ export default function DashboardPage() {
     historicoStatusFilter,
     isDentroPeriodoGlobal,
   ]);
-
-  useEffect(() => {
-    setHistoricoVisibleCount(20);
+  const handleLoadMoreHistorico = useCallback(() => {
+    if (historicoLoading || historicoLoadingMore || !historicoHasMore) {
+      return;
+    }
+    void carregarHistorico({ append: true, offset: historico.length });
   }, [
-    historicoTipoFilter,
-    historicoStatusFilter,
-    historicoPeriodoFilter,
+    carregarHistorico,
     historico.length,
+    historicoHasMore,
+    historicoLoading,
+    historicoLoadingMore,
   ]);
-
-  const historicoVisiveis = useMemo(
-    () => historicoFiltrado.slice(0, historicoVisibleCount),
-    [historicoFiltrado, historicoVisibleCount],
-  );
 
   const resumoPorTipo = useMemo(() => {
     return historicoFiltrado.reduce<
@@ -839,7 +877,10 @@ export default function DashboardPage() {
             </span>
           </div>
           <span className="text-[11px] text-slate-400">
-            Mostrando {historicoFiltrado.length} registro(s) após filtros
+            {historicoTotal !== null
+              ? `Carregados ${historico.length} de ${historicoTotal}`
+              : `Carregados ${historico.length}`}{" "}
+            · Mostrando {historicoFiltrado.length} após filtros
           </span>
         </div>
 
@@ -858,7 +899,7 @@ export default function DashboardPage() {
         ) : (
           <>
             <ul className="mt-4 space-y-3 text-xs text-slate-600">
-              {historicoVisiveis.map((registro) => {
+              {historicoFiltrado.map((registro) => {
                 const pathParaVisualizar =
                   resolveSignedPdfPath(registro.arquivo_assinado_path) ??
                   registro.arquivo_assinado_path ??
@@ -916,16 +957,15 @@ export default function DashboardPage() {
                 );
               })}
             </ul>
-            {historicoFiltrado.length > historicoVisiveis.length && (
+            {historicoHasMore && (
               <div className="mt-4 flex justify-center">
                 <button
                   type="button"
-                  onClick={() =>
-                    setHistoricoVisibleCount((count) => count + 20)
-                  }
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                  onClick={handleLoadMoreHistorico}
+                  disabled={historicoLoadingMore}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Carregar mais
+                  {historicoLoadingMore ? "Carregando..." : "Carregar mais"}
                 </button>
               </div>
             )}
@@ -1034,12 +1074,6 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-
-
-
-
-
 
 
 

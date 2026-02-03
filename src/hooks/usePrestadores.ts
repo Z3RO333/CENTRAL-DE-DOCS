@@ -54,7 +54,7 @@ export function usePrestadores(
     return token;
   }, []);
 
-  const fetchPrestadores = useCallback(async () => {
+  const fetchPrestadores = useCallback(async (signal?: AbortSignal) => {
     if (!enabled || !user) {
       setPrestadores([]);
       setLoading(false);
@@ -75,6 +75,7 @@ export function usePrestadores(
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal,
       });
 
       const payload = (await response.json()) as {
@@ -88,9 +89,15 @@ export function usePrestadores(
         );
       }
 
+      if (signal?.aborted) {
+        return;
+      }
       setPrestadores(payload.prestadores ?? []);
       setError(null);
     } catch (err) {
+      if (signal?.aborted) {
+        return;
+      }
       console.error("Erro ao carregar prestadores:", err);
       setPrestadores([]);
       setError(
@@ -104,7 +111,9 @@ export function usePrestadores(
   }, [assignedOnly, enabled, getAccessToken, user]);
 
   useEffect(() => {
-    void fetchPrestadores();
+    const controller = new AbortController();
+    void fetchPrestadores(controller.signal);
+    return () => controller.abort();
   }, [fetchPrestadores]);
 
   const createPrestador = useCallback(

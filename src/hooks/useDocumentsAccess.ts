@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -25,6 +25,7 @@ const ADMIN_MODULE_SET = new Set<string>(ADMIN_MODULES);
 
 export function useDocumentsAccess(): UseDocumentsAccessResult {
   const { user, isLoading: authLoading } = useAuth();
+  const isMountedRef = useRef(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,22 +38,33 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
   const [isAdmin, setIsAdmin] = useState(false);
   const [role, setRole] = useState<AccessRole>("colaborador");
 
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const fetchAccess = useCallback(async () => {
     if (!user) {
-      setHasAccess(false);
-      setIsAdmin(false);
-      setRole("colaborador");
-      setLoading(false);
-      setError(null);
-      setModules({
-        documentos: false,
-        dashboards: false,
-        perfil: false,
-      });
+      if (isMountedRef.current) {
+        setHasAccess(false);
+        setIsAdmin(false);
+        setRole("colaborador");
+        setLoading(false);
+        setError(null);
+        setModules({
+          documentos: false,
+          dashboards: false,
+          perfil: false,
+        });
+      }
       return;
     }
 
-    setLoading(true);
+    if (isMountedRef.current) {
+      setLoading(true);
+    }
     try {
       const selectWithModule = async (
         column: "user_id" | "email",
@@ -191,34 +203,40 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         baseModules.dashboards = true;
         baseModules.perfil = true;
       }
-      setModules(baseModules);
-      setIsAdmin(resolvedIsAdmin);
-      if (resolvedIsAdmin) {
-        setRole("admin");
-      } else if (isGerenteLoja) {
-        setRole("gerente_loja");
-      } else {
-        setRole("colaborador");
+      if (isMountedRef.current) {
+        setModules(baseModules);
+        setIsAdmin(resolvedIsAdmin);
+        if (resolvedIsAdmin) {
+          setRole("admin");
+        } else if (isGerenteLoja) {
+          setRole("gerente_loja");
+        } else {
+          setRole("colaborador");
+        }
+        setHasAccess(Boolean(user));
+        setError(null);
       }
-      setHasAccess(Boolean(user));
-      setError(null);
     } catch (err) {
       console.error("Erro ao verificar permissões de documentos:", err);
-      setHasAccess(false);
-      setIsAdmin(false);
-      setRole("colaborador");
-      setModules({
-        documentos: false,
-        dashboards: false,
-        perfil: false,
-      });
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Não foi possível confirmar seu acesso.",
-      );
+      if (isMountedRef.current) {
+        setHasAccess(false);
+        setIsAdmin(false);
+        setRole("colaborador");
+        setModules({
+          documentos: false,
+          dashboards: false,
+          perfil: false,
+        });
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Não foi possível confirmar seu acesso.",
+        );
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [user, normalizedEmail]);
 

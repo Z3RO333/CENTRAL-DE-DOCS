@@ -53,7 +53,7 @@ export function useLojas(options: UseLojasOptions = {}): UseLojasResult {
     return token;
   }, []);
 
-  const fetchLojas = useCallback(async () => {
+  const fetchLojas = useCallback(async (signal?: AbortSignal) => {
     if (!enabled) {
       setLojas([]);
       setLoading(false);
@@ -69,6 +69,7 @@ export function useLojas(options: UseLojasOptions = {}): UseLojasResult {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal,
       });
       const payload = (await response.json()) as {
         lojas?: Loja[];
@@ -77,17 +78,27 @@ export function useLojas(options: UseLojasOptions = {}): UseLojasResult {
       if (!response.ok) {
         throw new Error(payload.error ?? "Falha ao carregar lojas.");
       }
+      if (signal?.aborted) {
+        return;
+      }
       setLojas(payload.lojas ?? []);
     } catch (err) {
+      if (signal?.aborted) {
+        return;
+      }
       setLojas([]);
       setError(err instanceof Error ? err.message : "Falha ao carregar lojas.");
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, [enabled, getAccessToken]);
 
   useEffect(() => {
-    void fetchLojas();
+    const controller = new AbortController();
+    void fetchLojas(controller.signal);
+    return () => controller.abort();
   }, [fetchLojas]);
 
   const createLoja = useCallback(

@@ -510,21 +510,33 @@ export default function DocumentosPage() {
       return;
     }
 
+    let writeTimer: number | null = null;
     const handleScroll = () => {
-      const current = listStateRef.current;
-      if (!current) {
+      if (writeTimer !== null) {
         return;
       }
-      const next = { ...current, scrollY: window.scrollY };
-      listStateRef.current = next;
-      window.sessionStorage.setItem(
-        LIST_STATE_STORAGE_KEY,
-        JSON.stringify(next),
-      );
+      writeTimer = window.setTimeout(() => {
+        writeTimer = null;
+        const current = listStateRef.current;
+        if (!current) {
+          return;
+        }
+        const next = { ...current, scrollY: window.scrollY };
+        listStateRef.current = next;
+        window.sessionStorage.setItem(
+          LIST_STATE_STORAGE_KEY,
+          JSON.stringify(next),
+        );
+      }, 200);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (writeTimer !== null) {
+        window.clearTimeout(writeTimer);
+      }
+    };
   }, [hasRestoredState]);
 
   useEffect(() => {

@@ -1,6 +1,12 @@
 ﻿import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
+import {
+  normalizeIds,
+  resolveLimit,
+  safeParseDados,
+  sanitizeId,
+} from "@/lib/documentosApiUtils";
 
 type FormularioRow = {
   id: string;
@@ -40,7 +46,7 @@ class HttpError extends Error {
 async function getSessionUser(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    throw new HttpError(401, "RequisiÃ§Ã£o nÃ£o autorizada.");
+    throw new HttpError(401, "Requisição não autorizada.");
   }
 
   const accessToken = authHeader.slice("Bearer ".length).trim();
@@ -49,7 +55,7 @@ async function getSessionUser(request: Request) {
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
-      "ConfiguraÃ§Ã£o incompleta. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      "Configuração incompleta. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
     );
   }
 
@@ -62,7 +68,7 @@ async function getSessionUser(request: Request) {
 
   const { data, error } = await supabaseSession.auth.getUser(accessToken);
   if (error || !data?.user) {
-    throw new HttpError(401, "SessÃ£o invÃ¡lida ou expirada.");
+    throw new HttpError(401, "Sessão inválida ou expirada.");
   }
 
   return data.user;
@@ -187,11 +193,6 @@ async function getGerenteAccessEntries(
   return Array.from(unique.values());
 }
 
-const sanitizeId = (value: string) => value.replace(/[^a-zA-Z0-9-]/g, "");
-
-const normalizeIds = (values: string[]) =>
-  Array.from(new Set(values.map((value) => sanitizeId(value.trim())).filter(Boolean)));
-
 function mapRows(rows: FormularioRow[]): DocumentRecord[] {
   return rows.map((item) => ({
     id: item.id,
@@ -200,10 +201,7 @@ function mapRows(rows: FormularioRow[]): DocumentRecord[] {
     arquivo_path: item.arquivo_path,
     arquivo_assinado_path: item.arquivo_assinado_path ?? null,
     created_at: item.created_at,
-    dados:
-      typeof item.dados === "string"
-        ? (JSON.parse(item.dados) as Record<string, unknown>)
-        : (item.dados as Record<string, unknown> | null),
+    dados: safeParseDados(item.dados),
     assinado_por: item.assinado_por ?? null,
     user_id: item.user_id,
     prestador_id: item.prestador_id ?? null,
@@ -249,12 +247,8 @@ export async function GET(request: Request) {
     const somenteAssinados = searchParams.get("somenteAssinados") === "true";
     const somenteDisponiveisLote =
       searchParams.get("somenteDisponiveisLote") === "true";
-    const limitParamRaw = searchParams.get("limit");
-    const limitParam = limitParamRaw ? Number(limitParamRaw) : Number.NaN;
     const offsetParam = Number(searchParams.get("offset"));
-    const limit = Number.isFinite(limitParam)
-      ? Math.min(Math.max(limitParam, 1), 200)
-      : null;
+    const limit = resolveLimit(searchParams.get("limit"));
     const offset = Number.isFinite(offsetParam) ? Math.max(offsetParam, 0) : 0;
     let userFilter = filterUserId;
 
@@ -467,9 +461,7 @@ export async function GET(request: Request) {
       }
     }
 
-    if (limit !== null) {
-      query = query.range(offset, offset + limit - 1);
-    }
+    query = query.range(offset, offset + limit - 1);
 
     const { data, error, count } = await query;
     if (error) {
@@ -488,7 +480,7 @@ export async function GET(request: Request) {
     const message =
       err instanceof Error
         ? err.message
-        : "NÃ£o foi possÃ­vel carregar os documentos.";
+        : "Não foi possível carregar os documentos.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -522,7 +514,7 @@ export async function DELETE(request: Request) {
       throw recordError;
     }
     if (!registros || registros.length !== idsToRemove.length) {
-      throw new HttpError(404, "Documento nÃ£o encontrado.");
+      throw new HttpError(404, "Documento não encontrado.");
     }
 
     if (!canAccess) {
@@ -564,7 +556,7 @@ export async function DELETE(request: Request) {
     const message =
       err instanceof Error
         ? err.message
-        : "NÃ£o foi possÃ­vel remover o documento.";
+        : "Não foi possível remover o documento.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -601,10 +593,7 @@ export async function PATCH(request: Request) {
       throw new HttpError(404, "Documento não encontrado.");
     }
 
-    const dadosAtuais =
-      typeof registro.dados === "string"
-        ? (JSON.parse(registro.dados) as Record<string, unknown>)
-        : ((registro.dados ?? {}) as Record<string, unknown>);
+    const dadosAtuais = safeParseDados(registro.dados) ?? {};
     const dadosAtualizados = {
       ...dadosAtuais,
       ...body.updates,

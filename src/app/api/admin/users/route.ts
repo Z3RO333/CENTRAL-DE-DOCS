@@ -30,7 +30,7 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           error:
-            "ConfiguraÃ§Ã£o incompleta. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+            "Configuração incompleta. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
         },
         { status: 500 },
       );
@@ -90,7 +90,7 @@ export async function GET(request: Request) {
 
     if (!hasPermission) {
       return NextResponse.json(
-        { error: "VocÃª nÃ£o possui permissÃ£o para listar usuÃ¡rios." },
+        { error: "Você não possui permissão para listar usuários." },
         { status: 403 },
       );
     }
