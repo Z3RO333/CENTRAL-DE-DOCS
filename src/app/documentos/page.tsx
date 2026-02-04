@@ -60,11 +60,13 @@ const STORAGE_BUCKET = "formularios";
 const SIGNED_URL_EXPIRES_IN = 60 * 30;
 const LIST_STATE_STORAGE_KEY = "documentos:list-state";
 const LIST_CACHE_STORAGE_KEY = "documentos:list-cache";
+const FILTERS_CACHE_STORAGE_KEY = "documentos:filter-options";
 
 type DocumentosListState = {
   tipoFilter: string;
   tipoLaudoFilter: string;
   lojaFilter: string;
+  prestadorFilter: string;
   statusFilter: string;
   identificacaoFilter: string;
   anoFilter: string;
@@ -281,6 +283,7 @@ export default function DocumentosPage() {
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
   const [tipoLaudoFilter, setTipoLaudoFilter] = useState<string>("todos");
   const [lojaFilter, setLojaFilter] = useState<string>("todos");
+  const [prestadorFilter, setPrestadorFilter] = useState<string>("todos");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [identificacaoFilter, setIdentificacaoFilter] = useState<string>("");
   const [identificacaoDebounced, setIdentificacaoDebounced] =
@@ -311,6 +314,16 @@ export default function DocumentosPage() {
     values: Record<string, string>;
   } | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [filterOptions, setFilterOptions] = useState<{
+    anos: string[];
+    status: string[];
+    tipoLaudo: string[];
+    lojas: { id: string; nome: string; codigo: string | null }[];
+    prestadores: { id: string; nome: string; tipo_servico?: string | null }[];
+  }>({ anos: [], status: [], tipoLaudo: [], lojas: [], prestadores: [] });
+  const [filterOptionsLoading, setFilterOptionsLoading] = useState(false);
+  const [hasRestoredFilterOptions, setHasRestoredFilterOptions] =
+    useState(false);
 
   const getAccessToken = useCallback(async () => {
     const { data: sessionData, error: sessionError } =
@@ -324,6 +337,75 @@ export default function DocumentosPage() {
     }
     return token;
   }, []);
+
+  const carregarFiltros = useCallback(async () => {
+    setFilterOptionsLoading(true);
+    try {
+      const token = await getAccessToken();
+      const response = await fetch("/api/documentos/filtros", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = (await response.json()) as {
+        anos?: string[];
+        status?: string[];
+        tipoLaudo?: string[];
+        lojas?: { id: string; nome: string; codigo: string | null }[];
+        prestadores?: { id: string; nome: string; tipo_servico?: string | null }[];
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Não foi possível carregar os filtros.");
+      }
+      setFilterOptions({
+        anos: payload.anos ?? [],
+        status: payload.status ?? [],
+        tipoLaudo: payload.tipoLaudo ?? [],
+        lojas: payload.lojas ?? [],
+        prestadores: payload.prestadores ?? [],
+      });
+    } catch (err) {
+      console.error("Erro ao carregar filtros:", err);
+      setFilterOptions({
+        anos: [],
+        status: [],
+        tipoLaudo: [],
+        lojas: [],
+        prestadores: [],
+      });
+    } finally {
+      setFilterOptionsLoading(false);
+    }
+  }, [getAccessToken]);
+
+  useEffect(() => {
+    if (hasRestoredFilterOptions || typeof window === "undefined") {
+      return;
+    }
+    const raw = window.sessionStorage.getItem(FILTERS_CACHE_STORAGE_KEY);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as {
+          anos?: string[];
+          status?: string[];
+          tipoLaudo?: string[];
+          lojas?: { id: string; nome: string; codigo: string | null }[];
+          prestadores?: { id: string; nome: string; tipo_servico?: string | null }[];
+        };
+        setFilterOptions({
+          anos: parsed.anos ?? [],
+          status: parsed.status ?? [],
+          tipoLaudo: parsed.tipoLaudo ?? [],
+          lojas: parsed.lojas ?? [],
+          prestadores: parsed.prestadores ?? [],
+        });
+      } catch {
+        window.sessionStorage.removeItem(FILTERS_CACHE_STORAGE_KEY);
+      }
+    }
+    setHasRestoredFilterOptions(true);
+  }, [hasRestoredFilterOptions]);
 
   useEffect(() => {
     if (!confirmDialog) {
@@ -369,6 +451,9 @@ export default function DocumentosPage() {
         if (parsed.lojaFilter) {
           setLojaFilter(parsed.lojaFilter);
         }
+        if (parsed.prestadorFilter) {
+          setPrestadorFilter(parsed.prestadorFilter);
+        }
         if (parsed.statusFilter) {
           setStatusFilter(parsed.statusFilter);
         }
@@ -402,6 +487,7 @@ export default function DocumentosPage() {
           tipoFilter: parsed.tipoFilter ?? "todos",
           tipoLaudoFilter: parsed.tipoLaudoFilter ?? "todos",
           lojaFilter: parsed.lojaFilter ?? "todos",
+          prestadorFilter: parsed.prestadorFilter ?? "todos",
           statusFilter: parsed.statusFilter ?? "todos",
           identificacaoFilter: parsed.identificacaoFilter ?? "",
           anoFilter: parsed.anoFilter ?? "todos",
@@ -474,6 +560,7 @@ export default function DocumentosPage() {
       tipoFilter,
       tipoLaudoFilter,
       lojaFilter,
+      prestadorFilter,
       statusFilter,
       identificacaoFilter,
       anoFilter,
@@ -493,13 +580,14 @@ export default function DocumentosPage() {
     );
   }, [
     hasRestoredState,
-    tipoFilter,
-    tipoLaudoFilter,
-    lojaFilter,
-    statusFilter,
-    identificacaoFilter,
-    anoFilter,
-    mesFilter,
+      tipoFilter,
+      tipoLaudoFilter,
+      lojaFilter,
+      prestadorFilter,
+      statusFilter,
+      identificacaoFilter,
+      anoFilter,
+      mesFilter,
     somenteAssinados,
     somenteDisponiveisLote,
     viewMode,
@@ -553,6 +641,7 @@ export default function DocumentosPage() {
     tipoFilter,
     tipoLaudoFilter,
     lojaFilter,
+    prestadorFilter,
     statusFilter,
     identificacaoDebounced,
     anoFilter,
@@ -607,9 +696,13 @@ export default function DocumentosPage() {
           if (role === "gerente_loja") {
             // Usa o filtro por loja no backend.
           } else if (prestadoresDoUsuario.length > 0) {
-            prestadoresDoUsuario.forEach((prestador) => {
-              params.append("prestadorId", prestador.id);
-            });
+            if (prestadorFilter !== "todos") {
+              params.append("prestadorId", prestadorFilter);
+            } else {
+              prestadoresDoUsuario.forEach((prestador) => {
+                params.append("prestadorId", prestador.id);
+              });
+            }
           } else {
             params.set("userId", user.id);
           }
@@ -624,6 +717,9 @@ export default function DocumentosPage() {
         }
         if (lojaFilter !== "todos") {
           params.set("lojaId", lojaFilter);
+        }
+        if (prestadorFilter !== "todos") {
+          params.append("prestadorId", prestadorFilter);
         }
         if (statusFilter !== "todos") {
           params.set("status", statusFilter);
@@ -711,6 +807,7 @@ export default function DocumentosPage() {
     tipoFilter,
     tipoLaudoFilter,
     lojaFilter,
+    prestadorFilter,
     statusFilter,
     anoFilter,
     mesFilter,
@@ -718,6 +815,41 @@ export default function DocumentosPage() {
     somenteAssinados,
     somenteDisponiveisLote,
   ]);
+
+  useEffect(() => {
+    if (authLoading || accessLoading) {
+      return;
+    }
+    if (!user) {
+      return;
+    }
+    if (!canViewAllDocuments && role !== "gerente_loja" && prestadoresUsuarioLoading) {
+      return;
+    }
+    if (!hasRestoredFilterOptions) {
+      return;
+    }
+    void carregarFiltros();
+  }, [
+    authLoading,
+    accessLoading,
+    user,
+    canViewAllDocuments,
+    role,
+    prestadoresUsuarioLoading,
+    carregarFiltros,
+    hasRestoredFilterOptions,
+  ]);
+
+  useEffect(() => {
+    if (!hasRestoredFilterOptions || typeof window === "undefined") {
+      return;
+    }
+    window.sessionStorage.setItem(
+      FILTERS_CACHE_STORAGE_KEY,
+      JSON.stringify(filterOptions),
+    );
+  }, [hasRestoredFilterOptions, filterOptions]);
 
   const getPathParaVisualizacao = (registro: FormularioRecord) =>
     resolveSignedPdfPath(registro.arquivo_assinado_path) ??
@@ -976,15 +1108,16 @@ export default function DocumentosPage() {
     }
   };
 
-  const anosDisponiveis = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          registros.map((r) => new Date(r.created_at).getFullYear().toString()),
-        ),
-      ).sort((a, b) => Number(b) - Number(a)),
-    [registros],
-  );
+  const anosDisponiveis = useMemo(() => {
+    if (filterOptions.anos.length > 0) {
+      return filterOptions.anos;
+    }
+    return Array.from(
+      new Set(
+        registros.map((r) => new Date(r.created_at).getFullYear().toString()),
+      ),
+    ).sort((a, b) => Number(b) - Number(a));
+  }, [filterOptions.anos, registros]);
 
   const registrosFiltrados = useMemo(() => registros, [registros]);
 
@@ -1084,6 +1217,7 @@ export default function DocumentosPage() {
     setTipoFilter("todos");
     setTipoLaudoFilter("todos");
     setLojaFilter("todos");
+    setPrestadorFilter("todos");
     setStatusFilter("todos");
     setIdentificacaoFilter("");
     setAnoFilter("todos");
@@ -1118,6 +1252,9 @@ export default function DocumentosPage() {
   );
 
   const statusOptions = useMemo(() => {
+    if (filterOptions.status.length > 0) {
+      return ["todos", ...Array.from(new Set(filterOptions.status))];
+    }
     const base = ["todos", "pendente", "em_analise", "assinado"];
     const extras = Array.from(
       new Set(
@@ -1142,6 +1279,9 @@ export default function DocumentosPage() {
   }, [registros]);
 
   const tipoLaudoOptions = useMemo(() => {
+    if (filterOptions.tipoLaudo.length > 0) {
+      return ["todos", ...Array.from(new Set(filterOptions.tipoLaudo))];
+    }
     const valores = Array.from(
       new Set(
         registros
@@ -1150,18 +1290,42 @@ export default function DocumentosPage() {
       ),
     );
     return ["todos", ...valores];
-  }, [registros]);
+  }, [filterOptions.tipoLaudo, registros]);
 
-  const lojaOptions = useMemo(
-    () => [
+  const lojaOptions = useMemo(() => {
+    const base = [
       { value: "todos", label: "Todas as lojas" },
       ...lojas.map((loja) => ({
         value: loja.id,
         label: loja.codigo ? `${loja.nome} - ${loja.codigo}` : loja.nome,
       })),
-    ],
-    [lojas],
-  );
+    ];
+    if (filterOptions.lojas.length === 0) {
+      return base;
+    }
+    const extras = filterOptions.lojas.map((loja) => ({
+      value: loja.id,
+      label: loja.codigo ? `${loja.nome} - ${loja.codigo}` : loja.nome,
+    }));
+    const unique = new Map<string, { value: string; label: string }>();
+    [...base, ...extras].forEach((item) => unique.set(item.value, item));
+    return Array.from(unique.values());
+  }, [lojas, filterOptions.lojas]);
+
+  const prestadorOptions = useMemo(() => {
+    const options = filterOptions.prestadores.length > 0
+      ? filterOptions.prestadores
+      : prestadoresDoUsuario.map((p) => ({ id: p.id, nome: p.nome, tipo_servico: p.tipo_servico }));
+    return [
+      { value: "todos", label: "Todos os prestadores" },
+      ...options.map((prestador) => ({
+        value: prestador.id,
+        label: prestador.tipo_servico
+          ? `${prestador.nome} - ${prestador.tipo_servico}`
+          : prestador.nome,
+      })),
+    ];
+  }, [filterOptions.prestadores, prestadoresDoUsuario]);
 
   const showErrorMessage = error ?? authError ?? accessError;
   const hasSelection = selectedIds.length > 0;
@@ -1368,6 +1532,11 @@ export default function DocumentosPage() {
             Painel de filtros
           </div>
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
+            {filterOptionsLoading && (
+              <span className="text-[11px] font-semibold text-slate-400">
+                Carregando opções de filtro...
+              </span>
+            )}
             <button
               type="button"
               onClick={resetFilters}
@@ -1436,6 +1605,7 @@ export default function DocumentosPage() {
             <select
               value={tipoLaudoFilter}
               onChange={(event) => setTipoLaudoFilter(event.target.value)}
+              disabled={filterOptionsLoading}
               className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             >
               {tipoLaudoOptions.map((tipoLaudo) => (
@@ -1450,6 +1620,7 @@ export default function DocumentosPage() {
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
+              disabled={filterOptionsLoading}
               className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             >
               {statusOptions.map((statusOption) => (
@@ -1464,12 +1635,13 @@ export default function DocumentosPage() {
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-4">
-          {canManageDocuments && (
+          {(canManageDocuments || lojaOptions.length > 1) && (
             <label className="text-xs font-semibold text-slate-600">
               Loja
               <select
                 value={lojaFilter}
                 onChange={(event) => setLojaFilter(event.target.value)}
+                disabled={filterOptionsLoading}
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
               >
                 {lojaOptions.map((loja) => (
@@ -1480,11 +1652,29 @@ export default function DocumentosPage() {
               </select>
             </label>
           )}
+          {prestadorOptions.length > 1 && (
+            <label className="text-xs font-semibold text-slate-600">
+              Prestador
+              <select
+                value={prestadorFilter}
+                onChange={(event) => setPrestadorFilter(event.target.value)}
+                disabled={filterOptionsLoading}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+              >
+                {prestadorOptions.map((prestador) => (
+                  <option key={prestador.value} value={prestador.value}>
+                    {prestador.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="text-xs font-semibold text-slate-600">
             Ano de envio
             <select
               value={anoFilter}
               onChange={(event) => setAnoFilter(event.target.value)}
+              disabled={filterOptionsLoading}
               className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             >
               <option value="todos">Todos os anos</option>
