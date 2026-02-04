@@ -258,9 +258,6 @@ const getEdicaoInfo = (registro: FormularioRecord) => {
   return { editedBy, editedAt };
 };
 
-const mesAtual = String(new Date().getMonth() + 1).padStart(2, "0");
-const anoAtual = new Date().getFullYear().toString();
-
 export default function DocumentosPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
@@ -277,6 +274,8 @@ export default function DocumentosPage() {
   });
   const { lojas } = useLojas({ enabled: canManageDocuments });
   const [loading, setLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [registros, setRegistros] = useState<FormularioRecord[]>([]);
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
@@ -284,8 +283,10 @@ export default function DocumentosPage() {
   const [lojaFilter, setLojaFilter] = useState<string>("todos");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [identificacaoFilter, setIdentificacaoFilter] = useState<string>("");
-  const [anoFilter, setAnoFilter] = useState<string>(anoAtual);
-  const [mesFilter, setMesFilter] = useState<string>(mesAtual);
+  const [identificacaoDebounced, setIdentificacaoDebounced] =
+    useState<string>("");
+  const [anoFilter, setAnoFilter] = useState<string>("todos");
+  const [mesFilter, setMesFilter] = useState<string>("todos");
   const [somenteAssinados, setSomenteAssinados] = useState(false);
   const [somenteDisponiveisLote, setSomenteDisponiveisLote] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -403,14 +404,15 @@ export default function DocumentosPage() {
           lojaFilter: parsed.lojaFilter ?? "todos",
           statusFilter: parsed.statusFilter ?? "todos",
           identificacaoFilter: parsed.identificacaoFilter ?? "",
-          anoFilter: parsed.anoFilter ?? anoAtual,
-          mesFilter: parsed.mesFilter ?? mesAtual,
+          anoFilter: parsed.anoFilter ?? "todos",
+          mesFilter: parsed.mesFilter ?? "todos",
           somenteAssinados: parsed.somenteAssinados ?? false,
           somenteDisponiveisLote: parsed.somenteDisponiveisLote ?? false,
           viewMode: parsed.viewMode === "cards" ? "cards" : "tabela",
           scrollY: parsed.scrollY ?? 0,
           page: parsed.page && parsed.page > 0 ? parsed.page : 1,
-          pageSize: parsed.pageSize && parsed.pageSize > 0 ? parsed.pageSize : pageSize,
+          pageSize:
+            parsed.pageSize && parsed.pageSize > 0 ? parsed.pageSize : pageSize,
         };
       } catch {
         window.sessionStorage.removeItem(LIST_STATE_STORAGE_KEY);
@@ -552,12 +554,22 @@ export default function DocumentosPage() {
     tipoLaudoFilter,
     lojaFilter,
     statusFilter,
-    identificacaoFilter,
+    identificacaoDebounced,
     anoFilter,
     mesFilter,
     somenteAssinados,
     somenteDisponiveisLote,
   ]);
+
+  useEffect(() => {
+    const trimmed = identificacaoFilter.trim();
+    const timer = window.setTimeout(() => {
+      setIdentificacaoDebounced(trimmed);
+    }, 350);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [identificacaoFilter]);
 
   useEffect(() => {
     if (authLoading || accessLoading) {
@@ -581,7 +593,11 @@ export default function DocumentosPage() {
     let active = true;
 
     const load = async () => {
-      setLoading(true);
+      if (!hasLoadedOnce) {
+        setLoading(true);
+      } else {
+        setIsFetching(true);
+      }
       setError(null);
 
       try {
@@ -618,8 +634,8 @@ export default function DocumentosPage() {
         if (mesFilter !== "todos") {
           params.set("mes", mesFilter);
         }
-        if (identificacaoFilter.trim()) {
-          params.set("identificacao", identificacaoFilter.trim());
+        if (identificacaoDebounced) {
+          params.set("identificacao", identificacaoDebounced);
         }
         if (somenteAssinados) {
           params.set("somenteAssinados", "true");
@@ -666,7 +682,11 @@ export default function DocumentosPage() {
         }
       } finally {
         if (active) {
-          setLoading(false);
+          if (!hasLoadedOnce) {
+            setLoading(false);
+          }
+          setIsFetching(false);
+          setHasLoadedOnce(true);
         }
       }
     };
@@ -694,7 +714,7 @@ export default function DocumentosPage() {
     statusFilter,
     anoFilter,
     mesFilter,
-    identificacaoFilter,
+    identificacaoDebounced,
     somenteAssinados,
     somenteDisponiveisLote,
   ]);
@@ -1066,8 +1086,8 @@ export default function DocumentosPage() {
     setLojaFilter("todos");
     setStatusFilter("todos");
     setIdentificacaoFilter("");
-    setAnoFilter(anoAtual);
-    setMesFilter(mesAtual);
+    setAnoFilter("todos");
+    setMesFilter("todos");
     setSomenteAssinados(false);
     setSomenteDisponiveisLote(false);
   };
@@ -1152,6 +1172,12 @@ export default function DocumentosPage() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const canPrevPage = page > 1;
   const canNextPage = page < totalPages;
+  const mesSelecionadoLabel =
+    mesFilter === "todos"
+      ? "Todos os meses"
+      : MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual";
+  const anoSelecionadoLabel =
+    anoFilter === "todos" ? "Todos os anos" : anoFilter;
 
   useEffect(() => {
     if (page > totalPages) {
@@ -1159,7 +1185,7 @@ export default function DocumentosPage() {
     }
   }, [page, totalPages]);
 
-  if (authLoading || accessLoading || (loading && registros.length === 0)) {
+  if (authLoading || accessLoading || (!hasLoadedOnce && loading)) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
         Carregando documentos...
@@ -1312,7 +1338,9 @@ export default function DocumentosPage() {
           <p className="font-semibold text-slate-700">
             {totalResultados} resultado(s)
           </p>
-          <p>Filtros ativos atualizam automaticamente.</p>
+          <p>
+            {isFetching ? "Atualizando resultados..." : "Filtros ativos atualizam automaticamente."}
+          </p>
         </div>
       </div>
 
@@ -1483,8 +1511,8 @@ export default function DocumentosPage() {
             </select>
           </label>
           <div className="rounded-xl bg-slate-50 p-3 text-[11px] text-slate-500">
-            Os filtros acima são aplicados automaticamente. Por padrão
-            consideramos o mês corrente ({MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual"}).
+            Os filtros acima são aplicados automaticamente. Período selecionado:{" "}
+            {anoSelecionadoLabel}, {mesSelecionadoLabel}.
           </div>
         </div>
 <div className="mt-4 grid gap-3 md:grid-cols-4">
