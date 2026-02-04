@@ -747,7 +747,7 @@ export default function FormularioPage() {
                   </option>
                   {lojas.map((loja) => (
                     <option key={loja.id} value={loja.id}>
-                      {loja.nome}
+                      {loja.codigo ? `${loja.nome} - ${loja.codigo}` : loja.nome}
                     </option>
                   ))}
                 </select>
