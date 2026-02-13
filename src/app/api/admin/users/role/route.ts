@@ -32,6 +32,15 @@ type Identity = {
   email: string;
 };
 
+type GerenteInsertRow = {
+  scope: "gerente";
+  user_id: string | null;
+  email: string | null;
+  loja_id: string;
+  prestador_id: string | null;
+  can_view_all: boolean;
+};
+
 const ADMIN_MODULES = ["admin", "documentos", "dashboards", "perfil"] as const;
 
 const sanitizeId = (value: string) => value.replace(/[^a-zA-Z0-9-]/g, "");
@@ -255,7 +264,7 @@ export async function POST(request: Request) {
           throw new Error("Selecione ao menos uma loja para o gerente.");
         }
 
-        const gerenteRows = access.flatMap((entry) => {
+        const gerenteRows = access.flatMap<GerenteInsertRow>((entry) => {
           const lojaId = sanitizeId(entry.lojaId ?? "");
           if (!lojaId) {
             return [];
