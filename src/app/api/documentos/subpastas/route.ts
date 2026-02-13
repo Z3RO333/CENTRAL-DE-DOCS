@@ -248,7 +248,7 @@ export async function GET(request: Request) {
 
     let query = supabaseAdmin
       .from("formularios")
-      .select("created_at,tipo,dados,user_id,prestador_id", { count: "exact" })
+      .select("created_at,tipo,dados,user_id,prestador_id")
       .eq("dados->>loja_id", lojaId)
       .order("created_at", { ascending: false });
 
@@ -331,22 +331,19 @@ export async function GET(request: Request) {
 
     query = applyDateFilter(query, anoFilter, mesFilter);
 
-    const { data: firstBatch, error, count } = await query.range(0, 999);
-    if (error) {
-      throw error;
-    }
-
-    const rows: FormularioRow[] = (firstBatch as FormularioRow[]) ?? [];
-    const total = count ?? rows.length;
-    for (let offset = rows.length; offset < total; offset += 1000) {
-      const { data: batch, error: batchError } = await query.range(
-        offset,
-        Math.min(offset + 999, total - 1),
-      );
-      if (batchError) {
-        throw batchError;
+    const rows: FormularioRow[] = [];
+    let offset = 0;
+    while (true) {
+      const { data: batch, error } = await query.range(offset, offset + 999);
+      if (error) {
+        throw error;
       }
-      rows.push(...((batch as FormularioRow[]) ?? []));
+      const current = (batch as FormularioRow[]) ?? [];
+      rows.push(...current);
+      if (current.length < 1000) {
+        break;
+      }
+      offset += 1000;
     }
 
     const rootMap = new Map<string, SubpastaNode>();

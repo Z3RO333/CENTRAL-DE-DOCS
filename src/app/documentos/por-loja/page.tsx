@@ -256,6 +256,7 @@ export default function DocumentosPorLojaPage() {
 
   useEffect(() => {
     if (!user || authLoading || accessLoading || !canAccessDocumentos) {
+      setLojasLoading(false);
       return;
     }
 
@@ -339,9 +340,14 @@ export default function DocumentosPorLojaPage() {
   }, [selectedLojaId, selectedPrestadorId, selectedMes, selectedSubpastaKey]);
 
   useEffect(() => {
-    if (!user || !selectedLojaId || authLoading || accessLoading) {
+    if (!user || !selectedLojaId) {
       setSubpastas([]);
       setSelectedSubpastaKey(null);
+      setSubpastasLoading(false);
+      return;
+    }
+    if (authLoading || accessLoading || !canAccessDocumentos) {
+      setSubpastasLoading(false);
       return;
     }
 
@@ -423,6 +429,7 @@ export default function DocumentosPorLojaPage() {
     selectedLojaId,
     authLoading,
     accessLoading,
+    canAccessDocumentos,
     isAdmin,
     role,
     selectedPrestadorId,
@@ -446,9 +453,14 @@ export default function DocumentosPorLojaPage() {
   );
 
   useEffect(() => {
-    if (!user || !selectedLojaId || !selectedSubpasta || authLoading || accessLoading) {
+    if (!user || !selectedLojaId || !selectedSubpasta) {
       setDocs([]);
       setTotal(0);
+      setDocsLoading(false);
+      return;
+    }
+    if (authLoading || accessLoading || !canAccessDocumentos) {
+      setDocsLoading(false);
       return;
     }
 
@@ -525,6 +537,7 @@ export default function DocumentosPorLojaPage() {
     page,
     authLoading,
     accessLoading,
+    canAccessDocumentos,
     isAdmin,
     role,
     selectedPrestadorId,
