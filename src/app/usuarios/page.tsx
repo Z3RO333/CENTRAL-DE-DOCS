@@ -180,7 +180,7 @@ export default function UsuariosPage() {
     }
     const token = sessionData.session?.access_token;
     if (!token) {
-      throw new Error("Sessao expirada. Faca login novamente.");
+      throw new Error("Sessão expirada. Faça login novamente.");
     }
     return token;
   }, []);
@@ -369,7 +369,7 @@ export default function UsuariosPage() {
       }
       const token = sessionData.session?.access_token;
       if (!token) {
-        throw new Error("Sessao expirada. Faca login novamente.");
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
       const response = await fetch("/api/admin/users", {
         headers: {
@@ -533,11 +533,11 @@ export default function UsuariosPage() {
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6">
       <header>
         <h1 className="text-2xl font-semibold text-slate-900">
-          Gerenciamento de usuarios
+          Gerenciamento de usuários
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Aqui voce pode gerenciar os usuarios da aplicacao. Altere as funcoes
-          e permissoes de cada usuario.
+          Aqui você pode gerenciar os usuários da aplicação. Altere as funções
+          e permissões de cada usuário.
         </p>
       </header>
 

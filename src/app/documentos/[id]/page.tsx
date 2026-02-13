@@ -104,7 +104,7 @@ const normalizeSignatureDataUrl = async (
         canvas.height = height;
         const ctx = canvas.getContext("2d");
         if (!ctx) {
-          reject(new Error("Nao foi possivel processar a assinatura SVG."));
+          reject(new Error("Não foi possível processar a assinatura SVG."));
           return;
         }
         ctx.clearRect(0, 0, width, height);
@@ -112,7 +112,7 @@ const normalizeSignatureDataUrl = async (
         resolve({ dataUrl: canvas.toDataURL("image/png"), format: "png" });
       };
       img.onerror = () => {
-        reject(new Error("Nao foi possivel processar a assinatura SVG."));
+        reject(new Error("Não foi possível processar a assinatura SVG."));
       };
       img.src = dataUrl;
     });

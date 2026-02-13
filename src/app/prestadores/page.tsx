@@ -235,7 +235,7 @@ const getDocumentoNome = (registro: {
         }
         const token = data.session?.access_token;
         if (!token) {
-          throw new Error("Sessao expirada. Faca login novamente.");
+          throw new Error("Sessão expirada. Faça login novamente.");
         }
 
         const response = await fetch(
@@ -259,7 +259,7 @@ const getDocumentoNome = (registro: {
         };
 
         if (!response.ok) {
-          throw new Error(payload.error ?? "Nao foi possivel carregar vinculos.");
+          throw new Error(payload.error ?? "Não foi possível carregar vínculos.");
         }
 
         const next = (payload.vinculos ?? []).reduce<
@@ -283,7 +283,7 @@ const getDocumentoNome = (registro: {
         setVinculosError(
           err instanceof Error
             ? err.message
-            : "Nao foi possivel carregar vinculos.",
+            : "Não foi possível carregar vínculos.",
         );
         setVinculos({});
       } finally {
@@ -309,7 +309,7 @@ const getDocumentoNome = (registro: {
         }
         const token = data.session?.access_token;
         if (!token) {
-          throw new Error("Sessao expirada. Faca login novamente.");
+          throw new Error("Sessão expirada. Faça login novamente.");
         }
 
         const params = new URLSearchParams();
@@ -337,7 +337,7 @@ const getDocumentoNome = (registro: {
 
         if (!response.ok) {
           throw new Error(
-            payload.error ?? "Nao foi possivel carregar documentos.",
+            payload.error ?? "Não foi possível carregar documentos.",
           );
         }
 
@@ -350,7 +350,7 @@ const getDocumentoNome = (registro: {
         setDocumentosError(
           err instanceof Error
             ? err.message
-            : "Nao foi possivel carregar documentos.",
+            : "Não foi possível carregar documentos.",
         );
         setDocumentosVinculo([]);
       } finally {
@@ -876,7 +876,7 @@ const getDocumentoNome = (registro: {
       }
       const token = data.session?.access_token;
       if (!token) {
-        throw new Error("Sessao expirada. Faca login novamente.");
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
 
       const response = await fetch("/api/prestador-regras-vinculos/apply", {
@@ -895,7 +895,7 @@ const getDocumentoNome = (registro: {
       };
 
       if (!response.ok) {
-        throw new Error(payload.error ?? "Nao foi possivel aplicar a regra.");
+        throw new Error(payload.error ?? "Não foi possível aplicar a regra.");
       }
 
       setRegraFeedback({
@@ -910,7 +910,7 @@ const getDocumentoNome = (registro: {
         error:
           err instanceof Error
             ? err.message
-            : "Nao foi possivel aplicar a regra.",
+            : "Não foi possível aplicar a regra.",
         success: null,
       });
     } finally {
@@ -930,7 +930,7 @@ const getDocumentoNome = (registro: {
       }
       const token = data.session?.access_token;
       if (!token) {
-        throw new Error("Sessao expirada. Faca login novamente.");
+        throw new Error("Sessão expirada. Faça login novamente.");
       }
 
       if (nextValue) {
@@ -948,7 +948,7 @@ const getDocumentoNome = (registro: {
         });
         const payload = (await response.json()) as { error?: string };
         if (!response.ok) {
-          throw new Error(payload.error ?? "Nao foi possivel criar o vinculo.");
+          throw new Error(payload.error ?? "Não foi possível criar o vínculo.");
         }
       } else {
         const params = new URLSearchParams();
@@ -965,7 +965,7 @@ const getDocumentoNome = (registro: {
         );
         const payload = (await response.json()) as { error?: string };
         if (!response.ok) {
-          throw new Error(payload.error ?? "Nao foi possivel remover o vinculo.");
+          throw new Error(payload.error ?? "Não foi possível remover o vínculo.");
         }
       }
 
@@ -976,7 +976,7 @@ const getDocumentoNome = (registro: {
       setVinculosError(
         err instanceof Error
           ? err.message
-          : "Nao foi possivel atualizar o vinculo.",
+          : "Não foi possível atualizar o vínculo.",
       );
     }
   };
@@ -1346,7 +1346,7 @@ const getDocumentoNome = (registro: {
                               <p className="mt-1 text-[11px] text-slate-500">
                                 Tipo:{" "}
                                 {regra.tipo_regra === "tipo_servico"
-                                  ? "Tipo de servico"
+                                  ? "Tipo de serviço"
                                   : "Tipo de formulario"}
                               </p>
                               <p className="mt-1 text-[11px] text-slate-500">
@@ -1563,10 +1563,10 @@ const getDocumentoNome = (registro: {
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
                   >
                     <option value="formulario">Tipo de formulario</option>
-                    <option value="tipo_servico">Tipo de servico</option>
+                    <option value="tipo_servico">Tipo de serviço</option>
                   </select>
                   <span className="mt-1 block text-[11px] font-normal text-slate-500">
-                    Use formulario para tipos (ex.: notas_fiscais) ou servico
+                    Use formulário para tipos (ex.: notas_fiscais) ou serviço
                     para laudos.
                   </span>
                 </label>
@@ -1613,7 +1613,7 @@ const getDocumentoNome = (registro: {
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
                   >
                     <option value="true">Sim, incluir antigos</option>
-                    <option value="false">Nao, aplicar a partir de data</option>
+                    <option value="false">Não, aplicar a partir de data</option>
                   </select>
                   <span className="mt-1 block text-[11px] font-normal text-slate-500">
                     Se escolher nao, a regra considera apenas documentos a partir
@@ -1816,7 +1816,7 @@ const getDocumentoNome = (registro: {
                             </p>
                             {servico ? (
                               <p className="text-[11px] text-slate-500">
-                                Servico: {servico}
+                                Serviço: {servico}
                               </p>
                             ) : null}
                             <p className="text-[11px] text-slate-400">

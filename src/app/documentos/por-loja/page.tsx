@@ -50,14 +50,14 @@ const MESES = [
 ] as const;
 
 const tipoLabel: Record<string, string> = {
-  retencao_trabalhista: "Retencao Trabalhista",
+  retencao_trabalhista: "Retenção Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
 };
 
 const statusLabel: Record<string, string> = {
   pendente: "Pendente",
-  em_analise: "Em analise",
+  em_analise: "Em análise",
   assinado: "Assinado",
 };
 
@@ -152,7 +152,7 @@ export default function DocumentosPorLojaPage() {
     }
     const token = sessionData.session?.access_token;
     if (!token) {
-      throw new Error("Sessao expirada. Faca login novamente.");
+      throw new Error("Sessão expirada. Faça login novamente.");
     }
     return token;
   }, []);
@@ -373,7 +373,7 @@ export default function DocumentosPorLojaPage() {
         .createSignedUrl(path, expiresIn);
 
       if (signedError || !data?.signedUrl) {
-        throw signedError ?? new Error("Nao foi possivel gerar o link do arquivo.");
+        throw signedError ?? new Error("Não foi possível gerar o link do arquivo.");
       }
       return data.signedUrl;
     },
@@ -397,11 +397,11 @@ export default function DocumentosPorLojaPage() {
         const signedUrl = await getSignedFileUrl(path);
         const opened = window.open(signedUrl, "_blank", "noopener,noreferrer");
         if (!opened) {
-          setError("Nao foi possivel abrir o documento. Verifique o bloqueador de pop-up.");
+          setError("Não foi possível abrir o documento. Verifique o bloqueador de pop-up.");
         }
       } catch (err) {
         console.error("Erro ao abrir arquivo assinado:", err);
-        setError("Nao foi possivel abrir o documento. Tente novamente.");
+        setError("Não foi possível abrir o documento. Tente novamente.");
       }
     },
     [getSignedFileUrl],
@@ -647,10 +647,10 @@ export default function DocumentosPorLojaPage() {
                     <p className="text-[11px] text-slate-500">
                       Prestador:{" "}
                       {doc.prestador_id
-                        ? prestadorLabelById.get(doc.prestador_id) ?? doc.prestador_id
-                        : typeof doc.dados?.prestador === "string"
-                          ? doc.dados.prestador
-                          : "Prestador nao informado"}
+                          ? prestadorLabelById.get(doc.prestador_id) ?? doc.prestador_id
+                          : typeof doc.dados?.prestador === "string"
+                            ? doc.dados.prestador
+                          : "Prestador não informado"}
                     </p>
                     <p className="truncate text-[11px] text-slate-400">
                       ID: {doc.id}
@@ -745,7 +745,7 @@ export default function DocumentosPorLojaPage() {
           {selectedLojaId && total > PAGE_SIZE && (
             <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
               <span>
-                {total} resultado(s) - Pagina {page} de {totalPages}
+                {total} resultado(s) - Página {page} de {totalPages}
               </span>
               <div className="flex gap-2">
                 <button
@@ -764,7 +764,7 @@ export default function DocumentosPorLojaPage() {
                   disabled={page >= totalPages}
                   className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Proxima
+                  Próxima
                 </button>
               </div>
             </div>
