@@ -120,6 +120,7 @@ const resolveSignedPdfPath = (path?: string | null) => {
 export default function DocumentosPorLojaPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
   const {
     modules,
     role,
@@ -131,11 +132,11 @@ export default function DocumentosPorLojaPage() {
     prestadores,
     loading: prestadoresLoading,
   } = usePrestadores({
-    enabled: Boolean(user),
+    enabled: Boolean(userId),
     assignedOnly: !isAdmin,
   });
   const { lojas: lojasCadastradas, loading: lojasCadastradasLoading } = useLojas({
-    enabled: Boolean(user) && isAdmin,
+    enabled: Boolean(userId) && isAdmin,
   });
 
   const [lojas, setLojas] = useState<LojaPasta[]>([]);
@@ -244,7 +245,7 @@ export default function DocumentosPorLojaPage() {
       return;
     }
 
-    if (!user) {
+    if (!userId) {
       router.replace("/login");
       return;
     }
@@ -252,10 +253,10 @@ export default function DocumentosPorLojaPage() {
     if (!canAccessDocumentos) {
       router.replace("/dashboard");
     }
-  }, [authLoading, accessLoading, user, canAccessDocumentos, router]);
+  }, [authLoading, accessLoading, userId, canAccessDocumentos, router]);
 
   useEffect(() => {
-    if (!user || authLoading || accessLoading || !canAccessDocumentos) {
+    if (!userId || authLoading || accessLoading || !canAccessDocumentos) {
       setLojasLoading(false);
       return;
     }
@@ -267,7 +268,7 @@ export default function DocumentosPorLojaPage() {
       try {
         const token = await getAccessToken();
         const params = new URLSearchParams();
-        const userFilter = !isAdmin && role === "colaborador" ? user.id : "";
+        const userFilter = !isAdmin && role === "colaborador" ? userId : "";
         if (userFilter) {
           params.set("userId", userFilter);
         }
@@ -323,7 +324,7 @@ export default function DocumentosPorLojaPage() {
       active = false;
     };
   }, [
-    user,
+    userId,
     authLoading,
     accessLoading,
     canAccessDocumentos,
@@ -340,7 +341,7 @@ export default function DocumentosPorLojaPage() {
   }, [selectedLojaId, selectedPrestadorId, selectedMes, selectedSubpastaKey]);
 
   useEffect(() => {
-    if (!user || !selectedLojaId) {
+    if (!userId || !selectedLojaId) {
       setSubpastas([]);
       setSelectedSubpastaKey(null);
       setSubpastasLoading(false);
@@ -359,7 +360,7 @@ export default function DocumentosPorLojaPage() {
         const token = await getAccessToken();
         const params = new URLSearchParams();
         params.set("lojaId", selectedLojaId);
-        const userFilter = !isAdmin && role === "colaborador" ? user.id : "";
+        const userFilter = !isAdmin && role === "colaborador" ? userId : "";
         if (userFilter) {
           params.set("userId", userFilter);
         }
@@ -425,7 +426,7 @@ export default function DocumentosPorLojaPage() {
       active = false;
     };
   }, [
-    user,
+    userId,
     selectedLojaId,
     authLoading,
     accessLoading,
@@ -453,7 +454,7 @@ export default function DocumentosPorLojaPage() {
   );
 
   useEffect(() => {
-    if (!user || !selectedLojaId || !selectedSubpasta) {
+    if (!userId || !selectedLojaId || !selectedSubpasta) {
       setDocs([]);
       setTotal(0);
       setDocsLoading(false);
@@ -474,7 +475,7 @@ export default function DocumentosPorLojaPage() {
         params.set("lojaId", selectedLojaId);
         params.set("limit", PAGE_SIZE.toString());
         params.set("offset", ((page - 1) * PAGE_SIZE).toString());
-        const userFilter = !isAdmin && role === "colaborador" ? user.id : "";
+        const userFilter = !isAdmin && role === "colaborador" ? userId : "";
         if (userFilter) {
           params.set("userId", userFilter);
         }
@@ -532,7 +533,7 @@ export default function DocumentosPorLojaPage() {
       active = false;
     };
   }, [
-    user,
+    userId,
     selectedLojaId,
     page,
     authLoading,
