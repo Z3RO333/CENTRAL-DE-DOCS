@@ -45,6 +45,7 @@ const PAGE_SIZE = 20;
 const STORAGE_BUCKET = "formularios";
 const SIGNED_URL_EXPIRES_IN = 60 * 30;
 const CURRENT_YEAR = new Date().getFullYear().toString();
+const PAGE_STATE_STORAGE_KEY = "documentos-por-loja:state";
 const MESES = [
   { value: "01", label: "Janeiro" },
   { value: "02", label: "Fevereiro" },
@@ -157,6 +158,7 @@ export default function DocumentosPorLojaPage() {
   const [editingPrestadorId, setEditingPrestadorId] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [hasRestoredState, setHasRestoredState] = useState(false);
 
   const getAccessToken = useCallback(async () => {
     const { data: sessionData, error: sessionError } =
@@ -170,6 +172,72 @@ export default function DocumentosPorLojaPage() {
     }
     return token;
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || hasRestoredState) {
+      return;
+    }
+    try {
+      const raw = window.sessionStorage.getItem(PAGE_STATE_STORAGE_KEY);
+      if (!raw) {
+        setHasRestoredState(true);
+        return;
+      }
+      const parsed = JSON.parse(raw) as {
+        selectedLojaId?: string;
+        lojaSearch?: string;
+        selectedPrestadorId?: string;
+        selectedMes?: string;
+        selectedSubpastaKey?: string;
+        page?: number;
+      };
+      if (typeof parsed.selectedLojaId === "string") {
+        setSelectedLojaId(parsed.selectedLojaId);
+      }
+      if (typeof parsed.lojaSearch === "string") {
+        setLojaSearch(parsed.lojaSearch);
+      }
+      if (typeof parsed.selectedPrestadorId === "string") {
+        setSelectedPrestadorId(parsed.selectedPrestadorId);
+      }
+      if (typeof parsed.selectedMes === "string") {
+        setSelectedMes(parsed.selectedMes);
+      }
+      if (typeof parsed.selectedSubpastaKey === "string") {
+        setSelectedSubpastaKey(parsed.selectedSubpastaKey);
+      }
+      if (typeof parsed.page === "number" && Number.isFinite(parsed.page)) {
+        setPage(Math.max(1, parsed.page));
+      }
+    } catch (err) {
+      console.error("Erro ao restaurar estado de documentos por loja:", err);
+    } finally {
+      setHasRestoredState(true);
+    }
+  }, [hasRestoredState]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !hasRestoredState) {
+      return;
+    }
+    const snapshot = {
+      selectedLojaId,
+      lojaSearch,
+      selectedPrestadorId,
+      selectedMes,
+      selectedSubpastaKey,
+      page,
+    };
+    window.sessionStorage.setItem(PAGE_STATE_STORAGE_KEY, JSON.stringify(snapshot));
+  }, [
+    hasRestoredState,
+    selectedLojaId,
+    lojaSearch,
+    selectedPrestadorId,
+    selectedMes,
+    selectedSubpastaKey,
+    page,
+  ]);
 
   useEffect(() => {
     if (authLoading || accessLoading) {
@@ -230,7 +298,12 @@ export default function DocumentosPorLojaPage() {
         }
         const next = payload.lojas ?? [];
         setLojas(next);
-        setSelectedLojaId((prev) => prev ?? next[0]?.lojaId ?? null);
+        setSelectedLojaId((prev) => {
+          if (prev && next.some((item) => item.lojaId === prev)) {
+            return prev;
+          }
+          return next[0]?.lojaId ?? null;
+        });
       } catch (err) {
         if (active) {
           setError(err instanceof Error ? err.message : "Falha ao carregar pastas.");
@@ -513,25 +586,30 @@ export default function DocumentosPorLojaPage() {
   const openDocumentFile = useCallback(
     async (doc: DocumentoItem) => {
       setError(null);
+      const tab = window.open("", "_blank", "noopener,noreferrer");
+      if (!tab) {
+        setError("Nao foi possivel abrir nova aba. Verifique o bloqueador de pop-up.");
+        return;
+      }
+
       const path =
         resolveSignedPdfPath(doc.arquivo_assinado_path) ??
         doc.arquivo_assinado_path ??
         doc.arquivo_path;
 
       if (!path) {
+        tab.close();
         setError("Arquivo indisponivel no momento.");
         return;
       }
 
       try {
         const signedUrl = await getSignedFileUrl(path);
-        const opened = window.open(signedUrl, "_blank", "noopener,noreferrer");
-        if (!opened) {
-          setError("Não foi possível abrir o documento. Verifique o bloqueador de pop-up.");
-        }
+        tab.location.href = signedUrl;
       } catch (err) {
+        tab.close();
         console.error("Erro ao abrir arquivo assinado:", err);
-        setError("Não foi possível abrir o documento. Tente novamente.");
+        setError("Nao foi possivel abrir o documento. Tente novamente.");
       }
     },
     [getSignedFileUrl],
