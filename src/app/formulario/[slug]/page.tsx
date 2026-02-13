@@ -181,6 +181,23 @@ const formatData = (value: string) => {
   return date.toLocaleString("pt-BR");
 };
 
+const formatCompetenciaInput = (value: string) => {
+  const digits = value.replace(/\D/g, "").slice(0, 6);
+  if (digits.length <= 2) {
+    return digits;
+  }
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+};
+
+const isCompetenciaValida = (value: string) => {
+  const match = value.match(/^(\d{2})\/(\d{4})$/);
+  if (!match) {
+    return false;
+  }
+  const month = Number(match[1]);
+  return month >= 1 && month <= 12;
+};
+
 type DocumentoHistorico = {
   id: string;
   tipo: string;
@@ -364,9 +381,13 @@ export default function FormularioPage() {
 
   const handleChange = (name: string, value: string) => {
     setValues((prev) => {
-      const updated = { ...prev, [name]: value };
+      const nextValue =
+        config.slug === "retencao-trabalhista" && name === "competencia"
+          ? formatCompetenciaInput(value)
+          : value;
+      const updated = { ...prev, [name]: nextValue };
       if (config.slug === "notas-fiscais" && name === "numero_pedido") {
-        updated.numero_nf = value;
+        updated.numero_nf = nextValue;
       }
       return updated;
     });
@@ -565,6 +586,14 @@ export default function FormularioPage() {
         setError("Sessão expirada. Faça login novamente.");
         router.push("/login");
         return;
+      }
+
+      if (config.slug === "retencao-trabalhista") {
+        const competencia = values.competencia ?? "";
+        if (!isCompetenciaValida(competencia)) {
+          setError("Competencia invalida. Use o formato MM/AAAA.");
+          return;
+        }
       }
 
       beginFormProgress();
@@ -771,6 +800,8 @@ export default function FormularioPage() {
                   onChange={(e) => handleChange(field.name, e.target.value)}
                   placeholder={field.placeholder}
                   list={field.options ? `${field.name}-options` : undefined}
+                  inputMode={field.name === "competencia" ? "numeric" : undefined}
+                  maxLength={field.name === "competencia" ? 7 : undefined}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-sky-500/40 placeholder:text-slate-400 focus:border-sky-500 focus:ring"
                 />
               )}
@@ -797,6 +828,11 @@ export default function FormularioPage() {
                     : lojas.length === 0
                       ? "Cadastre uma loja antes de enviar documentos."
                       : "Selecione a loja para vincular o envio."}
+                </p>
+              )}
+              {field.name === "competencia" && (
+                <p className="text-[11px] text-slate-500">
+                  Digite apenas numeros. O formato sera aplicado automaticamente: MM/AAAA.
                 </p>
               )}
             </div>
