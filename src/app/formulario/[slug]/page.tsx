@@ -265,6 +265,7 @@ export default function FormularioPage() {
 
   const [values, setValues] = useState<FormValues>({});
   const [files, setFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -407,6 +408,17 @@ export default function FormularioPage() {
 
   const handleLojaSelection = (lojaId: string) => {
     handleChange("loja_id", lojaId);
+  };
+
+  const removeSelectedFile = (targetIndex: number) => {
+    setFiles((prev) => prev.filter((_, index) => index !== targetIndex));
+  };
+
+  const clearSelectedFiles = () => {
+    setFiles([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const beginFormProgress = () => {
@@ -848,6 +860,7 @@ export default function FormularioPage() {
           </label>
           <input
             id="arquivo"
+            ref={fileInputRef}
             type="file"
             accept="application/pdf,image/png,image/jpeg"
             required
@@ -861,6 +874,41 @@ export default function FormularioPage() {
             className="block w-full cursor-pointer rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-sky-500 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:border-sky-500"
           />
           <p className="text-[11px] text-slate-500">PNG, JPEG ou PDF</p>
+          {files.length > 0 && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[11px] font-medium text-slate-600">
+                  {files.length} arquivo(s) selecionado(s)
+                </p>
+                <button
+                  type="button"
+                  onClick={clearSelectedFiles}
+                  className="text-[11px] font-semibold text-red-600 transition hover:text-red-500"
+                >
+                  Limpar todos
+                </button>
+              </div>
+              <ul className="space-y-1">
+                {files.map((file, index) => (
+                  <li
+                    key={`${file.name}-${file.size}-${index}`}
+                    className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-2 py-1.5"
+                  >
+                    <span className="truncate text-[11px] text-slate-700">
+                      {file.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeSelectedFile(index)}
+                      className="shrink-0 text-[11px] font-semibold text-red-600 transition hover:text-red-500"
+                    >
+                      Remover
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {error && (
