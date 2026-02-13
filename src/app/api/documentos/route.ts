@@ -583,15 +583,27 @@ export async function PATCH(request: Request) {
     const body = (await request.json()) as {
       id?: string;
       updates?: Record<string, unknown>;
+      lojaId?: string | null;
+      prestadorId?: string | null;
     };
     const id = body.id?.trim();
-    if (!id || !body.updates || typeof body.updates !== "object") {
-      throw new HttpError(400, "Informe o id e os dados para atualização.");
+    const hasDadosUpdates =
+      body.updates &&
+      typeof body.updates === "object" &&
+      Object.keys(body.updates).length > 0;
+    const hasLojaUpdate = Object.prototype.hasOwnProperty.call(body, "lojaId");
+    const hasPrestadorUpdate = Object.prototype.hasOwnProperty.call(
+      body,
+      "prestadorId",
+    );
+
+    if (!id || (!hasDadosUpdates && !hasLojaUpdate && !hasPrestadorUpdate)) {
+      throw new HttpError(400, "Informe o id e os dados para atualizacao.");
     }
 
     const { data: registro, error: registroError } = await supabaseAdmin
       .from("formularios")
-      .select("id,dados")
+      .select("id,dados,prestador_id")
       .eq("id", id)
       .maybeSingle();
     if (registroError) {
@@ -602,16 +614,69 @@ export async function PATCH(request: Request) {
     }
 
     const dadosAtuais = safeParseDados(registro.dados) ?? {};
+    const updates = hasDadosUpdates ? body.updates ?? {} : {};
     const dadosAtualizados = {
       ...dadosAtuais,
-      ...body.updates,
+      ...updates,
       edited_by: email ?? user.id,
       edited_at: new Date().toISOString(),
     };
+    const updatePayload: {
+      dados: Record<string, unknown>;
+      prestador_id?: string | null;
+    } = {
+      dados: dadosAtualizados,
+    };
+
+    if (hasLojaUpdate) {
+      const lojaId = sanitizeId((body.lojaId ?? "").trim());
+      if (!lojaId) {
+        throw new HttpError(400, "Informe uma loja valida.");
+      }
+
+      const { data: loja, error: lojaError } = await supabaseAdmin
+        .from("lojas")
+        .select("id,nome")
+        .eq("id", lojaId)
+        .maybeSingle();
+      if (lojaError) {
+        throw lojaError;
+      }
+      if (!loja) {
+        throw new HttpError(404, "Loja nao encontrada.");
+      }
+
+      updatePayload.dados.loja_id = loja.id;
+      updatePayload.dados.loja_nome =
+        typeof loja.nome === "string" ? loja.nome : "Loja";
+    }
+
+    if (hasPrestadorUpdate) {
+      const prestadorId = sanitizeId((body.prestadorId ?? "").trim());
+      if (!prestadorId) {
+        updatePayload.prestador_id = null;
+        delete updatePayload.dados.prestador;
+      } else {
+        const { data: prestador, error: prestadorError } = await supabaseAdmin
+          .from("prestadores")
+          .select("id,nome")
+          .eq("id", prestadorId)
+          .maybeSingle();
+        if (prestadorError) {
+          throw prestadorError;
+        }
+        if (!prestador) {
+          throw new HttpError(404, "Prestador nao encontrado.");
+        }
+        updatePayload.prestador_id = prestador.id;
+        updatePayload.dados.prestador =
+          typeof prestador.nome === "string" ? prestador.nome : prestador.id;
+      }
+    }
 
     const { data: updated, error: updateError } = await supabaseAdmin
       .from("formularios")
-      .update({ dados: dadosAtualizados })
+      .update(updatePayload)
       .eq("id", id)
       .select(
         "id,tipo,status,arquivo_path,arquivo_assinado_path,created_at,dados,assinado_por,user_id,prestador_id",

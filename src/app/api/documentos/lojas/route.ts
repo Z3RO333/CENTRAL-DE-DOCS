@@ -177,6 +177,8 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const filterUserId = searchParams.get("userId")?.trim() ?? "";
+    const anoFilter = searchParams.get("ano");
+    const mesFilter = searchParams.get("mes");
     const filterPrestadores = Array.from(
       new Set(
         searchParams
@@ -252,6 +254,28 @@ export async function GET(request: Request) {
       query = query.eq("prestador_id", filterPrestadores[0]);
     } else if (filterPrestadores.length > 1) {
       query = query.in("prestador_id", filterPrestadores);
+    }
+
+    if (anoFilter && anoFilter !== "todos") {
+      const ano = Number(anoFilter);
+      if (!Number.isNaN(ano)) {
+        if (mesFilter && mesFilter !== "todos") {
+          const mes = Number(mesFilter);
+          if (!Number.isNaN(mes) && mes >= 1 && mes <= 12) {
+            const start = new Date(ano, mes - 1, 1);
+            const end = new Date(ano, mes, 1);
+            query = query
+              .gte("created_at", start.toISOString())
+              .lt("created_at", end.toISOString());
+          }
+        } else {
+          const start = new Date(ano, 0, 1);
+          const end = new Date(ano + 1, 0, 1);
+          query = query
+            .gte("created_at", start.toISOString())
+            .lt("created_at", end.toISOString());
+        }
+      }
     }
 
     const { data: firstBatch, error, count } = await query.range(0, 999);
