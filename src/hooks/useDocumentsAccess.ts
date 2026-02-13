@@ -204,7 +204,8 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         baseModules.documentos = true;
         baseModules.dashboards = true;
         baseModules.perfil = true;
-      } else if (isGerenteLoja || hasAnyModulePermission) {
+      } else if (isGerenteLoja || hasAnyModulePermission || Boolean(user)) {
+        // Colaborador autenticado deve manter acesso ao fluxo de formularios/documentos.
         baseModules.documentos = true;
       }
 
