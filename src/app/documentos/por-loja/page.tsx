@@ -586,7 +586,7 @@ export default function DocumentosPorLojaPage() {
   const openDocumentFile = useCallback(
     async (doc: DocumentoItem) => {
       setError(null);
-      const tab = window.open("", "_blank", "noopener,noreferrer");
+      const tab = window.open("about:blank", "_blank");
       if (!tab) {
         setError("Nao foi possivel abrir nova aba. Verifique o bloqueador de pop-up.");
         return;
@@ -605,6 +605,7 @@ export default function DocumentosPorLojaPage() {
 
       try {
         const signedUrl = await getSignedFileUrl(path);
+        tab.opener = null;
         tab.location.href = signedUrl;
       } catch (err) {
         tab.close();
