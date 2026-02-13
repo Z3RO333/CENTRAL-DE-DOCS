@@ -100,14 +100,16 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
       };
 
       const baseModules: ModulesAccess = {
-        documentos: true,
+        documentos: false,
         dashboards: false,
         perfil: false,
       };
       let resolvedIsAdmin = false;
+      let hasAnyModulePermission = false;
 
       const applyRecords = (records: { modulo?: string | null }[] | null) => {
         records?.forEach((item) => {
+          hasAnyModulePermission = true;
           const modulo = item.modulo ?? "documentos";
           if (ADMIN_MODULE_SET.has(modulo)) {
             resolvedIsAdmin = true;
@@ -202,7 +204,15 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         baseModules.documentos = true;
         baseModules.dashboards = true;
         baseModules.perfil = true;
+      } else if (isGerenteLoja || hasAnyModulePermission) {
+        baseModules.documentos = true;
       }
+
+      const resolvedHasAccess =
+        resolvedIsAdmin ||
+        isGerenteLoja ||
+        Object.values(baseModules).some(Boolean);
+
       if (isMountedRef.current) {
         setModules(baseModules);
         setIsAdmin(resolvedIsAdmin);
@@ -213,11 +223,11 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         } else {
           setRole("colaborador");
         }
-        setHasAccess(Boolean(user));
+        setHasAccess(resolvedHasAccess);
         setError(null);
       }
     } catch (err) {
-      console.error("Erro ao verificar permissões de documentos:", err);
+      console.error("Erro ao verificar permissoes de documentos:", err);
       if (isMountedRef.current) {
         setHasAccess(false);
         setIsAdmin(false);
@@ -230,7 +240,7 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         setError(
           err instanceof Error
             ? err.message
-            : "Não foi possível confirmar seu acesso.",
+            : "Nao foi possivel confirmar seu acesso.",
         );
       }
     } finally {
@@ -256,4 +266,5 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
     refresh: fetchAccess,
   };
 }
+
 

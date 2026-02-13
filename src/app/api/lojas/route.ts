@@ -104,14 +104,8 @@ function normalizeEmails(values: string[]) {
 
 export async function GET(request: Request) {
   try {
-    const user = await getSessionUser(request);
-    const email = user.email?.toLowerCase().trim() ?? null;
+    await getSessionUser(request);
     const supabaseAdmin = createSupabaseAdminClient();
-
-    const canAccess = await hasAdminAccess(user.id, email, supabaseAdmin);
-    if (!canAccess) {
-      throw new HttpError(403, "Você não possui permissão para gerenciar lojas.");
-    }
 
     const { data, error } = await supabaseAdmin
       .from("lojas")
@@ -303,3 +297,4 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+

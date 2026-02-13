@@ -24,7 +24,7 @@ async function getAuthorizedAdmin(accessToken: string) {
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
-      "NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY são obrigatórios.",
+      "NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY sao obrigatorios.",
     );
   }
 
@@ -39,7 +39,7 @@ async function getAuthorizedAdmin(accessToken: string) {
     await supabaseSessionClient.auth.getUser(accessToken);
 
   if (sessionError || !userData?.user) {
-    throw new Error("Sessão inválida.");
+    throw new Error("Sessao invalida.");
   }
 
   const supabaseAdmin = createSupabaseAdminClient();
@@ -63,11 +63,11 @@ async function getAuthorizedAdmin(accessToken: string) {
   let hasPermission = Boolean(permissionById);
   if (!hasPermission && requesterEmail) {
     const { data: permissionByEmail, error: permissionByEmailError } =
-        await supabaseAdmin
-          .from("documentos_acesso")
-          .select("id")
-          .eq("email", requesterEmail)
-          .eq("scope", "admin")
+      await supabaseAdmin
+        .from("documentos_acesso")
+        .select("id")
+        .eq("email", requesterEmail)
+        .eq("scope", "admin")
         .in("modulo", ADMIN_MODULES)
         .limit(1)
         .maybeSingle();
@@ -79,7 +79,7 @@ async function getAuthorizedAdmin(accessToken: string) {
   }
 
   if (!hasPermission) {
-    throw new Error("Você não tem permissão para gerenciar acessos.");
+    throw new Error("Voce nao tem permissao para gerenciar acessos.");
   }
 
   return supabaseAdmin;
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
-        { error: "Requisição não autorizada." },
+        { error: "Requisicao nao autorizada." },
         { status: 401 },
       );
     }
@@ -99,10 +99,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Payload;
 
     if (!body?.action) {
-      return NextResponse.json(
-        { error: "Ação inválida." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Acao invalida." }, { status: 400 });
     }
 
     const supabaseAdmin = await getAuthorizedAdmin(token);
@@ -111,16 +108,13 @@ export async function POST(request: Request) {
       const normalizedEmail = body.email?.toLowerCase().trim();
       if (!normalizedEmail) {
         return NextResponse.json(
-          { error: "Informe o e-mail do usuário." },
+          { error: "Informe o e-mail do usuario." },
           { status: 400 },
         );
       }
 
       if (!MODULE_WHITELIST.includes(body.module)) {
-        return NextResponse.json(
-          { error: "Módulo inválido." },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: "Modulo invalido." }, { status: 400 });
       }
 
       let resolvedUserId = body.userId?.trim() || null;
@@ -129,14 +123,16 @@ export async function POST(request: Request) {
         let page = 1;
         // eslint-disable-next-line no-constant-condition
         while (true) {
-          const { data, error: listError } =
-            await supabaseAdmin.auth.admin.listUsers({
+          const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers(
+            {
               page,
               perPage,
-            });
+            },
+          );
           if (listError) {
             return NextResponse.json({ error: listError.message }, { status: 400 });
           }
+
           const match =
             data?.users?.find(
               (user) => user.email?.toLowerCase().trim() === normalizedEmail,
@@ -156,7 +152,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error:
-              "Usuário não encontrado no Supabase. Informe o ID ou solicite que o usuário faça login pelo menos uma vez.",
+              "Usuario nao encontrado no Supabase. Informe o ID ou solicite que o usuario faca login pelo menos uma vez.",
           },
           { status: 400 },
         );
@@ -176,10 +172,7 @@ export async function POST(request: Request) {
         .single();
 
       if (insertError) {
-        return NextResponse.json(
-          { error: insertError.message },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: insertError.message }, { status: 400 });
       }
 
       return NextResponse.json({ permission: data });
@@ -198,21 +191,18 @@ export async function POST(request: Request) {
       .eq("id", body.permissionId);
 
     if (deleteError) {
-      return NextResponse.json(
-        { error: deleteError.message },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: deleteError.message }, { status: 400 });
     }
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("Erro na API de permissões:", err);
+    console.error("Erro na API de permissoes:", err);
     return NextResponse.json(
       {
         error:
           err instanceof Error
             ? err.message
-            : "Erro interno ao atualizar permissões.",
+            : "Erro interno ao atualizar permissoes.",
       },
       { status: 500 },
     );

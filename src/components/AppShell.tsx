@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Building2,
   Store,
+  FolderOpen,
   HelpCircle,
   Menu,
   ChevronLeft,
@@ -71,7 +72,16 @@ export default function AppShell({
       href: "/documentos",
       label: "Documentos",
       icon: FileText,
-      isActive: pathname?.startsWith("/documentos"),
+      isActive:
+        pathname?.startsWith("/documentos") &&
+        !pathname?.startsWith("/documentos/por-loja"),
+      isVisible: canAccessDocuments,
+    },
+    {
+      href: "/documentos/por-loja",
+      label: "Documentos por Loja",
+      icon: FolderOpen,
+      isActive: pathname?.startsWith("/documentos/por-loja"),
       isVisible: canAccessDocuments,
     },
     {

@@ -49,7 +49,7 @@ export function usePrestadores(
     }
     const token = data.session?.access_token;
     if (!token) {
-      throw new Error("Sessão expirada. Faça login novamente.");
+      throw new Error("Sessao expirada. Faca login novamente.");
     }
     return token;
   }, []);
@@ -85,7 +85,7 @@ export function usePrestadores(
 
       if (!response.ok) {
         throw new Error(
-          payload.error ?? "Não foi possível carregar os prestadores.",
+          payload.error ?? "Nao foi possivel carregar os prestadores.",
         );
       }
 
@@ -103,7 +103,7 @@ export function usePrestadores(
       setError(
         err instanceof Error
           ? err.message
-          : "Não foi possível carregar os prestadores.",
+          : "Nao foi possivel carregar os prestadores.",
       );
     } finally {
       setLoading(false);
@@ -119,10 +119,10 @@ export function usePrestadores(
   const createPrestador = useCallback(
     async (input: CreatePrestadorInput) => {
       if (!enabled) {
-        throw new Error("Criação de prestadores está desabilitada.");
+        throw new Error("Criacao de prestadores esta desabilitada.");
       }
       if (!user) {
-        throw new Error("Sessão expirada. Faça login novamente.");
+        throw new Error("Sessao expirada. Faca login novamente.");
       }
 
       const token = await getAccessToken();
@@ -143,7 +143,7 @@ export function usePrestadores(
       const prestador = payload.prestador;
       if (!response.ok || !prestador) {
         throw new Error(
-          payload.error ?? "Não foi possível cadastrar o prestador.",
+          payload.error ?? "Nao foi possivel cadastrar o prestador.",
         );
       }
 
@@ -161,3 +161,4 @@ export function usePrestadores(
     createPrestador,
   };
 }
+

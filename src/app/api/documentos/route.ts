@@ -424,6 +424,14 @@ export async function GET(request: Request) {
       query = query.eq("tipo", "registro_laudos").neq("status", "assinado");
     }
 
+    if (filterLojas.length === 1) {
+      query = query.eq("dados->>loja_id", filterLojas[0]);
+    } else if (filterLojas.length > 1) {
+      query = query.or(
+        filterLojas.map((lojaId) => `dados->>loja_id.eq.${lojaId}`).join(","),
+      );
+    }
+
     if (anoFilter && anoFilter !== "todos") {
       const ano = Number(anoFilter);
       if (!Number.isNaN(ano)) {

@@ -65,6 +65,7 @@ const FILTERS_CACHE_STORAGE_KEY = "documentos:filter-options";
 type DocumentosListState = {
   tipoFilter: string;
   tipoLaudoFilter: string;
+  userFilter: string;
   lojaFilter: string;
   prestadorFilter: string;
   statusFilter: string;
@@ -77,6 +78,12 @@ type DocumentosListState = {
   scrollY: number;
   page: number;
   pageSize: number;
+};
+
+type AdminUserOption = {
+  id: string;
+  email: string | null;
+  name: string | null;
 };
 
 const normalizeRegistroStatus = (registro: FormularioRecord) => {
@@ -282,6 +289,7 @@ export default function DocumentosPage() {
   const [registros, setRegistros] = useState<FormularioRecord[]>([]);
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
   const [tipoLaudoFilter, setTipoLaudoFilter] = useState<string>("todos");
+  const [userFilter, setUserFilter] = useState<string>("todos");
   const [lojaFilter, setLojaFilter] = useState<string>("todos");
   const [prestadorFilter, setPrestadorFilter] = useState<string>("todos");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
@@ -324,6 +332,8 @@ export default function DocumentosPage() {
   const [filterOptionsLoading, setFilterOptionsLoading] = useState(false);
   const [hasRestoredFilterOptions, setHasRestoredFilterOptions] =
     useState(false);
+  const [adminUsers, setAdminUsers] = useState<AdminUserOption[]>([]);
+  const [adminUsersLoading, setAdminUsersLoading] = useState(false);
 
   const getAccessToken = useCallback(async () => {
     const { data: sessionData, error: sessionError } =
@@ -378,6 +388,51 @@ export default function DocumentosPage() {
       setFilterOptionsLoading(false);
     }
   }, [getAccessToken]);
+
+  useEffect(() => {
+    if (!user || authLoading || accessLoading || !canManageDocuments) {
+      setAdminUsers([]);
+      setAdminUsersLoading(false);
+      return;
+    }
+
+    let active = true;
+    const loadAdminUsers = async () => {
+      setAdminUsersLoading(true);
+      try {
+        const token = await getAccessToken();
+        const response = await fetch("/api/admin/users", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const payload = (await response.json()) as {
+          users?: AdminUserOption[];
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Falha ao carregar usuarios.");
+        }
+        if (active) {
+          setAdminUsers(payload.users ?? []);
+        }
+      } catch (err) {
+        if (active) {
+          setAdminUsers([]);
+          console.error("Erro ao carregar usuarios para filtro:", err);
+        }
+      } finally {
+        if (active) {
+          setAdminUsersLoading(false);
+        }
+      }
+    };
+
+    void loadAdminUsers();
+    return () => {
+      active = false;
+    };
+  }, [user, authLoading, accessLoading, canManageDocuments, getAccessToken]);
 
   useEffect(() => {
     if (hasRestoredFilterOptions || typeof window === "undefined") {
@@ -448,6 +503,9 @@ export default function DocumentosPage() {
         if (parsed.tipoLaudoFilter) {
           setTipoLaudoFilter(parsed.tipoLaudoFilter);
         }
+        if (parsed.userFilter) {
+          setUserFilter(parsed.userFilter);
+        }
         if (parsed.lojaFilter) {
           setLojaFilter(parsed.lojaFilter);
         }
@@ -486,6 +544,7 @@ export default function DocumentosPage() {
         listStateRef.current = {
           tipoFilter: parsed.tipoFilter ?? "todos",
           tipoLaudoFilter: parsed.tipoLaudoFilter ?? "todos",
+          userFilter: parsed.userFilter ?? "todos",
           lojaFilter: parsed.lojaFilter ?? "todos",
           prestadorFilter: parsed.prestadorFilter ?? "todos",
           statusFilter: parsed.statusFilter ?? "todos",
@@ -559,6 +618,7 @@ export default function DocumentosPage() {
     const next: DocumentosListState = {
       tipoFilter,
       tipoLaudoFilter,
+      userFilter,
       lojaFilter,
       prestadorFilter,
       statusFilter,
@@ -580,14 +640,15 @@ export default function DocumentosPage() {
     );
   }, [
     hasRestoredState,
-      tipoFilter,
-      tipoLaudoFilter,
-      lojaFilter,
-      prestadorFilter,
-      statusFilter,
-      identificacaoFilter,
-      anoFilter,
-      mesFilter,
+    tipoFilter,
+    tipoLaudoFilter,
+    userFilter,
+    lojaFilter,
+    prestadorFilter,
+    statusFilter,
+    identificacaoFilter,
+    anoFilter,
+    mesFilter,
     somenteAssinados,
     somenteDisponiveisLote,
     viewMode,
@@ -640,6 +701,7 @@ export default function DocumentosPage() {
   }, [
     tipoFilter,
     tipoLaudoFilter,
+    userFilter,
     lojaFilter,
     prestadorFilter,
     statusFilter,
@@ -706,6 +768,9 @@ export default function DocumentosPage() {
           } else {
             params.set("userId", user.id);
           }
+        }
+        if (canManageDocuments && userFilter !== "todos") {
+          params.set("userId", userFilter);
         }
         params.set("limit", pageSize.toString());
         params.set("offset", ((page - 1) * pageSize).toString());
@@ -806,6 +871,7 @@ export default function DocumentosPage() {
     pageSize,
     tipoFilter,
     tipoLaudoFilter,
+    userFilter,
     lojaFilter,
     prestadorFilter,
     statusFilter,
@@ -1216,6 +1282,7 @@ export default function DocumentosPage() {
   const resetFilters = () => {
     setTipoFilter("todos");
     setTipoLaudoFilter("todos");
+    setUserFilter("todos");
     setLojaFilter("todos");
     setPrestadorFilter("todos");
     setStatusFilter("todos");
@@ -1291,6 +1358,26 @@ export default function DocumentosPage() {
     );
     return ["todos", ...valores];
   }, [filterOptions.tipoLaudo, registros]);
+
+  const colaboradorOptions = useMemo(
+    () => [
+      { value: "todos", label: "Todos os colaboradores" },
+      ...adminUsers.map((item) => {
+        const name = item.name?.trim();
+        if (name && item.email) {
+          return {
+            value: item.id,
+            label: `${name} (${item.email})`,
+          };
+        }
+        return {
+          value: item.id,
+          label: item.email ?? name ?? item.id,
+        };
+      }),
+    ],
+    [adminUsers],
+  );
 
   const lojaOptions = useMemo(() => {
     const base = [
@@ -1532,7 +1619,7 @@ export default function DocumentosPage() {
             Painel de filtros
           </div>
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
-            {filterOptionsLoading && (
+            {(filterOptionsLoading || adminUsersLoading) && (
               <span className="text-[11px] font-semibold text-slate-400">
                 Carregando opções de filtro...
               </span>
@@ -1635,6 +1722,23 @@ export default function DocumentosPage() {
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-4">
+          {canManageDocuments && (
+            <label className="text-xs font-semibold text-slate-600">
+              Colaborador (quem enviou)
+              <select
+                value={userFilter}
+                onChange={(event) => setUserFilter(event.target.value)}
+                disabled={adminUsersLoading}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+              >
+                {colaboradorOptions.map((colaborador) => (
+                  <option key={colaborador.value} value={colaborador.value}>
+                    {colaborador.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {(canManageDocuments || lojaOptions.length > 1) && (
             <label className="text-xs font-semibold text-slate-600">
               Loja

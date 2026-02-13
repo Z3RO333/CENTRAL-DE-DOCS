@@ -48,7 +48,7 @@ export function useLojas(options: UseLojasOptions = {}): UseLojasResult {
     }
     const token = sessionData.session?.access_token;
     if (!token) {
-      throw new Error("Sessão expirada. Faça login novamente.");
+      throw new Error("Sessao expirada. Faca login novamente.");
     }
     return token;
   }, []);
@@ -186,3 +186,4 @@ export function useLojas(options: UseLojasOptions = {}): UseLojasResult {
     removeLoja,
   };
 }
+
