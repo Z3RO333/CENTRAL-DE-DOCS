@@ -240,6 +240,14 @@ export async function GET(request: Request) {
     );
     const tipoFilter = searchParams.get("tipo");
     const tipoLaudoFilter = searchParams.get("tipoLaudo");
+    const tipoLaudoFilters = Array.from(
+      new Set(
+        searchParams
+          .getAll("tipoLaudo")
+          .map((value) => value.trim())
+          .filter(Boolean),
+      ),
+    );
     const statusFilter = searchParams.get("status");
     const anoFilter = searchParams.get("ano");
     const mesFilter = searchParams.get("mes");
@@ -408,7 +416,9 @@ export async function GET(request: Request) {
       query = query.eq("tipo", tipoFilter);
     }
 
-    if (tipoLaudoFilter && tipoLaudoFilter !== "todos") {
+    if (tipoLaudoFilters.length > 1) {
+      query = query.in("dados->>tipo_laudo", tipoLaudoFilters);
+    } else if (tipoLaudoFilter && tipoLaudoFilter !== "todos") {
       query = query.eq("dados->>tipo_laudo", tipoLaudoFilter);
     }
 

@@ -30,6 +30,17 @@ type DocumentoItem = {
   prestador_id?: string | null;
 };
 
+type SubpastaNode = {
+  key: string;
+  nome: string;
+  tipo: string;
+  tipoLaudo: string | null;
+  tipoLaudoValores: string[];
+  totalDocumentos: number;
+  ultimoEnvioAt: string | null;
+  children: SubpastaNode[];
+};
+
 const PAGE_SIZE = 20;
 const STORAGE_BUCKET = "formularios";
 const SIGNED_URL_EXPIRES_IN = 60 * 30;
@@ -137,6 +148,9 @@ export default function DocumentosPorLojaPage() {
   const [lojaSearch, setLojaSearch] = useState("");
   const [selectedPrestadorId, setSelectedPrestadorId] = useState("");
   const [selectedMes, setSelectedMes] = useState("");
+  const [subpastas, setSubpastas] = useState<SubpastaNode[]>([]);
+  const [subpastasLoading, setSubpastasLoading] = useState(false);
+  const [selectedSubpastaKey, setSelectedSubpastaKey] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [editingLojaId, setEditingLojaId] = useState("");
@@ -249,10 +263,117 @@ export default function DocumentosPorLojaPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [selectedLojaId, selectedPrestadorId, selectedMes]);
+  }, [selectedLojaId, selectedPrestadorId, selectedMes, selectedSubpastaKey]);
 
   useEffect(() => {
     if (!user || !selectedLojaId || authLoading || accessLoading) {
+      setSubpastas([]);
+      setSelectedSubpastaKey(null);
+      return;
+    }
+
+    let active = true;
+    const loadSubpastas = async () => {
+      setSubpastasLoading(true);
+      setError(null);
+      try {
+        const token = await getAccessToken();
+        const params = new URLSearchParams();
+        params.set("lojaId", selectedLojaId);
+        const userFilter = !isAdmin && role === "colaborador" ? user.id : "";
+        if (userFilter) {
+          params.set("userId", userFilter);
+        }
+        if (isAdmin && selectedPrestadorId) {
+          params.set("prestadorId", selectedPrestadorId);
+        }
+        if (selectedMes) {
+          params.set("ano", CURRENT_YEAR);
+          params.set("mes", selectedMes);
+        }
+
+        const response = await fetch(`/api/documentos/subpastas?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const payload = (await response.json()) as {
+          subpastas?: SubpastaNode[];
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Falha ao carregar subpastas.");
+        }
+        if (!active) {
+          return;
+        }
+        const next = payload.subpastas ?? [];
+        setSubpastas(next);
+        setSelectedSubpastaKey((prev) => {
+          if (
+            prev &&
+            next.some(
+              (item) =>
+                item.key === prev || item.children.some((child) => child.key === prev),
+            )
+          ) {
+            return prev;
+          }
+          const first = next[0];
+          if (!first) {
+            return null;
+          }
+          if (first.tipo === "registro_laudos" && first.children.length > 0) {
+            return first.children[0].key;
+          }
+          return first.key;
+        });
+      } catch (err) {
+        if (active) {
+          setError(err instanceof Error ? err.message : "Falha ao carregar subpastas.");
+          setSubpastas([]);
+          setSelectedSubpastaKey(null);
+        }
+      } finally {
+        if (active) {
+          setSubpastasLoading(false);
+        }
+      }
+    };
+
+    void loadSubpastas();
+    return () => {
+      active = false;
+    };
+  }, [
+    user,
+    selectedLojaId,
+    authLoading,
+    accessLoading,
+    isAdmin,
+    role,
+    selectedPrestadorId,
+    selectedMes,
+    refreshKey,
+    getAccessToken,
+  ]);
+
+  const subpastaMap = useMemo(() => {
+    const map = new Map<string, SubpastaNode>();
+    subpastas.forEach((item) => {
+      map.set(item.key, item);
+      item.children.forEach((child) => map.set(child.key, child));
+    });
+    return map;
+  }, [subpastas]);
+
+  const selectedSubpasta = useMemo(
+    () => (selectedSubpastaKey ? subpastaMap.get(selectedSubpastaKey) ?? null : null),
+    [selectedSubpastaKey, subpastaMap],
+  );
+
+  useEffect(() => {
+    if (!user || !selectedLojaId || !selectedSubpasta || authLoading || accessLoading) {
       setDocs([]);
       setTotal(0);
       return;
@@ -278,6 +399,14 @@ export default function DocumentosPorLojaPage() {
         if (selectedMes) {
           params.set("ano", CURRENT_YEAR);
           params.set("mes", selectedMes);
+        }
+        params.set("tipo", selectedSubpasta.tipo);
+        if (selectedSubpasta.tipoLaudoValores.length > 0) {
+          selectedSubpasta.tipoLaudoValores.forEach((value) => {
+            params.append("tipoLaudo", value);
+          });
+        } else if (selectedSubpasta.tipoLaudo) {
+          params.set("tipoLaudo", selectedSubpasta.tipoLaudo);
         }
 
         const response = await fetch(`/api/documentos?${params.toString()}`, {
@@ -327,6 +456,7 @@ export default function DocumentosPorLojaPage() {
     role,
     selectedPrestadorId,
     selectedMes,
+    selectedSubpasta,
     refreshKey,
     getAccessToken,
   ]);
@@ -467,6 +597,49 @@ export default function DocumentosPorLojaPage() {
       setSavingEdit(false);
     }
   }, [editingDocId, editingLojaId, editingPrestadorId, getAccessToken]);
+
+  const renderSubpastasPanel = () => (
+    <div className="rounded-xl border border-slate-100 px-3 py-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Subpastas
+      </p>
+      <div className="mt-2 space-y-2">
+        {subpastas.map((item) => (
+          <div key={item.key}>
+            <button
+              type="button"
+              onClick={() => setSelectedSubpastaKey(item.key)}
+              className={`w-full rounded-lg px-3 py-2 text-left text-xs font-semibold transition ${
+                selectedSubpastaKey === item.key
+                  ? "bg-sky-50 text-sky-700"
+                  : "text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              {item.nome} ({item.totalDocumentos})
+            </button>
+            {item.children.length > 0 && (
+              <div className="mt-1 space-y-1 pl-3">
+                {item.children.map((child) => (
+                  <button
+                    key={child.key}
+                    type="button"
+                    onClick={() => setSelectedSubpastaKey(child.key)}
+                    className={`w-full rounded-lg px-3 py-1.5 text-left text-xs transition ${
+                      selectedSubpastaKey === child.key
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {child.nome} ({child.totalDocumentos})
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   if (authLoading || accessLoading) {
     return (
@@ -623,14 +796,23 @@ export default function DocumentosPorLojaPage() {
             <p className="text-sm text-slate-500">
               Selecione uma loja para listar os documentos.
             </p>
-          ) : docsLoading ? (
-            <p className="text-sm text-slate-500">Carregando documentos...</p>
-          ) : docs.length === 0 ? (
+          ) : subpastasLoading ? (
+            <p className="text-sm text-slate-500">Carregando subpastas...</p>
+          ) : subpastas.length === 0 ? (
             <p className="text-sm text-slate-500">
-              Nenhum documento encontrado nessa loja.
+              Nenhuma subpasta encontrada nessa loja.
             </p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              {renderSubpastasPanel()}
+              {docsLoading ? (
+                <p className="text-sm text-slate-500">Carregando documentos...</p>
+              ) : docs.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  Nenhum documento encontrado nessa subpasta.
+                </p>
+              ) : (
+                <div className="space-y-2">
               {docs.map((doc) => (
                 <div
                   key={doc.id}
@@ -739,6 +921,8 @@ export default function DocumentosPorLojaPage() {
                   </div>
                 </div>
               ))}
+                </div>
+              )}
             </div>
           )}
 
