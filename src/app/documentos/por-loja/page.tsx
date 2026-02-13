@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ExternalLink, Folder } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
+import { usePrestadores } from "@/hooks/usePrestadores";
 import { supabase } from "@/lib/supabaseClient";
 
 type LojaPasta = {
@@ -27,12 +28,18 @@ type DocumentoItem = {
   user_id: string;
 };
 
+type AdminUserOption = {
+  id: string;
+  email: string | null;
+  name: string | null;
+};
+
 const PAGE_SIZE = 20;
 const STORAGE_BUCKET = "formularios";
 const SIGNED_URL_EXPIRES_IN = 60 * 30;
 
 const tipoLabel: Record<string, string> = {
-  retencao_trabalhista: "Retencao Trabalhista",
+  retencao_trabalhista: "Retenção Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
 };
@@ -97,6 +104,12 @@ export default function DocumentosPorLojaPage() {
     loading: accessLoading,
   } = useDocumentsAccess();
   const canAccessDocumentos = modules.documentos;
+  const {
+    prestadores,
+    loading: prestadoresLoading,
+  } = usePrestadores({
+    enabled: Boolean(user) && isAdmin,
+  });
 
   const [lojas, setLojas] = useState<LojaPasta[]>([]);
   const [lojasLoading, setLojasLoading] = useState(true);
@@ -107,6 +120,10 @@ export default function DocumentosPorLojaPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [lojaSearch, setLojaSearch] = useState("");
+  const [adminUsers, setAdminUsers] = useState<AdminUserOption[]>([]);
+  const [adminUsersLoading, setAdminUsersLoading] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedPrestadorId, setSelectedPrestadorId] = useState("");
 
   const getAccessToken = useCallback(async () => {
     const { data: sessionData, error: sessionError } =
@@ -148,8 +165,17 @@ export default function DocumentosPorLojaPage() {
       try {
         const token = await getAccessToken();
         const params = new URLSearchParams();
-        if (!isAdmin && role === "colaborador") {
-          params.set("userId", user.id);
+        const userFilter =
+          !isAdmin && role === "colaborador"
+            ? user.id
+            : isAdmin && selectedUserId
+              ? selectedUserId
+              : "";
+        if (userFilter) {
+          params.set("userId", userFilter);
+        }
+        if (isAdmin && selectedPrestadorId) {
+          params.set("prestadorId", selectedPrestadorId);
         }
         const url =
           params.size > 0
@@ -197,6 +223,8 @@ export default function DocumentosPorLojaPage() {
     canAccessDocumentos,
     role,
     isAdmin,
+    selectedUserId,
+    selectedPrestadorId,
     getAccessToken,
   ]);
 
@@ -221,8 +249,17 @@ export default function DocumentosPorLojaPage() {
         params.set("lojaId", selectedLojaId);
         params.set("limit", PAGE_SIZE.toString());
         params.set("offset", ((page - 1) * PAGE_SIZE).toString());
-        if (!isAdmin && role === "colaborador") {
-          params.set("userId", user.id);
+        const userFilter =
+          !isAdmin && role === "colaborador"
+            ? user.id
+            : isAdmin && selectedUserId
+              ? selectedUserId
+              : "";
+        if (userFilter) {
+          params.set("userId", userFilter);
+        }
+        if (isAdmin && selectedPrestadorId) {
+          params.set("prestadorId", selectedPrestadorId);
         }
 
         const response = await fetch(`/api/documentos?${params.toString()}`, {
@@ -262,7 +299,64 @@ export default function DocumentosPorLojaPage() {
     return () => {
       active = false;
     };
-  }, [user, selectedLojaId, page, authLoading, accessLoading, isAdmin, role, getAccessToken]);
+  }, [
+    user,
+    selectedLojaId,
+    page,
+    authLoading,
+    accessLoading,
+    isAdmin,
+    role,
+    selectedUserId,
+    selectedPrestadorId,
+    getAccessToken,
+  ]);
+
+  useEffect(() => {
+    if (!user || !isAdmin || authLoading || accessLoading) {
+      setAdminUsers([]);
+      setSelectedUserId("");
+      return;
+    }
+
+    let active = true;
+    const loadAdminUsers = async () => {
+      setAdminUsersLoading(true);
+      try {
+        const token = await getAccessToken();
+        const response = await fetch("/api/admin/users", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const payload = (await response.json()) as {
+          users?: AdminUserOption[];
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Falha ao carregar usuarios.");
+        }
+        if (!active) {
+          return;
+        }
+        setAdminUsers(payload.users ?? []);
+      } catch (err) {
+        console.error("Erro ao carregar usuarios para filtro:", err);
+        if (active) {
+          setAdminUsers([]);
+        }
+      } finally {
+        if (active) {
+          setAdminUsersLoading(false);
+        }
+      }
+    };
+
+    void loadAdminUsers();
+    return () => {
+      active = false;
+    };
+  }, [user, isAdmin, authLoading, accessLoading, getAccessToken]);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(total / PAGE_SIZE)),
@@ -280,6 +374,15 @@ export default function DocumentosPorLojaPage() {
       return nome.includes(term) || codigo.includes(term);
     });
   }, [lojas, lojaSearch]);
+
+  const userLabelById = useMemo(() => {
+    const map = new Map<string, string>();
+    adminUsers.forEach((item) => {
+      const label = item.name?.trim() || item.email?.trim() || item.id;
+      map.set(item.id, label);
+    });
+    return map;
+  }, [adminUsers]);
 
   useEffect(() => {
     if (!selectedLojaId) {
@@ -358,6 +461,67 @@ export default function DocumentosPorLojaPage() {
           Voltar para documentos
         </Link>
       </div>
+
+      {isAdmin && (
+        <div className="rounded-2xl bg-white p-3 shadow-sm shadow-slate-200">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label
+                htmlFor="admin-user-filter"
+                className="block text-xs font-semibold uppercase tracking-wide text-slate-500"
+              >
+                Colaborador (enviado por)
+              </label>
+              <div className="mt-2">
+                <select
+                  id="admin-user-filter"
+                  value={selectedUserId}
+                  onChange={(event) => setSelectedUserId(event.target.value)}
+                  disabled={adminUsersLoading}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                >
+                  <option value="">
+                    {adminUsersLoading
+                      ? "Carregando usuarios..."
+                      : "Todos os colaboradores"}
+                  </option>
+                  {adminUsers.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name?.trim() || item.email?.trim() || item.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label
+                htmlFor="admin-prestador-filter"
+                className="block text-xs font-semibold uppercase tracking-wide text-slate-500"
+              >
+                Prestador
+              </label>
+              <div className="mt-2">
+                <select
+                  id="admin-prestador-filter"
+                  value={selectedPrestadorId}
+                  onChange={(event) => setSelectedPrestadorId(event.target.value)}
+                  disabled={prestadoresLoading}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                >
+                  <option value="">
+                    {prestadoresLoading ? "Carregando prestadores..." : "Todos os prestadores"}
+                  </option>
+                  {prestadores.map((prestador) => (
+                    <option key={prestador.id} value={prestador.id}>
+                      {prestador.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-2xl bg-red-50 px-4 py-3 text-xs text-red-700">
@@ -447,6 +611,12 @@ export default function DocumentosPorLojaPage() {
                     <p className="text-[11px] text-slate-500">
                       Status: {statusLabel[doc.status] ?? doc.status} - Enviado em{" "}
                       {formatDateTime(doc.created_at)}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Enviado por:{" "}
+                      {doc.user_id === user?.id
+                        ? user.email ?? user.id
+                        : userLabelById.get(doc.user_id) ?? doc.user_id}
                     </p>
                     <p className="truncate text-[11px] text-slate-400">
                       ID: {doc.id}

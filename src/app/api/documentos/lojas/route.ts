@@ -177,6 +177,14 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const filterUserId = searchParams.get("userId")?.trim() ?? "";
+    const filterPrestadores = Array.from(
+      new Set(
+        searchParams
+          .getAll("prestadorId")
+          .map((value) => sanitizeId(value.trim()))
+          .filter(Boolean),
+      ),
+    );
 
     let query = supabaseAdmin
       .from("formularios")
@@ -238,6 +246,12 @@ export async function GET(request: Request) {
     } else {
       // Regra do colaborador: somente lojas em que ele proprio enviou documentos.
       query = query.eq("user_id", user.id);
+    }
+
+    if (filterPrestadores.length === 1) {
+      query = query.eq("prestador_id", filterPrestadores[0]);
+    } else if (filterPrestadores.length > 1) {
+      query = query.in("prestador_id", filterPrestadores);
     }
 
     const { data: firstBatch, error, count } = await query.range(0, 999);
