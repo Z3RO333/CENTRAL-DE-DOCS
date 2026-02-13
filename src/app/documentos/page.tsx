@@ -1969,7 +1969,7 @@ export default function DocumentosPage() {
         </div>
       ) : viewMode === "tabela" ? (
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[1080px] divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
@@ -2003,7 +2003,9 @@ export default function DocumentosPage() {
                   <th className="hidden px-4 py-3 text-left md:table-cell">
                     Enviado em
                   </th>
-                  <th className="w-[180px] min-w-[180px] px-4 py-3 text-right whitespace-nowrap">Ações</th>
+                  <th className="sticky right-0 z-20 w-[190px] min-w-[190px] whitespace-nowrap border-l border-slate-100 bg-slate-50 px-4 py-3 text-right">
+                    Ações
+                  </th>
 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
@@ -2098,7 +2100,7 @@ export default function DocumentosPage() {
                       <td className="hidden px-4 py-3 text-xs text-slate-500 md:table-cell">
                         {formatDateTime(registro.created_at)}
                       </td>
-                      <td className="w-[180px] min-w-[180px] px-4 py-3 whitespace-nowrap">
+                      <td className="sticky right-0 z-10 w-[190px] min-w-[190px] whitespace-nowrap border-l border-slate-100 bg-white px-4 py-3">
                         <div className="flex flex-col items-end gap-2 text-[11px]">
                           <button
                             type="button"
