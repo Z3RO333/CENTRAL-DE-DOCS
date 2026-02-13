@@ -720,7 +720,10 @@ export default function DocumentosPorLojaPage() {
     </div>
   );
 
-  if (authLoading || accessLoading) {
+  const hasDataRendered = lojas.length > 0 || subpastas.length > 0 || docs.length > 0;
+  const showInitialLoader = (authLoading || accessLoading) && !hasDataRendered;
+
+  if (showInitialLoader) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
         Carregando pastas...
@@ -827,7 +830,7 @@ export default function DocumentosPorLojaPage() {
               className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-700 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
             />
           </div>
-          {lojasLoading ? (
+          {lojasLoading && lojas.length === 0 ? (
             <p className="px-2 text-sm text-slate-500">Carregando lojas...</p>
           ) : filteredLojas.length === 0 ? (
             <p className="px-2 text-sm text-slate-500">
@@ -875,7 +878,7 @@ export default function DocumentosPorLojaPage() {
             <p className="text-sm text-slate-500">
               Selecione uma loja para listar os documentos.
             </p>
-          ) : subpastasLoading ? (
+          ) : subpastasLoading && subpastas.length === 0 ? (
             <p className="text-sm text-slate-500">Carregando subpastas...</p>
           ) : subpastas.length === 0 ? (
             <p className="text-sm text-slate-500">
@@ -884,7 +887,7 @@ export default function DocumentosPorLojaPage() {
           ) : (
             <div className="space-y-3">
               {renderSubpastasPanel()}
-              {docsLoading ? (
+              {docsLoading && docs.length === 0 ? (
                 <p className="text-sm text-slate-500">Carregando documentos...</p>
               ) : docs.length === 0 ? (
                 <p className="text-sm text-slate-500">
