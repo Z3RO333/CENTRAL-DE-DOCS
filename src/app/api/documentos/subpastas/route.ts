@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 import { normalizeIds, safeParseDados, sanitizeId } from "@/lib/documentosApiUtils";
 import { resolveServicoOficial } from "@/lib/servicosVocab";
+import { buildDocumentosAccessOr } from "@/lib/documentosAccessFilters";
+import {
+  ApiHttpError as HttpError,
+  getAuthorizedPrestadorIds,
+  getGerenteAccessEntries,
+  getSessionUserFromRequest,
+  hasDocumentosAccess,
+} from "@/lib/apiAuth";
 
 type FormularioRow = {
   created_at: string;
@@ -10,12 +17,6 @@ type FormularioRow = {
   dados: Record<string, unknown> | string | null;
   prestador_id: string | null;
   user_id: string;
-};
-
-type GerenteAccessRow = {
-  loja_id: string | null;
-  prestador_id: string | null;
-  can_view_all: boolean | null;
 };
 
 type SubpastaNode = {
@@ -29,151 +30,6 @@ type SubpastaNode = {
   children: SubpastaNode[];
 };
 
-class HttpError extends Error {
-  status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
-
-async function getSessionUser(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    throw new HttpError(401, "Requisicao nao autorizada.");
-  }
-
-  const accessToken = authHeader.slice("Bearer ".length).trim();
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "Configuracao incompleta. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-    );
-  }
-
-  const supabaseSession = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-
-  const { data, error } = await supabaseSession.auth.getUser(accessToken);
-  if (error || !data?.user) {
-    throw new HttpError(401, "Sessao invalida ou expirada.");
-  }
-
-  return data.user;
-}
-
-async function hasDocumentosAccess(
-  userId: string,
-  email: string | null,
-  supabaseAdmin = createSupabaseAdminClient(),
-) {
-  const adminModules = ["admin", "documentos", "dashboards", "perfil"];
-  const { data, error } = await supabaseAdmin
-    .from("documentos_acesso")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("scope", "admin")
-    .in("modulo", adminModules)
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-  if (data) {
-    return true;
-  }
-  if (!email) {
-    return false;
-  }
-
-  const { data: emailData, error: emailError } = await supabaseAdmin
-    .from("documentos_acesso")
-    .select("id")
-    .eq("email", email)
-    .eq("scope", "admin")
-    .in("modulo", adminModules)
-    .limit(1)
-    .maybeSingle();
-
-  if (emailError) {
-    throw emailError;
-  }
-
-  return Boolean(emailData);
-}
-
-async function getAuthorizedPrestadorIds(
-  email: string | null,
-  supabaseAdmin = createSupabaseAdminClient(),
-) {
-  if (!email) {
-    return [];
-  }
-  const { data, error } = await supabaseAdmin
-    .from("prestadores")
-    .select("id,usuarios")
-    .contains("usuarios", [email]);
-  if (error) {
-    throw error;
-  }
-  return (
-    data?.map((item) => ({
-      id: item.id as string,
-      usuarios: (item.usuarios as string[] | null) ?? [],
-    })) ?? []
-  )
-    .filter((item) => item.usuarios.some((usuario) => usuario === email))
-    .map((item) => item.id);
-}
-
-async function getGerenteAccessEntries(
-  userId: string,
-  email: string | null,
-  supabaseAdmin = createSupabaseAdminClient(),
-) {
-  const entries: GerenteAccessRow[] = [];
-
-  const { data: byId, error: byIdError } = await supabaseAdmin
-    .from("documentos_acesso")
-    .select("loja_id,prestador_id,can_view_all")
-    .eq("scope", "gerente")
-    .eq("user_id", userId);
-  if (byIdError) {
-    throw byIdError;
-  }
-  if (byId) {
-    entries.push(...(byId as GerenteAccessRow[]));
-  }
-
-  if (email) {
-    const { data: byEmail, error: byEmailError } = await supabaseAdmin
-      .from("documentos_acesso")
-      .select("loja_id,prestador_id,can_view_all")
-      .eq("scope", "gerente")
-      .eq("email", email);
-    if (byEmailError) {
-      throw byEmailError;
-    }
-    if (byEmail) {
-      entries.push(...(byEmail as GerenteAccessRow[]));
-    }
-  }
-
-  const unique = new Map<string, GerenteAccessRow>();
-  entries.forEach((entry) => {
-    const key = `${entry.loja_id ?? ""}:${entry.prestador_id ?? ""}:${entry.can_view_all ? "1" : "0"}`;
-    unique.set(key, entry);
-  });
-  return Array.from(unique.values());
-}
 
 const TIPO_LABEL: Record<string, string> = {
   retencao_trabalhista: "Retencao Trabalhista",
@@ -215,7 +71,7 @@ const applyDateFilter = (
 
 export async function GET(request: Request) {
   try {
-    const user = await getSessionUser(request);
+    const user = await getSessionUserFromRequest(request);
     const email = user.email?.toLowerCase().trim() ?? null;
     const supabaseAdmin = createSupabaseAdminClient();
     const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
@@ -238,14 +94,6 @@ export async function GET(request: Request) {
     const anoFilter = searchParams.get("ano");
     const mesFilter = searchParams.get("mes");
 
-    const hasPrestadorAccess = allowedPrestadores.length > 0;
-    const hasGerenteAccess = gerenteEntries.length > 0;
-    const isSelfFilter = filterUserId === user.id;
-
-    if (!canAccess && !hasPrestadorAccess && !hasGerenteAccess && !isSelfFilter) {
-      throw new HttpError(403, "Voce nao possui permissao para acessar esses documentos.");
-    }
-
     let query = supabaseAdmin
       .from("formularios")
       .select("created_at,tipo,dados,user_id,prestador_id")
@@ -257,67 +105,15 @@ export async function GET(request: Request) {
     }
 
     if (!canAccess) {
-      const accessOr: string[] = [];
-
-      if (hasPrestadorAccess) {
-        const allowedSet = new Set(allowedPrestadores);
-        const prestadoresPermitidos =
-          filterPrestadores.length > 0
-            ? filterPrestadores.filter((id) => allowedSet.has(id))
-            : allowedPrestadores;
-        if (filterPrestadores.length > 0 && prestadoresPermitidos.length === 0) {
-          throw new HttpError(403, "Voce nao possui permissao para consultar prestadores.");
-        }
-        if (prestadoresPermitidos.length === 1) {
-          accessOr.push(`prestador_id.eq.${prestadoresPermitidos[0]}`);
-        } else if (prestadoresPermitidos.length > 1) {
-          accessOr.push(`prestador_id.in.(${prestadoresPermitidos.join(",")})`);
-        }
-      }
-
-      if (hasGerenteAccess) {
-        const lojaEntries = gerenteEntries.filter(
-          (entry) => sanitizeId(entry.loja_id ?? "") === lojaId,
-        );
-        const canViewAll = lojaEntries.some((entry) => Boolean(entry.can_view_all));
-        if (canViewAll) {
-          if (filterPrestadores.length > 0) {
-            if (filterPrestadores.length === 1) {
-              accessOr.push(`prestador_id.eq.${filterPrestadores[0]}`);
-            } else {
-              accessOr.push(`prestador_id.in.(${filterPrestadores.join(",")})`);
-            }
-          } else {
-            accessOr.push(`dados->>loja_id.eq.${lojaId}`);
-          }
-        } else {
-          const allowedByLoja = normalizeIds(
-            lojaEntries
-              .map((entry) => entry.prestador_id ?? "")
-              .filter(Boolean),
-          );
-          const filteredAllowed =
-            filterPrestadores.length > 0
-              ? allowedByLoja.filter((id) => filterPrestadores.includes(id))
-              : allowedByLoja;
-          if (filteredAllowed.length > 0) {
-            if (filteredAllowed.length === 1) {
-              accessOr.push(`prestador_id.eq.${filteredAllowed[0]}`);
-            } else {
-              accessOr.push(`prestador_id.in.(${filteredAllowed.join(",")})`);
-            }
-          }
-        }
-      }
-
-      if (isSelfFilter) {
-        accessOr.push(`user_id.eq.${user.id}`);
-      }
-
-      if (accessOr.length === 0) {
-        throw new HttpError(403, "Voce nao possui permissao para acessar esses documentos.");
-      }
-
+      const accessOr = buildDocumentosAccessOr({
+        canAccess,
+        allowedPrestadores,
+        gerenteEntries,
+        userId: user.id,
+        filterUserId,
+        filterPrestadores,
+        filterLojas: [lojaId],
+      });
       query = query.or(accessOr.join(","));
     }
 
