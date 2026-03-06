@@ -229,7 +229,50 @@ export default function LojasPage() {
       </section>
 
       <section className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
-        <div className="overflow-x-auto">
+        <div className="space-y-3 p-3 md:hidden">
+          {lojasLoading ? (
+            <p className="py-3 text-center text-sm text-slate-500">
+              Carregando lojas...
+            </p>
+          ) : visibleLojas.length === 0 ? (
+            <p className="py-3 text-center text-sm text-slate-500">
+              Nenhuma loja encontrada.
+            </p>
+          ) : (
+            visibleLojas.map((loja) => (
+              <article
+                key={loja.id}
+                className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700"
+              >
+                <p className="font-semibold text-slate-900">{loja.nome}</p>
+                <div className="mt-2 space-y-1 text-xs text-slate-500">
+                  <p>Codigo: {loja.codigo ?? "-"}</p>
+                  <p>{loja.usuarios.length} e-mail(s) vinculado(s)</p>
+                </div>
+                <div className="mt-3 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(loja)}
+                    className="rounded-full border border-slate-200 p-2 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                    aria-label="Editar loja"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleRemove(loja)}
+                    className="rounded-full border border-red-200 p-2 text-red-600 transition hover:border-red-300 hover:bg-red-50"
+                    aria-label="Remover loja"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[560px] text-sm">
             <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>

@@ -592,70 +592,107 @@ export default function UsuariosPage() {
       </section>
 
       <section className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
-            <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-5 py-3 text-left">Nome</th>
-                <th className="px-5 py-3 text-left">E-mail</th>
-                <th className="px-5 py-3 text-left">Funcao</th>
-                <th className="px-5 py-3 text-left">Status</th>
-                <th className="px-5 py-3 text-right"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {usersLoading || permissionsLoading || gerenteEntriesLoading ? (
-                <tr>
-                  <td className="px-5 py-6 text-center text-slate-500" colSpan={5}>
-                    Carregando usuarios...
-                  </td>
-                </tr>
-              ) : visibleUsers.length === 0 ? (
-                <tr>
-                  <td className="px-5 py-6 text-center text-slate-500" colSpan={5}>
-                    Nenhum usuario encontrado.
-                  </td>
-                </tr>
-              ) : (
-                visibleUsers.map((entry) => {
-                  const role = getUserRole(entry);
-                  return (
-                    <tr key={entry.id} className="text-slate-700">
-                      <td className="px-5 py-4">
-                        <div className="font-semibold text-slate-900">
+        {usersLoading || permissionsLoading || gerenteEntriesLoading ? (
+          <div className="px-5 py-6 text-center text-sm text-slate-500">
+            Carregando usuarios...
+          </div>
+        ) : visibleUsers.length === 0 ? (
+          <div className="px-5 py-6 text-center text-sm text-slate-500">
+            Nenhum usuario encontrado.
+          </div>
+        ) : (
+          <>
+            <div className="space-y-3 p-3 md:hidden">
+              {visibleUsers.map((entry) => {
+                const role = getUserRole(entry);
+                return (
+                  <article
+                    key={entry.id}
+                    className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-slate-900">
                           {getDisplayName(entry)}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">{entry.email ?? "-"}</td>
-                      <td className="px-5 py-4">
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                          {getRoleLabel(role)}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="inline-flex items-center gap-2">
-                          <span className="h-3 w-3 rounded-full bg-emerald-500" />
-                          Ativo
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => openEditor(entry)}
-                          disabled={!entry.email}
-                          className="rounded-full border border-slate-200 p-2 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          aria-label="Editar usuario"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                        </p>
+                        <p className="text-xs text-slate-500">{entry.email ?? "-"}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openEditor(entry)}
+                        disabled={!entry.email}
+                        className="rounded-full border border-slate-200 p-2 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Editar usuario"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">
+                        {getRoleLabel(role)}
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                        Ativo
+                      </span>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-5 py-3 text-left">Nome</th>
+                    <th className="px-5 py-3 text-left">E-mail</th>
+                    <th className="px-5 py-3 text-left">Funcao</th>
+                    <th className="px-5 py-3 text-left">Status</th>
+                    <th className="px-5 py-3 text-right"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {visibleUsers.map((entry) => {
+                    const role = getUserRole(entry);
+                    return (
+                      <tr key={entry.id} className="text-slate-700">
+                        <td className="px-5 py-4">
+                          <div className="font-semibold text-slate-900">
+                            {getDisplayName(entry)}
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">{entry.email ?? "-"}</td>
+                        <td className="px-5 py-4">
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                            {getRoleLabel(role)}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-3 w-3 rounded-full bg-emerald-500" />
+                            Ativo
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => openEditor(entry)}
+                            disabled={!entry.email}
+                            className="rounded-full border border-slate-200 p-2 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            aria-label="Editar usuario"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </section>
 
       {editingUser && (
