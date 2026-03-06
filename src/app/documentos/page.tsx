@@ -697,6 +697,12 @@ export default function DocumentosPage() {
   }, [anoFilter, mesFilter]);
 
   useEffect(() => {
+    if (tipoFilter !== TIPO_ASSINAVEL && tipoLaudoFilter !== "todos") {
+      setTipoLaudoFilter("todos");
+    }
+  }, [tipoFilter, tipoLaudoFilter]);
+
+  useEffect(() => {
     setPage(1);
   }, [
     tipoFilter,
@@ -782,9 +788,6 @@ export default function DocumentosPage() {
         }
         if (lojaFilter !== "todos") {
           params.set("lojaId", lojaFilter);
-        }
-        if (prestadorFilter !== "todos") {
-          params.append("prestadorId", prestadorFilter);
         }
         if (statusFilter !== "todos") {
           params.set("status", statusFilter);
@@ -1426,7 +1429,9 @@ export default function DocumentosPage() {
   const mesSelecionadoLabel =
     mesFilter === "todos"
       ? "Todos os meses"
-      : MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual";
+      : anoFilter !== "todos"
+        ? `${mesFilter}/${anoFilter}`
+        : MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual";
   const anoSelecionadoLabel =
     anoFilter === "todos" ? "Todos os anos" : anoFilter;
 
@@ -1794,12 +1799,15 @@ export default function DocumentosPage() {
             <select
               value={mesFilter}
               onChange={(event) => setMesFilter(event.target.value)}
+              disabled={anoFilter === "todos"}
               className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             >
               <option value="todos">Todos os meses</option>
               {MESES.map((mes) => (
                 <option key={mes.value} value={mes.value}>
-                  {mes.label}
+                  {anoFilter !== "todos"
+                    ? `${mes.value}/${anoFilter}`
+                    : mes.label}
                 </option>
               ))}
             </select>
