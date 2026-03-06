@@ -69,7 +69,7 @@ export default function DocumentosPage() {
   const [identificacaoFilter, setIdentificacaoFilter] = useState<string>("");
   const [identificacaoDebounced, setIdentificacaoDebounced] =
     useState<string>("");
-  const [anoFilter, setAnoFilter] = useState<string>("todos");
+  const [anoFilter, setAnoFilter] = useState<string>("2026");
   const [mesFilter, setMesFilter] = useState<string>("todos");
   const [somenteAssinados, setSomenteAssinados] = useState(false);
   const [somenteDisponiveisLote, setSomenteDisponiveisLote] = useState(false);
@@ -322,7 +322,7 @@ export default function DocumentosPage() {
           prestadorFilter: parsed.prestadorFilter ?? "todos",
           statusFilter: parsed.statusFilter ?? "todos",
           identificacaoFilter: parsed.identificacaoFilter ?? "",
-          anoFilter: parsed.anoFilter ?? "todos",
+          anoFilter: parsed.anoFilter ?? "2026",
           mesFilter: parsed.mesFilter ?? "todos",
           somenteAssinados: parsed.somenteAssinados ?? false,
           somenteDisponiveisLote: parsed.somenteDisponiveisLote ?? false,
@@ -1063,7 +1063,7 @@ export default function DocumentosPage() {
     setPrestadorFilter("todos");
     setStatusFilter("todos");
     setIdentificacaoFilter("");
-    setAnoFilter("todos");
+    setAnoFilter("2026");
     setMesFilter("todos");
     setSomenteAssinados(false);
     setSomenteDisponiveisLote(false);
