@@ -287,6 +287,21 @@ const TIPO_LABELS: Record<string, string> = {
   notas_fiscais: "Notas Fiscais",
 };
 
+const MONTH_LABELS: Record<string, string> = {
+  "01": "janeiro",
+  "02": "fevereiro",
+  "03": "março",
+  "04": "abril",
+  "05": "maio",
+  "06": "junho",
+  "07": "julho",
+  "08": "agosto",
+  "09": "setembro",
+  "10": "outubro",
+  "11": "novembro",
+  "12": "dezembro",
+};
+
 const formatStatusLabel = (value: string) =>
   STATUS_LABELS[value] ?? humanize(value);
 
@@ -496,6 +511,61 @@ const createEmptyInsights = (): DocumentoCopilotInsights => ({
   tendenciaMensal: [],
   observacoes: [],
 });
+
+const buildTemporalReply = (input: {
+  message: string;
+  filters: DocumentoCopilotFilters;
+  insights: DocumentoCopilotInsights;
+  matches: DocumentoCopilotMatch[];
+  total: number;
+}) => {
+  const normalizedMessage = normalizeText(input.message).toLowerCase();
+  const asksMonthlyBreakdown =
+    /(por mês|por mes|mensal|evolu|tendên|tenden|últimos meses|ultimos meses|mês teve mais|mes teve mais)/.test(
+      normalizedMessage,
+    );
+  const asksHighestMonth =
+    /(mês teve mais|mes teve mais|qual mês|qual mes|maior volume|pico)/.test(
+      normalizedMessage,
+    );
+  const hasMonthFilter = typeof input.filters.mes === "string" && input.filters.mes.trim();
+  const monthLabel = hasMonthFilter
+    ? MONTH_LABELS[input.filters.mes as string] ?? input.filters.mes
+    : null;
+
+  if (hasMonthFilter && input.filters.ano) {
+    const totalLabel = input.total === 1 ? "documento" : "documentos";
+    return `Em ${monthLabel} de ${input.filters.ano} encontrei ${input.total} ${totalLabel}.`;
+  }
+
+  if (asksHighestMonth && input.insights.tendenciaMensal.length > 0) {
+    const topMonth = [...input.insights.tendenciaMensal].sort(
+      (a, b) => b.total - a.total || a.label.localeCompare(b.label),
+    )[0];
+    if (topMonth) {
+      const totalLabel = topMonth.total === 1 ? "documento" : "documentos";
+      return `O mês com mais documentos no recorte atual foi ${topMonth.label}, com ${topMonth.total} ${totalLabel}.`;
+    }
+  }
+
+  if (asksMonthlyBreakdown && input.insights.tendenciaMensal.length > 0) {
+    const itens = input.insights.tendenciaMensal
+      .filter((item) => item.total > 0)
+      .map((item) => `${item.label}: ${item.total}`)
+      .join(", ");
+    if (itens) {
+      return `No recorte atual, o volume por mês ficou assim: ${itens}.`;
+    }
+  }
+
+  if (hasMonthFilter && !input.filters.ano) {
+    const currentYear = new Date().getFullYear();
+    const totalLabel = input.total === 1 ? "documento" : "documentos";
+    return `Em ${monthLabel} de ${currentYear} encontrei ${input.total} ${totalLabel}.`;
+  }
+
+  return null;
+};
 
 const buildTextSearchOr = (term: string) => {
   const sanitized = normalizeText(term);
@@ -750,6 +820,14 @@ const buildDocumentoCandidatesQuery = (input: {
           .lt("created_at", end.toISOString());
       }
     }
+  } else if (filters.mes && /^(0[1-9]|1[0-2])$/.test(filters.mes)) {
+    const anoAtual = new Date().getFullYear();
+    const mes = Number(filters.mes);
+    const start = new Date(anoAtual, mes - 1, 1);
+    const end = new Date(anoAtual, mes, 1);
+    query = query
+      .gte("created_at", start.toISOString())
+      .lt("created_at", end.toISOString());
   }
 
   const textOr = filters.termo ? buildTextSearchOr(filters.termo) : null;
@@ -964,9 +1042,17 @@ export async function runDocumentoCopilot(
     canAccess,
     supabaseAdmin,
   });
+  const temporalReply = buildTemporalReply({
+    message,
+    filters,
+    insights,
+    matches,
+    total,
+  });
 
   return {
     reply:
+      temporalReply ||
       parsed.reply?.trim() ||
       (matches.length > 0
         ? `Encontrei ${matches.length} documento(s) que parecem corresponder à sua busca.`

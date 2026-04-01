@@ -312,10 +312,10 @@ export function DocumentosCopilot({
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Tendência mensal
+                        Documentos por mês
                       </p>
                       <p className="text-[11px] text-slate-500">
-                        Últimos meses observados
+                        Volume total em cada mês observado
                       </p>
                     </div>
                     <div className="mt-4 flex items-end gap-2">
@@ -332,7 +332,9 @@ export function DocumentosCopilot({
                           <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                             {item.label}
                           </p>
-                          <p className="text-[11px] text-slate-500">{item.total}</p>
+                          <p className="text-[11px] text-slate-500">
+                            {item.total} docs
+                          </p>
                         </div>
                       ))}
                     </div>
