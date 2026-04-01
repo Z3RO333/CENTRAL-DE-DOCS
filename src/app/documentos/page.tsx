@@ -1706,10 +1706,8 @@ export default function DocumentosPage() {
       )}
 
       <div
-        className={`grid gap-6 xl:items-start ${
-          copilotCollapsed
-            ? "xl:grid-cols-[minmax(0,1fr)_72px]"
-            : "xl:grid-cols-[minmax(0,1fr)_360px]"
+        className={`flex flex-col gap-6 ${
+          copilotCollapsed ? "xl:pr-[96px]" : "xl:pr-[384px]"
         }`}
       >
         <div className="min-w-0 space-y-6">
@@ -2166,7 +2164,11 @@ export default function DocumentosPage() {
         </div>
       )}
         </div>
-        <aside className="hidden xl:block xl:sticky xl:top-6 xl:self-start">
+        <aside
+          className={`hidden xl:block xl:fixed xl:right-6 xl:top-6 xl:z-20 xl:h-[calc(100vh-3rem)] ${
+            copilotCollapsed ? "xl:w-[72px]" : "xl:w-[360px]"
+          }`}
+        >
           <DocumentosCopilot
             collapsed={copilotCollapsed}
             onToggleCollapsed={() => setCopilotCollapsed((value) => !value)}

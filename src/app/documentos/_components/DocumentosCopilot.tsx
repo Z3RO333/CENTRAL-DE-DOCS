@@ -114,7 +114,7 @@ export function DocumentosCopilot({
   };
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-slate-200 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(15,23,42,0.92))] text-white shadow-2xl shadow-slate-900/10 xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto xl:overscroll-contain">
+    <section className="h-full overflow-hidden rounded-3xl border border-slate-200 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(15,23,42,0.92))] text-white shadow-2xl shadow-slate-900/10 xl:h-full xl:w-full xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto xl:overscroll-contain">
       <div className="border-b border-white/10 px-5 py-4">
         {collapsed ? (
           <div className="flex items-center justify-center">
