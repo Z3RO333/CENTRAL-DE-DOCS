@@ -18,6 +18,13 @@ Aplicação Next.js (App Router) que integra com Supabase para autenticação e 
 
 2. Preencha `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` com os valores do seu projeto Supabase.  
    Essas mesmas variáveis devem ser configuradas no painel da Vercel (Project Settings → Environment Variables).
+3. Se quiser habilitar o copilot de documentos, configure também:
+
+   - `AZURE_OPENAI_API_KEY`
+
+   O endpoint do Azure OpenAI já está definido no projeto para:
+
+   `https://bml-azure-openai-agents.openai.azure.com/openai/deployments/gpt-5-chat/chat/completions?api-version=2025-01-01-preview`
 
 ## Scripts principais
 

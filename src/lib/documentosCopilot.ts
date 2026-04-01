@@ -1,0 +1,673 @@
+import {
+  DEFAULT_LIMIT,
+  normalizeIds,
+  safeParseDados,
+  sanitizeId,
+} from "@/lib/documentosApiUtils";
+import { buildDocumentosAccessOr } from "@/lib/documentosAccessFilters";
+import { callAzureOpenAiChat } from "@/lib/azureOpenAi";
+import {
+  getAuthorizedPrestadorIds,
+  getGerenteAccessEntries,
+  hasDocumentosAccess,
+  type GerenteAccessRow,
+} from "@/lib/apiAuth";
+import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
+
+export const DOCUMENTO_COPILOT_LIMIT = 8;
+
+export const DOCUMENTO_COPILOT_TYPES = {
+  retencao_trabalhista: "Retenção Trabalhista",
+  registro_laudos: "Registro e Laudos",
+  notas_fiscais: "Notas Fiscais",
+} as const;
+
+export const DOCUMENTO_COPILOT_STATUS = [
+  "pendente",
+  "em_analise",
+  "revisado",
+  "assinado",
+] as const;
+
+export type DocumentoCopilotFilters = {
+  termo?: string;
+  tipo?: string;
+  tipoLaudo?: string;
+  status?: string;
+  ano?: string;
+  mes?: string;
+  lojaId?: string;
+  prestadorId?: string;
+  somenteAssinados?: boolean;
+  somenteDisponiveisLote?: boolean;
+};
+
+export type DocumentoCopilotMatch = {
+  id: string;
+  tipo: string;
+  status: string;
+  created_at: string;
+  nome: string;
+  identificacao: string;
+  complemento: string | null;
+  lojaId: string | null;
+  lojaNome: string | null;
+  prestadorId: string | null;
+  prestadorNome: string | null;
+  tipoLaudo: string | null;
+  observacoes: string | null;
+};
+
+export type DocumentoCopilotResponse = {
+  reply: string;
+  summary: string;
+  filters: DocumentoCopilotFilters;
+  results: DocumentoCopilotMatch[];
+  total: number;
+};
+
+export type DocumentoCopilotRequest = {
+  message?: string;
+  currentFilters?: DocumentoCopilotFilters;
+};
+
+type Row = {
+  id: string;
+  tipo: string;
+  status: string;
+  created_at: string;
+  dados: Record<string, unknown> | string | null;
+  arquivo_path: string;
+  arquivo_assinado_path: string | null;
+  prestador_id: string | null;
+  user_id: string;
+};
+
+type CandidateRow = Row & {
+  lojaId: string | null;
+  identificacao: string;
+  complemento: string | null;
+  tipoLaudo: string | null;
+  observacoes: string | null;
+  nome: string;
+  lojaNome: string | null;
+};
+
+type EntityRow = {
+  id: string;
+  nome: string | null;
+};
+
+const humanize = (value: string) =>
+  value
+    .split("_")
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+    .join(" ");
+
+const normalizeText = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^\p{L}\p{N}\s._-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const normalizeTipoValue = (value: string) => {
+  const normalized = normalizeText(value).toLowerCase();
+  const map: Record<string, string> = {
+    retencao_trabalhista: "retencao_trabalhista",
+    "retencao trabalhista": "retencao_trabalhista",
+    "retenção trabalhista": "retencao_trabalhista",
+    registro_laudos: "registro_laudos",
+    "registro e laudos": "registro_laudos",
+    "registro laudos": "registro_laudos",
+    notas_fiscais: "notas_fiscais",
+    "notas fiscais": "notas_fiscais",
+  };
+  return map[normalized] ?? null;
+};
+
+const normalizeStatusValue = (value: string) => {
+  const normalized = normalizeText(value).toLowerCase();
+  const map: Record<string, string> = {
+    pendente: "pendente",
+    "em analise": "em_analise",
+    em_analise: "em_analise",
+    revisado: "revisado",
+    assinado: "assinado",
+    assinados: "assinado",
+  };
+  return map[normalized] ?? null;
+};
+
+const normalizeMesValue = (value: string) => {
+  const normalized = normalizeText(value).toLowerCase();
+  if (/^(0?[1-9]|1[0-2])$/.test(normalized)) {
+    return normalized.padStart(2, "0");
+  }
+  const map: Record<string, string> = {
+    janeiro: "01",
+    fevereiro: "02",
+    marco: "03",
+    abril: "04",
+    maio: "05",
+    junho: "06",
+    julho: "07",
+    agosto: "08",
+    setembro: "09",
+    outubro: "10",
+    novembro: "11",
+    dezembro: "12",
+  };
+  return map[normalized] ?? null;
+};
+
+const getCampoTexto = (
+  dados: Record<string, unknown> | null,
+  campos: string[],
+) => {
+  if (!dados) {
+    return null;
+  }
+
+  for (const campo of campos) {
+    const valor = dados[campo];
+    if (typeof valor === "string" && valor.trim()) {
+      return valor.trim();
+    }
+  }
+
+  return null;
+};
+
+const getIdentificacao = (registro: {
+  tipo: string;
+  dados: Record<string, unknown> | null;
+}) => {
+  switch (registro.tipo) {
+    case "retencao_trabalhista":
+      return getCampoTexto(registro.dados, ["empresa"]);
+    case "registro_laudos":
+      return getCampoTexto(registro.dados, ["prestador", "responsavel"]);
+    case "notas_fiscais":
+      return getCampoTexto(registro.dados, ["numero_pedido", "numero_nf"]);
+    default:
+      return getCampoTexto(registro.dados, ["empresa", "prestador"]);
+  }
+};
+
+const getComplemento = (registro: {
+  tipo: string;
+  dados: Record<string, unknown> | null;
+}) => {
+  switch (registro.tipo) {
+    case "retencao_trabalhista":
+      return getCampoTexto(registro.dados, ["cnpj"]);
+    case "registro_laudos":
+      return getCampoTexto(registro.dados, ["responsavel"]);
+    case "notas_fiscais":
+      return getCampoTexto(registro.dados, ["cnpj_emitente"]);
+    default:
+      return getCampoTexto(registro.dados, ["observacoes", "cnpj"]);
+  }
+};
+
+const getTipoLaudo = (dados: Record<string, unknown> | null) =>
+  getCampoTexto(dados, ["tipo_laudo"]);
+
+const getObservacoes = (dados: Record<string, unknown> | null) =>
+  getCampoTexto(dados, ["observacoes", "descricao"]);
+
+const getLojaId = (dados: Record<string, unknown> | null) =>
+  getCampoTexto(dados, ["loja_id"]);
+
+const getLojaNome = (dados: Record<string, unknown> | null) =>
+  getCampoTexto(dados, ["loja_nome"]);
+
+const getNomeDocumento = (registro: Row) => {
+  const dados = safeParseDados(registro.dados);
+  const anexos = dados?.anexos;
+  if (Array.isArray(anexos) && anexos.length > 0) {
+    const primeiro = anexos[0] as { nome?: unknown } | null;
+    if (primeiro && typeof primeiro.nome === "string" && primeiro.nome.trim()) {
+      return primeiro.nome.trim();
+    }
+  }
+
+  const path = registro.arquivo_assinado_path ?? registro.arquivo_path;
+  return path.split("/").pop() ?? registro.id;
+};
+
+const buildTextSearchOr = (term: string) => {
+  const sanitized = normalizeText(term);
+  if (!sanitized) {
+    return null;
+  }
+  const pattern = `%${sanitized}%`;
+  return [
+    `dados->>empresa.ilike.${pattern}`,
+    `dados->>prestador.ilike.${pattern}`,
+    `dados->>responsavel.ilike.${pattern}`,
+    `dados->>numero_pedido.ilike.${pattern}`,
+    `dados->>numero_nf.ilike.${pattern}`,
+    `dados->>descricao.ilike.${pattern}`,
+    `dados->>observacoes.ilike.${pattern}`,
+    `dados->>tipo_laudo.ilike.${pattern}`,
+    `dados->>loja_nome.ilike.${pattern}`,
+  ];
+};
+
+const parseJsonObject = <T,>(raw: string, fallback: T): T => {
+  try {
+    const parsed = JSON.parse(raw) as T;
+    if (parsed && typeof parsed === "object") {
+      return parsed;
+    }
+  } catch {
+    return fallback;
+  }
+  return fallback;
+};
+
+const hasAnyFilter = (filters: DocumentoCopilotFilters) =>
+  Boolean(
+    filters.termo ||
+      filters.tipo ||
+      filters.tipoLaudo ||
+      filters.status ||
+      filters.ano ||
+      filters.mes ||
+      filters.lojaId ||
+      filters.prestadorId ||
+      filters.somenteAssinados ||
+      filters.somenteDisponiveisLote,
+  );
+
+const stripKnownFilters = (filters: DocumentoCopilotFilters) => {
+  const cleaned: DocumentoCopilotFilters = {};
+
+  if (typeof filters.termo === "string" && filters.termo.trim()) {
+    cleaned.termo = filters.termo.trim();
+  }
+  if (typeof filters.tipo === "string" && filters.tipo.trim()) {
+    cleaned.tipo = normalizeTipoValue(filters.tipo.trim()) ?? filters.tipo.trim();
+  }
+  if (typeof filters.status === "string" && filters.status.trim()) {
+    cleaned.status =
+      normalizeStatusValue(filters.status.trim()) ?? filters.status.trim();
+  }
+  if (typeof filters.tipoLaudo === "string" && filters.tipoLaudo.trim()) {
+    cleaned.tipoLaudo = filters.tipoLaudo.trim();
+  }
+  if (typeof filters.ano === "string" && filters.ano.trim()) {
+    cleaned.ano = filters.ano.trim();
+  }
+  if (typeof filters.mes === "string" && filters.mes.trim()) {
+    cleaned.mes = normalizeMesValue(filters.mes.trim()) ?? filters.mes.trim();
+  }
+  if (typeof filters.lojaId === "string" && filters.lojaId.trim()) {
+    cleaned.lojaId = sanitizeId(filters.lojaId.trim());
+  }
+  if (typeof filters.prestadorId === "string" && filters.prestadorId.trim()) {
+    cleaned.prestadorId = sanitizeId(filters.prestadorId.trim());
+  }
+  if (typeof filters.somenteAssinados === "boolean") {
+    cleaned.somenteAssinados = filters.somenteAssinados;
+  }
+  if (typeof filters.somenteDisponiveisLote === "boolean") {
+    cleaned.somenteDisponiveisLote = filters.somenteDisponiveisLote;
+  }
+
+  return cleaned;
+};
+
+const buildSearchSummary = (filters: DocumentoCopilotFilters) => {
+  const partes: string[] = [];
+  if (filters.tipo) {
+    partes.push(`tipo ${humanize(filters.tipo)}`);
+  }
+  if (filters.status) {
+    partes.push(`status ${humanize(filters.status)}`);
+  }
+  if (filters.tipoLaudo) {
+    partes.push(`tipo de laudo "${filters.tipoLaudo}"`);
+  }
+  if (filters.ano) {
+    partes.push(`ano ${filters.ano}`);
+  }
+  if (filters.mes) {
+    partes.push(`mês ${filters.mes}`);
+  }
+  if (filters.lojaId) {
+    partes.push(`loja ${filters.lojaId}`);
+  }
+  if (filters.prestadorId) {
+    partes.push(`prestador ${filters.prestadorId}`);
+  }
+  if (filters.termo) {
+    partes.push(`termo "${filters.termo}"`);
+  }
+  if (filters.somenteAssinados) {
+    partes.push("somente assinados");
+  }
+  if (filters.somenteDisponiveisLote) {
+    partes.push("disponíveis para lote");
+  }
+
+  return partes.length > 0
+    ? `Critérios usados: ${partes.join(", ")}.`
+    : "Sem filtros específicos, usei a intenção principal da pergunta.";
+};
+
+const buildPrompt = (input: {
+  message: string;
+  currentFilters?: DocumentoCopilotFilters;
+}) => {
+  const currentFilters = input.currentFilters
+    ? stripKnownFilters(input.currentFilters)
+    : {};
+
+  return [
+    {
+      role: "system" as const,
+      content: [
+        "Você é um copiloto interno para encontrar documentos em um sistema corporativo.",
+        "Seu trabalho é converter a pergunta do usuário em filtros simples e responder em português brasileiro.",
+        "Regras: nunca invente documentos, nunca mencione dados fora do conjunto retornado, e nunca peça acesso admin.",
+        "Se faltarem dados para filtrar com confiança, peça uma única pergunta de clarificação curta.",
+        "Retorne sempre JSON válido com as chaves reply, filters e intent.",
+        "Valores válidos de tipo: retencao_trabalhista, registro_laudos, notas_fiscais.",
+        "Valores válidos de status: pendente, em_analise, revisado, assinado.",
+        "Se o usuário mencionar um tipo de laudo, preencha tipoLaudo.",
+      ].join(" "),
+    },
+    {
+      role: "user" as const,
+      content: JSON.stringify({
+        pergunta: input.message,
+        filtrosAtuais: currentFilters,
+        formatoEsperado: {
+          intent: "search|clarify|explain",
+          reply: "texto curto e útil",
+          filters: {
+            termo: "opcional",
+            tipo: "opcional",
+            status: "opcional",
+            tipoLaudo: "opcional",
+            ano: "opcional",
+            mes: "opcional",
+            lojaId: "opcional",
+            prestadorId: "opcional",
+            somenteAssinados: "opcional",
+            somenteDisponiveisLote: "opcional",
+          },
+        },
+      }),
+    },
+  ];
+};
+
+const queryDocumentoCandidates = async (input: {
+  filters: DocumentoCopilotFilters;
+  userId: string;
+  allowedPrestadores: string[];
+  gerenteEntries: GerenteAccessRow[];
+  canAccess: boolean;
+  supabaseAdmin?: ReturnType<typeof createSupabaseAdminClient>;
+}) => {
+  const {
+    filters,
+    userId,
+    allowedPrestadores,
+    gerenteEntries,
+    canAccess,
+    supabaseAdmin = createSupabaseAdminClient(),
+  } = input;
+
+  const filterPrestadores = normalizeIds(
+    [filters.prestadorId ?? ""].filter(Boolean),
+  );
+  const filterLojas = normalizeIds([filters.lojaId ?? ""].filter(Boolean));
+  const accessOr = buildDocumentosAccessOr({
+    canAccess,
+    allowedPrestadores,
+    gerenteEntries,
+    userId,
+    filterUserId: null,
+    filterPrestadores,
+    filterLojas,
+  });
+
+  let query = supabaseAdmin
+    .from("formularios")
+    .select(
+      "id,tipo,status,created_at,dados,arquivo_path,arquivo_assinado_path,prestador_id,user_id",
+      { count: "exact" },
+    )
+    .order("created_at", { ascending: false });
+
+  if (!canAccess && accessOr.length > 0) {
+    query = query.or(accessOr.join(","));
+  }
+
+  if (filters.tipo) {
+    query = query.eq("tipo", filters.tipo);
+  }
+
+  if (filters.status) {
+    query = query.eq("status", filters.status);
+  }
+
+  if (filters.tipoLaudo) {
+    const tipoLaudo = normalizeText(filters.tipoLaudo);
+    if (tipoLaudo) {
+      query = query.ilike("dados->>tipo_laudo", `%${tipoLaudo}%`);
+    }
+  }
+
+  if (filters.somenteAssinados) {
+    query = query.eq("status", "assinado");
+  }
+
+  if (filters.somenteDisponiveisLote) {
+    query = query.eq("tipo", "registro_laudos").neq("status", "assinado");
+  }
+
+  if (filters.ano && /^\d{4}$/.test(filters.ano)) {
+    const ano = Number(filters.ano);
+    if (!Number.isNaN(ano)) {
+      if (filters.mes && /^(0[1-9]|1[0-2])$/.test(filters.mes)) {
+        const mes = Number(filters.mes);
+        const start = new Date(ano, mes - 1, 1);
+        const end = new Date(ano, mes, 1);
+        query = query
+          .gte("created_at", start.toISOString())
+          .lt("created_at", end.toISOString());
+      } else {
+        const start = new Date(ano, 0, 1);
+        const end = new Date(ano + 1, 0, 1);
+        query = query
+          .gte("created_at", start.toISOString())
+          .lt("created_at", end.toISOString());
+      }
+    }
+  }
+
+  const textOr = filters.termo ? buildTextSearchOr(filters.termo) : null;
+  if (textOr && textOr.length > 0) {
+    query = query.or(textOr.join(","));
+  }
+
+  const { data, error, count } = await query.range(0, DEFAULT_LIMIT - 1);
+  if (error) {
+    throw error;
+  }
+
+  const rows = ((data as Row[]) ?? []).map((registro) => {
+    const dados = safeParseDados(registro.dados);
+    const lojaId = getLojaId(dados);
+    return {
+      id: registro.id,
+      tipo: registro.tipo,
+      status: registro.status,
+      created_at: registro.created_at,
+      dados,
+      arquivo_path: registro.arquivo_path,
+      arquivo_assinado_path: registro.arquivo_assinado_path,
+      prestador_id: registro.prestador_id,
+      user_id: registro.user_id,
+      lojaId,
+      identificacao: getIdentificacao({ tipo: registro.tipo, dados }) ?? "Não informado",
+      complemento: getComplemento({ tipo: registro.tipo, dados }),
+      tipoLaudo: getTipoLaudo(dados),
+      observacoes: getObservacoes(dados),
+      nome: getNomeDocumento(registro),
+      lojaNome: getLojaNome(dados),
+    } satisfies CandidateRow;
+  });
+
+  const lojasMap = new Map<string, string | null>();
+  const prestadoresMap = new Map<string, string | null>();
+
+  const lojaIds = Array.from(
+    new Set(
+      rows
+        .map((row) => row.lojaId)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  if (lojaIds.length > 0) {
+    const { data: lojasData } = await supabaseAdmin
+      .from("lojas")
+      .select("id,nome")
+      .in("id", lojaIds);
+    (lojasData as EntityRow[] | null)?.forEach((item) => {
+      lojasMap.set(item.id, item.nome ?? null);
+    });
+  }
+
+  const prestadorIds = Array.from(
+    new Set(
+      rows
+        .map((row) => row.prestador_id)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  if (prestadorIds.length > 0) {
+    const { data: prestadoresData } = await supabaseAdmin
+      .from("prestadores")
+      .select("id,nome")
+      .in("id", prestadorIds);
+    (prestadoresData as EntityRow[] | null)?.forEach((item) => {
+      prestadoresMap.set(item.id, item.nome ?? null);
+    });
+  }
+
+  const matches = rows.slice(0, DOCUMENTO_COPILOT_LIMIT).map((row) => ({
+    id: row.id,
+    tipo: row.tipo,
+    status: row.status,
+    created_at: row.created_at,
+    nome: row.nome,
+    identificacao: row.identificacao,
+    complemento: row.complemento,
+    lojaId: row.lojaId ?? null,
+    lojaNome: row.lojaId ? lojasMap.get(row.lojaId) ?? row.lojaNome : null,
+    prestadorId: row.prestador_id ?? null,
+    prestadorNome: row.prestador_id
+      ? prestadoresMap.get(row.prestador_id) ?? null
+      : null,
+    tipoLaudo: row.tipoLaudo,
+    observacoes: row.observacoes,
+  }));
+
+  return {
+    matches,
+    total: count ?? matches.length,
+  };
+};
+
+export async function runDocumentoCopilot(
+  request: DocumentoCopilotRequest,
+  auth: {
+    userId: string;
+    email: string | null;
+  },
+) {
+  const supabaseAdmin = createSupabaseAdminClient();
+  const allowedPrestadores = await getAuthorizedPrestadorIds(
+    auth.email,
+    supabaseAdmin,
+  );
+  const gerenteEntries = await getGerenteAccessEntries(
+    auth.userId,
+    auth.email,
+    supabaseAdmin,
+  );
+  const canAccess = await hasDocumentosAccess(
+    auth.userId,
+    auth.email,
+    supabaseAdmin,
+  );
+
+  const promptMessages = buildPrompt({
+    message: request.message?.trim() || "",
+    currentFilters: request.currentFilters,
+  });
+
+  const raw = await callAzureOpenAiChat({
+    messages: promptMessages,
+    temperature: 0.1,
+    maxTokens: 650,
+  });
+
+  const parsed = parseJsonObject<{
+    reply?: string;
+    intent?: "search" | "clarify" | "explain";
+    filters?: DocumentoCopilotFilters;
+  }>(raw, {});
+
+  const filters = stripKnownFilters(parsed.filters ?? {});
+  const hasParsedFilters = hasAnyFilter(filters);
+  const message = request.message?.trim() ?? "";
+  const fallbackTerm = normalizeText(message);
+  if (!filters.termo && fallbackTerm && !hasParsedFilters) {
+    filters.termo = fallbackTerm;
+  }
+
+  const summary = buildSearchSummary(filters);
+  const intent = parsed.intent ?? (filters.termo ? "search" : "clarify");
+
+  if (intent === "clarify" && !hasAnyFilter(filters)) {
+    return {
+      reply:
+        parsed.reply?.trim() ||
+        "Posso procurar por tipo, status, loja, prestador, mês ou um trecho do nome do documento. Me diga um detalhe a mais.",
+      summary,
+      filters,
+      results: [],
+      total: 0,
+    } satisfies DocumentoCopilotResponse;
+  }
+
+  const { matches, total } = await queryDocumentoCandidates({
+    filters,
+    userId: auth.userId,
+    allowedPrestadores,
+    gerenteEntries,
+    canAccess,
+    supabaseAdmin,
+  });
+
+  return {
+    reply:
+      parsed.reply?.trim() ||
+      (matches.length > 0
+        ? `Encontrei ${matches.length} documento(s) que parecem corresponder à sua busca.`
+        : "Não encontrei documentos com esses critérios. Posso ajustar a busca se você me disser mais um detalhe."),
+    summary,
+    filters,
+    results: matches,
+    total,
+  } satisfies DocumentoCopilotResponse;
+}
