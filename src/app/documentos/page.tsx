@@ -8,7 +8,11 @@ import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { useLojas } from "@/hooks/useLojas";
-<<<<<<< HEAD
+import { DocumentosBatchActions } from "./_components/DocumentosBatchActions";
+import { DocumentosEmptyState } from "./_components/DocumentosEmptyState";
+import { DocumentosFilters } from "./_components/DocumentosFilters";
+import { DocumentosPagination } from "./_components/DocumentosPagination";
+import { TIPO_LABEL } from "./_lib/documentosShared";
 
 type FormularioRecord = {
   id: string;
