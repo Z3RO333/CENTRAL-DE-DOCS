@@ -7,6 +7,7 @@ import { useState } from "react";
 import {
   LayoutDashboard,
   FileText,
+  Bot,
   LogOut,
   UserRound,
   BarChart3,
@@ -36,6 +37,7 @@ export default function AppShell({
     useDocumentsAccess();
   const showNav = pathname !== "/login";
   const isDocumentsRoute = pathname?.startsWith("/documentos");
+  const isCopilotRoute = pathname?.startsWith("/copilot");
 
   const isAuthenticated = !!user;
   const canAccessDocuments =
@@ -76,6 +78,13 @@ export default function AppShell({
       isActive:
         pathname?.startsWith("/documentos") &&
         !pathname?.startsWith("/documentos/por-loja"),
+      isVisible: canAccessDocuments,
+    },
+    {
+      href: "/copilot",
+      label: "Copiloto",
+      icon: Bot,
+      isActive: pathname?.startsWith("/copilot"),
       isVisible: canAccessDocuments,
     },
     {
@@ -123,11 +132,35 @@ export default function AppShell({
   ];
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[var(--app-bg)] text-slate-900">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.08),transparent_50%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(15,23,42,0.05),transparent_55%)]" />
+    <div
+      className={`relative min-h-screen overflow-hidden ${
+        isCopilotRoute
+          ? "bg-[#050816] text-white"
+          : "bg-[var(--app-bg)] text-slate-900"
+      }`}
+    >
+      <div
+        className={`pointer-events-none absolute inset-0 ${
+          isCopilotRoute
+            ? "bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.14),transparent_42%)]"
+            : "bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.08),transparent_50%)]"
+        }`}
+      />
+      <div
+        className={`pointer-events-none absolute inset-0 ${
+          isCopilotRoute
+            ? "bg-[radial-gradient(circle_at_bottom,_rgba(15,23,42,0.2),transparent_55%)]"
+            : "bg-[radial-gradient(circle_at_bottom,_rgba(15,23,42,0.05),transparent_55%)]"
+        }`}
+      />
       <div className="pointer-events-none absolute inset-0 opacity-40">
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.06)_1px,transparent_1px)] bg-[size:160px_160px]" />
+        <div
+          className={`absolute inset-0 ${
+            isCopilotRoute
+              ? "bg-[linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)]"
+              : "bg-[linear-gradient(90deg,rgba(15,23,42,0.06)_1px,transparent_1px)]"
+          } bg-[size:160px_160px]`}
+        />
       </div>
 
       <div className="relative z-10 flex min-h-screen">
@@ -285,7 +318,7 @@ export default function AppShell({
         <div
           className={`flex min-h-screen flex-1 flex-col ${
             isSidebarCollapsed ? "md:pl-20" : "md:pl-72"
-          }`}
+          } ${isCopilotRoute ? "bg-transparent" : ""}`}
         >
           <header className="sticky top-0 z-20 flex items-center justify-between bg-[#f6f2ec]/80 px-4 py-3 backdrop-blur md:hidden">
             <button
@@ -308,36 +341,70 @@ export default function AppShell({
             </div>
           </header>
 
-          <main className="relative flex-1 px-4 pb-10 pt-6 md:px-8">
+          <main
+            className={`relative flex-1 px-4 pb-10 pt-6 md:px-8 ${
+              isCopilotRoute ? "bg-transparent" : ""
+            }`}
+          >
             <div
               className={`mx-auto flex w-full flex-1 ${
-                isDocumentsRoute ? "max-w-[1700px]" : "max-w-6xl"
+                isDocumentsRoute
+                  ? "max-w-[1700px]"
+                  : isCopilotRoute
+                    ? "max-w-[1500px]"
+                    : "max-w-6xl"
               }`}
             >
-              <div className="relative w-full rounded-[28px] bg-white/95 p-6 shadow-[0_28px_70px_rgba(148,163,184,0.25)]">
+              <div
+                className={`relative w-full p-6 ${
+                  isCopilotRoute
+                    ? "overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,15,31,0.96),rgba(11,18,34,0.92))] text-white shadow-[0_28px_80px_rgba(2,6,23,0.55)]"
+                    : "rounded-[28px] bg-white/95 shadow-[0_28px_70px_rgba(148,163,184,0.25)]"
+                }`}
+              >
                 {authError && (
-                  <div className="mb-4 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                  <div
+                    className={`mb-4 rounded-2xl px-4 py-3 text-xs ${
+                      isCopilotRoute
+                        ? "border border-cyan-400/20 bg-cyan-400/10 text-cyan-50"
+                        : "bg-amber-50 text-amber-900"
+                    }`}
+                  >
                     <p className="font-medium">{authError}</p>
                     <button
                       type="button"
                       onClick={() => refresh()}
-                      className="mt-2 text-amber-700 underline underline-offset-2"
+                      className={`mt-2 underline underline-offset-2 ${
+                        isCopilotRoute ? "text-cyan-200" : "text-amber-700"
+                      }`}
                     >
                       Tentar novamente
                     </button>
                   </div>
                 )}
                 {isLoading ? (
-                  <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
+                  <div
+                    className={`flex flex-1 items-center justify-center text-sm ${
+                      isCopilotRoute ? "text-slate-300" : "text-slate-500"
+                    }`}
+                  >
                     Carregando sessão...
                   </div>
                 ) : resolvedWithoutUser ? (
-                  <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-slate-500">
+                  <div
+                    className={`flex flex-1 flex-col items-center justify-center gap-3 text-sm ${
+                      isCopilotRoute ? "text-slate-300" : "text-slate-500"
+                    }`}
+                  >
                     <p>Sessão expirada. Faça login novamente para continuar.</p>
                     <button
                       type="button"
                       onClick={() => router.push("/login")}
-                      className="rounded-full bg-sky-600 px-4 py-1.5 text-xs font-semibold text-white shadow-md shadow-sky-200/60 transition hover:bg-sky-500"
+                      className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+                        isCopilotRoute
+                          ? "bg-cyan-400 text-slate-950 shadow-md shadow-cyan-950/30 hover:bg-cyan-300"
+                          : "bg-sky-600 text-white shadow-md shadow-sky-200/60 hover:bg-sky-500"
+                      }`}
                     >
                       Ir para login
                     </button>

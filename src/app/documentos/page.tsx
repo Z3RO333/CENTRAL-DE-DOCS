@@ -9,14 +9,10 @@ import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { useLojas } from "@/hooks/useLojas";
 import { DocumentosBatchActions } from "./_components/DocumentosBatchActions";
-import {
-  DocumentosCopilot,
-} from "./_components/DocumentosCopilot";
 import { DocumentosEmptyState } from "./_components/DocumentosEmptyState";
 import { DocumentosFilters } from "./_components/DocumentosFilters";
 import { DocumentosPagination } from "./_components/DocumentosPagination";
 import { TIPO_LABEL } from "./_lib/documentosShared";
-import type { DocumentoCopilotFilters as CopilotFilters } from "@/lib/documentosCopilot";
 
 type FormularioRecord = {
   id: string;
@@ -321,7 +317,6 @@ export default function DocumentosPage() {
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [hasRestoredState, setHasRestoredState] = useState(false);
   const [hasRestoredCache, setHasRestoredCache] = useState(false);
-  const [copilotCollapsed, setCopilotCollapsed] = useState(false);
   const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const listStateRef = useRef<DocumentosListState | null>(null);
@@ -1366,24 +1361,6 @@ export default function DocumentosPage() {
     setPage(1);
   };
 
-  const applyCopilotFilters = (filters: CopilotFilters) => {
-    setTipoFilter(filters.tipo ?? "todos");
-    setTipoLaudoFilter(filters.tipoLaudo ?? "todos");
-    setUserFilter("todos");
-    setLojaFilter(filters.lojaId ?? "todos");
-    setPrestadorFilter(filters.prestadorId ?? "todos");
-    setStatusFilter(filters.status ?? "todos");
-    setIdentificacaoFilter(filters.termo ?? "");
-    setAnoFilter(filters.ano ?? "todos");
-    setMesFilter(filters.mes ?? "todos");
-    setSomenteAssinados(filters.somenteAssinados ?? false);
-    setSomenteDisponiveisLote(filters.somenteDisponiveisLote ?? false);
-    setPage(1);
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
-
   const tipoOptions = useMemo(
     () => {
       const extras = Array.from(
@@ -1749,27 +1726,6 @@ export default function DocumentosPage() {
             formatStatusLabel={formatStatusLabel}
           />
         </div>
-
-        <section className="w-full">
-          <DocumentosCopilot
-            collapsed={copilotCollapsed}
-            onToggleCollapsed={() => setCopilotCollapsed((value) => !value)}
-            currentFilters={{
-              tipo: tipoFilter !== "todos" ? tipoFilter : undefined,
-              tipoLaudo:
-                tipoLaudoFilter !== "todos" ? tipoLaudoFilter : undefined,
-              status: statusFilter !== "todos" ? statusFilter : undefined,
-              ano: anoFilter !== "todos" ? anoFilter : undefined,
-              mes: mesFilter !== "todos" ? mesFilter : undefined,
-              lojaId: lojaFilter !== "todos" ? lojaFilter : undefined,
-              prestadorId: prestadorFilter !== "todos" ? prestadorFilter : undefined,
-              termo: identificacaoFilter.trim() || undefined,
-              somenteAssinados,
-              somenteDisponiveisLote,
-            }}
-            onApplyFilters={applyCopilotFilters}
-          />
-        </section>
 
           {canManageDocuments && (
             <DocumentosBatchActions
