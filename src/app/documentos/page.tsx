@@ -1705,11 +1705,7 @@ export default function DocumentosPage() {
         </div>
       )}
 
-      <div
-        className={`flex flex-col gap-6 ${
-          copilotCollapsed ? "xl:mr-[96px]" : "xl:mr-[384px]"
-        }`}
-      >
+      <div className="flex flex-col gap-6">
         <div className="min-w-0 space-y-6">
           <DocumentosFilters
             canManageDocuments={canManageDocuments}
@@ -1752,6 +1748,28 @@ export default function DocumentosPage() {
             onSomenteDisponiveisLoteChange={setSomenteDisponiveisLote}
             formatStatusLabel={formatStatusLabel}
           />
+        </div>
+
+        <section className="w-full">
+          <DocumentosCopilot
+            collapsed={copilotCollapsed}
+            onToggleCollapsed={() => setCopilotCollapsed((value) => !value)}
+            currentFilters={{
+              tipo: tipoFilter !== "todos" ? tipoFilter : undefined,
+              tipoLaudo:
+                tipoLaudoFilter !== "todos" ? tipoLaudoFilter : undefined,
+              status: statusFilter !== "todos" ? statusFilter : undefined,
+              ano: anoFilter !== "todos" ? anoFilter : undefined,
+              mes: mesFilter !== "todos" ? mesFilter : undefined,
+              lojaId: lojaFilter !== "todos" ? lojaFilter : undefined,
+              prestadorId: prestadorFilter !== "todos" ? prestadorFilter : undefined,
+              termo: identificacaoFilter.trim() || undefined,
+              somenteAssinados,
+              somenteDisponiveisLote,
+            }}
+            onApplyFilters={applyCopilotFilters}
+          />
+        </section>
 
           {canManageDocuments && (
             <DocumentosBatchActions
@@ -2163,31 +2181,6 @@ export default function DocumentosPage() {
           })}
         </div>
       )}
-        </div>
-        <aside
-          className={`hidden xl:block xl:fixed xl:right-6 xl:top-6 xl:z-20 xl:h-[calc(100vh-3rem)] ${
-            copilotCollapsed ? "xl:w-[72px]" : "xl:w-[360px]"
-          }`}
-        >
-          <DocumentosCopilot
-            collapsed={copilotCollapsed}
-            onToggleCollapsed={() => setCopilotCollapsed((value) => !value)}
-            currentFilters={{
-              tipo: tipoFilter !== "todos" ? tipoFilter : undefined,
-              tipoLaudo:
-                tipoLaudoFilter !== "todos" ? tipoLaudoFilter : undefined,
-              status: statusFilter !== "todos" ? statusFilter : undefined,
-              ano: anoFilter !== "todos" ? anoFilter : undefined,
-              mes: mesFilter !== "todos" ? mesFilter : undefined,
-              lojaId: lojaFilter !== "todos" ? lojaFilter : undefined,
-              prestadorId: prestadorFilter !== "todos" ? prestadorFilter : undefined,
-              termo: identificacaoFilter.trim() || undefined,
-              somenteAssinados,
-              somenteDisponiveisLote,
-            }}
-            onApplyFilters={applyCopilotFilters}
-          />
-        </aside>
       </div>
     </div>
   );
