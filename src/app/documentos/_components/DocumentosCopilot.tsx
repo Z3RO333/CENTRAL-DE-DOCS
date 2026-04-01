@@ -6,6 +6,7 @@ import { Bot, LoaderCircle, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import type {
   DocumentoCopilotFilters,
+  DocumentoCopilotInsights,
   DocumentoCopilotMatch,
 } from "@/lib/documentosCopilot";
 
@@ -19,6 +20,7 @@ type CopilotResponse = {
   filters: DocumentoCopilotFilters;
   results: DocumentoCopilotMatch[];
   total: number;
+  insights: DocumentoCopilotInsights;
   error?: string;
 };
 
@@ -29,6 +31,8 @@ const formatDate = (value: string) => {
   }
   return date.toLocaleDateString("pt-BR");
 };
+
+const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 
 export function DocumentosCopilot({
   currentFilters,
@@ -50,6 +54,20 @@ export function DocumentosCopilot({
     }
     return token;
   };
+
+  const insights = response?.insights;
+  const maxStatus = Math.max(
+    ...(insights?.porStatus.map((item) => item.total) ?? [0]),
+    1,
+  );
+  const maxLoja = Math.max(
+    ...(insights?.porLoja.map((item) => item.total) ?? [0]),
+    1,
+  );
+  const maxTrend = Math.max(
+    ...(insights?.tendenciaMensal.map((item) => item.total) ?? [0]),
+    1,
+  );
 
   const submit = async (text: string) => {
     const trimmed = text.trim();
@@ -158,7 +176,180 @@ export function DocumentosCopilot({
               <p className="text-xs leading-5 text-slate-300">{response.summary}</p>
             </div>
 
+            {insights && insights.totalDocumentos > 0 && (
+              <div className="space-y-4 rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Leitura rápida
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      O copilot resumiu o cenário com base nos documentos encontrados.
+                    </p>
+                  </div>
+                  {insights.isTruncated && (
+                    <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-[11px] font-semibold text-amber-100">
+                      Análise parcial
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                    <p className="text-[11px] uppercase tracking-wide text-slate-400">
+                      Documentos
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold text-white">
+                      {insights.totalDocumentos}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                    <p className="text-[11px] uppercase tracking-wide text-slate-400">
+                      Lojas
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold text-white">
+                      {insights.totalLojas}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                    <p className="text-[11px] uppercase tracking-wide text-slate-400">
+                      Pendentes
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold text-white">
+                      {insights.totalPendentes}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                    <p className="text-[11px] uppercase tracking-wide text-slate-400">
+                      Assinados
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold text-white">
+                      {insights.totalAssinados}
+                    </p>
+                  </div>
+                </div>
+
+                {insights.observacoes.length > 0 && (
+                  <div className="space-y-2 rounded-2xl border border-cyan-400/10 bg-cyan-400/5 px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-cyan-100">
+                      Análise
+                    </p>
+                    <div className="space-y-1 text-sm text-slate-100">
+                      {insights.observacoes.map((item) => (
+                        <p key={item}>{item}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Por status
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Distribuição do conjunto analisado
+                      </p>
+                    </div>
+                    <div className="mt-3 space-y-3">
+                      {insights.porStatus.map((item) => (
+                        <div key={item.key}>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-slate-200">{item.label}</span>
+                            <span className="font-semibold text-white">
+                              {item.total} ({formatPercent(item.percentual)})
+                            </span>
+                          </div>
+                          <div className="mt-1 h-2 rounded-full bg-white/5">
+                            <div
+                              className="h-full rounded-full bg-cyan-400"
+                              style={{
+                                width: `${Math.max((item.total / maxStatus) * 100, 6)}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Por loja
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Top 5 lojas mais recorrentes
+                      </p>
+                    </div>
+                    <div className="mt-3 space-y-3">
+                      {insights.porLoja.map((item) => (
+                        <div key={item.key}>
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="min-w-0 truncate text-slate-200">
+                              {item.label}
+                            </span>
+                            <span className="shrink-0 font-semibold text-white">
+                              {item.total}
+                            </span>
+                          </div>
+                          <div className="mt-1 h-2 rounded-full bg-white/5">
+                            <div
+                              className="h-full rounded-full bg-emerald-400"
+                              style={{
+                                width: `${Math.max((item.total / maxLoja) * 100, 6)}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {insights.tendenciaMensal.length > 0 && (
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Tendência mensal
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Últimos meses observados
+                      </p>
+                    </div>
+                    <div className="mt-4 flex items-end gap-2">
+                      {insights.tendenciaMensal.map((item) => (
+                        <div key={item.key} className="flex-1 text-center">
+                          <div className="flex h-24 items-end">
+                            <div
+                              className="w-full rounded-t-xl bg-sky-400/80"
+                              style={{
+                                height: `${Math.max((item.total / maxTrend) * 100, 6)}%`,
+                              }}
+                            />
+                          </div>
+                          <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                            {item.label}
+                          </p>
+                          <p className="text-[11px] text-slate-500">{item.total}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Resultados
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {response.results.length} encontrado(s)
+                </p>
+              </div>
               {response.results.length > 0 ? (
                 response.results.map((item) => (
                   <div

@@ -1,5 +1,6 @@
 import {
   DEFAULT_LIMIT,
+  MAX_LIMIT,
   normalizeIds,
   safeParseDados,
   sanitizeId,
@@ -58,12 +59,41 @@ export type DocumentoCopilotMatch = {
   observacoes: string | null;
 };
 
+export type DocumentoCopilotInsightItem = {
+  key: string;
+  label: string;
+  total: number;
+  percentual: number;
+};
+
+export type DocumentoCopilotTrendItem = {
+  key: string;
+  label: string;
+  total: number;
+};
+
+export type DocumentoCopilotInsights = {
+  totalDocumentos: number;
+  totalLojas: number;
+  totalPrestadores: number;
+  totalAssinados: number;
+  totalPendentes: number;
+  totalEmAnalise: number;
+  isTruncated: boolean;
+  porStatus: DocumentoCopilotInsightItem[];
+  porTipo: DocumentoCopilotInsightItem[];
+  porLoja: DocumentoCopilotInsightItem[];
+  tendenciaMensal: DocumentoCopilotTrendItem[];
+  observacoes: string[];
+};
+
 export type DocumentoCopilotResponse = {
   reply: string;
   summary: string;
   filters: DocumentoCopilotFilters;
   results: DocumentoCopilotMatch[];
   total: number;
+  insights: DocumentoCopilotInsights;
 };
 
 export type DocumentoCopilotRequest = {
@@ -96,6 +126,12 @@ type CandidateRow = Row & {
 type EntityRow = {
   id: string;
   nome: string | null;
+};
+
+type InsightCount = {
+  key: string;
+  label: string;
+  total: number;
 };
 
 const humanize = (value: string) =>
@@ -237,6 +273,229 @@ const getNomeDocumento = (registro: Row) => {
   const path = registro.arquivo_assinado_path ?? registro.arquivo_path;
   return path.split("/").pop() ?? registro.id;
 };
+
+const STATUS_LABELS: Record<string, string> = {
+  pendente: "Pendente",
+  em_analise: "Em análise",
+  revisado: "Revisado",
+  assinado: "Assinado",
+};
+
+const TIPO_LABELS: Record<string, string> = {
+  retencao_trabalhista: "Retenção Trabalhista",
+  registro_laudos: "Registro e Laudos",
+  notas_fiscais: "Notas Fiscais",
+};
+
+const formatStatusLabel = (value: string) =>
+  STATUS_LABELS[value] ?? humanize(value);
+
+const formatTipoLabel = (value: string) =>
+  TIPO_LABELS[value] ?? humanize(value);
+
+const getInsightLabel = (value: string | null | undefined) => {
+  if (typeof value !== "string") {
+    return "Não informado";
+  }
+  const trimmed = value.trim();
+  return trimmed || "Não informado";
+};
+
+const buildInsightItems = (
+  rows: CandidateRow[],
+  getKey: (row: CandidateRow) => string | null | undefined,
+  getLabel: (row: CandidateRow) => string,
+  totalBase: number,
+  limit = 5,
+) => {
+  const grouped = new Map<string, InsightCount>();
+
+  rows.forEach((row) => {
+    const rawKey = getKey(row);
+    const key = getInsightLabel(rawKey);
+    const current = grouped.get(key);
+    if (current) {
+      current.total += 1;
+      return;
+    }
+    grouped.set(key, {
+      key,
+      label: getLabel(row),
+      total: 1,
+    });
+  });
+
+  return Array.from(grouped.values())
+    .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label))
+    .slice(0, limit)
+    .map((item) => ({
+      key: item.key,
+      label: item.label,
+      total: item.total,
+      percentual:
+        totalBase > 0 ? Number(((item.total / totalBase) * 100).toFixed(1)) : 0,
+    }));
+};
+
+const buildTrendItems = (rows: CandidateRow[], limit = 6) => {
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const grouped = new Map<string, number>();
+  rows.forEach((row) => {
+    const date = new Date(row.created_at);
+    if (Number.isNaN(date.getTime())) {
+      return;
+    }
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    grouped.set(key, (grouped.get(key) ?? 0) + 1);
+  });
+
+  const baseDate = new Date(rows[0].created_at);
+  if (Number.isNaN(baseDate.getTime())) {
+    return [];
+  }
+
+  const points: { key: string; label: string }[] = [];
+  const cursor = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+  for (let index = 0; index < limit; index += 1) {
+    const monthDate = new Date(
+      cursor.getFullYear(),
+      cursor.getMonth() - (limit - 1 - index),
+      1,
+    );
+    const key = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, "0")}`;
+    points.push({
+      key,
+      label: monthDate.toLocaleDateString("pt-BR", {
+        month: "short",
+        year: "2-digit",
+      }).replace(".", ""),
+    });
+  }
+
+  return points.map((point) => ({
+    ...point,
+    total: grouped.get(point.key) ?? 0,
+  }));
+};
+
+const buildInsightsSummary = (input: {
+  total: number;
+  totalAssinados: number;
+  totalPendentes: number;
+  totalEmAnalise: number;
+  topLoja?: DocumentoCopilotInsightItem | null;
+  topStatus?: DocumentoCopilotInsightItem | null;
+  isTruncated: boolean;
+}) => {
+  const frases: string[] = [];
+  if (input.total > 0) {
+    frases.push(`Foram encontrados ${input.total} documentos nesta leitura.`);
+  }
+  if (input.topLoja) {
+    frases.push(
+      `${input.topLoja.label} lidera com ${input.topLoja.total} documento(s) (${input.topLoja.percentual}%).`,
+    );
+  }
+  if (input.totalPendentes > 0 || input.totalEmAnalise > 0 || input.totalAssinados > 0) {
+    frases.push(
+      `${input.totalPendentes} pendentes, ${input.totalEmAnalise} em análise e ${input.totalAssinados} assinados.`,
+    );
+  }
+  if (input.topStatus) {
+    frases.push(
+      `O status mais frequente é ${input.topStatus.label.toLowerCase()}.`,
+    );
+  }
+  if (input.isTruncated) {
+    frases.push("A análise considera no máximo 1000 registros por consulta.");
+  }
+
+  return frases.slice(0, 4);
+};
+
+const buildAnalyticInsights = (input: {
+  rows: CandidateRow[];
+  total: number;
+  isTruncated: boolean;
+}) => {
+  const { rows, total, isTruncated } = input;
+  const porStatus = buildInsightItems(
+    rows,
+    (row) => row.status,
+    (row) => formatStatusLabel(row.status),
+    rows.length,
+    4,
+  );
+  const porTipo = buildInsightItems(
+    rows,
+    (row) => row.tipo,
+    (row) => formatTipoLabel(row.tipo),
+    rows.length,
+    3,
+  );
+  const porLoja = buildInsightItems(
+    rows,
+    (row) => row.lojaId ?? row.lojaNome ?? null,
+    (row) =>
+      row.lojaNome?.trim() ||
+      row.lojaId?.trim() ||
+      "Sem loja vinculada",
+    rows.length,
+    5,
+  );
+  const tendenciaMensal = buildTrendItems(rows);
+
+  const totalAssinados = porStatus.find((item) => item.key === "assinado")?.total ?? 0;
+  const totalPendentes = porStatus.find((item) => item.key === "pendente")?.total ?? 0;
+  const totalEmAnalise = porStatus.find((item) => item.key === "em_analise")?.total ?? 0;
+  const topLoja = porLoja[0] ?? null;
+  const topStatus = porStatus[0] ?? null;
+  const totalLojas = new Set(rows.map((row) => row.lojaId ?? row.lojaNome ?? "Sem loja")).size;
+  const totalPrestadores = new Set(
+    rows.map((row) => row.prestador_id ?? "Sem prestador"),
+  ).size;
+
+  return {
+    totalDocumentos: total,
+    totalLojas,
+    totalPrestadores,
+    totalAssinados,
+    totalPendentes,
+    totalEmAnalise,
+    isTruncated,
+    porStatus,
+    porTipo,
+    porLoja,
+    tendenciaMensal,
+    observacoes: buildInsightsSummary({
+      total,
+      totalAssinados,
+      totalPendentes,
+      totalEmAnalise,
+      topLoja,
+      topStatus,
+      isTruncated,
+    }),
+    } satisfies DocumentoCopilotInsights;
+};
+
+const createEmptyInsights = (): DocumentoCopilotInsights => ({
+  totalDocumentos: 0,
+  totalLojas: 0,
+  totalPrestadores: 0,
+  totalAssinados: 0,
+  totalPendentes: 0,
+  totalEmAnalise: 0,
+  isTruncated: false,
+  porStatus: [],
+  porTipo: [],
+  porLoja: [],
+  tendenciaMensal: [],
+  observacoes: [],
+});
 
 const buildTextSearchOr = (term: string) => {
   const sanitized = normalizeText(term);
@@ -407,7 +666,7 @@ const buildPrompt = (input: {
   ];
 };
 
-const queryDocumentoCandidates = async (input: {
+const buildDocumentoCandidatesQuery = (input: {
   filters: DocumentoCopilotFilters;
   userId: string;
   allowedPrestadores: string[];
@@ -498,12 +757,52 @@ const queryDocumentoCandidates = async (input: {
     query = query.or(textOr.join(","));
   }
 
-  const { data, error, count } = await query.range(0, DEFAULT_LIMIT - 1);
+  return query;
+};
+
+const queryDocumentoCandidates = async (input: {
+  filters: DocumentoCopilotFilters;
+  userId: string;
+  allowedPrestadores: string[];
+  gerenteEntries: GerenteAccessRow[];
+  canAccess: boolean;
+  supabaseAdmin?: ReturnType<typeof createSupabaseAdminClient>;
+}) => {
+  const {
+    filters,
+    supabaseAdmin = createSupabaseAdminClient(),
+  } = input;
+
+  const baseQuery = buildDocumentoCandidatesQuery({
+    ...input,
+    supabaseAdmin,
+  });
+
+  const { data, error, count } = await baseQuery.range(0, DEFAULT_LIMIT - 1);
   if (error) {
     throw error;
   }
 
-  const rows = ((data as Row[]) ?? []).map((registro) => {
+  const total = count ?? ((data as Row[] | null)?.length ?? 0);
+  const rowsRaw = ((data as Row[]) ?? []) as Row[];
+  const maxRowsToFetch = Math.min(total, MAX_LIMIT);
+
+  for (let offset = DEFAULT_LIMIT; offset < maxRowsToFetch; offset += DEFAULT_LIMIT) {
+    const { data: nextData, error: nextError } = await buildDocumentoCandidatesQuery({
+      ...input,
+      supabaseAdmin,
+    }).range(offset, Math.min(offset + DEFAULT_LIMIT - 1, maxRowsToFetch - 1));
+    if (nextError) {
+      throw nextError;
+    }
+    const nextRows = ((nextData as Row[]) ?? []) as Row[];
+    rowsRaw.push(...nextRows);
+    if (nextRows.length < DEFAULT_LIMIT) {
+      break;
+    }
+  }
+
+  const rows = rowsRaw.map((registro) => {
     const dados = safeParseDados(registro.dados);
     const lojaId = getLojaId(dados);
     return {
@@ -517,7 +816,8 @@ const queryDocumentoCandidates = async (input: {
       prestador_id: registro.prestador_id,
       user_id: registro.user_id,
       lojaId,
-      identificacao: getIdentificacao({ tipo: registro.tipo, dados }) ?? "Não informado",
+      identificacao:
+        getIdentificacao({ tipo: registro.tipo, dados }) ?? "Não informado",
       complemento: getComplemento({ tipo: registro.tipo, dados }),
       tipoLaudo: getTipoLaudo(dados),
       observacoes: getObservacoes(dados),
@@ -583,7 +883,12 @@ const queryDocumentoCandidates = async (input: {
 
   return {
     matches,
-    total: count ?? matches.length,
+    total,
+    insights: buildAnalyticInsights({
+      rows,
+      total,
+      isTruncated: total > rows.length,
+    }),
   };
 };
 
@@ -647,10 +952,11 @@ export async function runDocumentoCopilot(
       filters,
       results: [],
       total: 0,
+      insights: createEmptyInsights(),
     } satisfies DocumentoCopilotResponse;
   }
 
-  const { matches, total } = await queryDocumentoCandidates({
+  const { matches, total, insights } = await queryDocumentoCandidates({
     filters,
     userId: auth.userId,
     allowedPrestadores,
@@ -669,5 +975,6 @@ export async function runDocumentoCopilot(
     filters,
     results: matches,
     total,
+    insights,
   } satisfies DocumentoCopilotResponse;
 }
