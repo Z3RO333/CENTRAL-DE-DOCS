@@ -1537,7 +1537,7 @@ export default function DocumentosPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 py-4 xl:pr-[380px]">
+    <div className="flex flex-1 flex-col gap-6 py-4 xl:pr-[420px]">
       {confirmDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6" onClick={() => setConfirmDialog(null)}>
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl shadow-slate-900/20" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">
