@@ -70,6 +70,7 @@ const tipoLabel: Record<string, string> = {
 const statusLabel: Record<string, string> = {
   pendente: "Pendente",
   em_analise: "Em análise",
+  revisado: "Revisado",
   assinado: "Assinado",
 };
 
