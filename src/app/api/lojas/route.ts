@@ -1,6 +1,10 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+﻿import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
+import {
+  ApiHttpError as HttpError,
+  getSessionUserFromRequest,
+  hasDocumentosAccess,
+} from "@/lib/apiAuth";
 
 type LojaRow = {
   id: string;
@@ -10,92 +14,6 @@ type LojaRow = {
   created_at: string;
 };
 
-class HttpError extends Error {
-  status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
-
-async function getSessionUser(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    throw new HttpError(401, "Requisição não autorizada.");
-  }
-
-  const accessToken = authHeader.slice("Bearer ".length).trim();
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "Configuração incompleta. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-    );
-  }
-
-  const supabaseSession = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-
-  const { data, error } = await supabaseSession.auth.getUser(accessToken);
-  if (error || !data?.user) {
-    throw new HttpError(401, "Sessão inválida ou expirada.");
-  }
-
-  return data.user;
-}
-
-async function hasAdminAccess(
-  userId: string,
-  email: string | null,
-  supabaseAdmin = createSupabaseAdminClient(),
-) {
-  const adminModules = ["admin", "documentos", "dashboards", "perfil"];
-  const { data, error } = await supabaseAdmin
-    .from("documentos_acesso")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("scope", "admin")
-    .in("modulo", adminModules)
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  if (data) {
-    return true;
-  }
-
-  if (!email) {
-    return false;
-  }
-
-  const {
-    data: emailData,
-    error: emailError,
-  } = await supabaseAdmin
-    .from("documentos_acesso")
-    .select("id")
-    .eq("email", email)
-    .eq("scope", "admin")
-    .in("modulo", adminModules)
-    .limit(1)
-    .maybeSingle();
-
-  if (emailError) {
-    throw emailError;
-  }
-
-  return Boolean(emailData);
-}
-
 function normalizeEmails(values: string[]) {
   return values
     .map((value) => value.trim().toLowerCase())
@@ -104,7 +22,7 @@ function normalizeEmails(values: string[]) {
 
 export async function GET(request: Request) {
   try {
-    await getSessionUser(request);
+    await getSessionUserFromRequest(request);
     const supabaseAdmin = createSupabaseAdminClient();
 
     const { data, error } = await supabaseAdmin
@@ -139,13 +57,13 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await getSessionUser(request);
+    const user = await getSessionUserFromRequest(request);
     const email = user.email?.toLowerCase().trim() ?? null;
     const supabaseAdmin = createSupabaseAdminClient();
 
-    const canAccess = await hasAdminAccess(user.id, email, supabaseAdmin);
+    const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
     if (!canAccess) {
-      throw new HttpError(403, "Você não possui permissão para criar lojas.");
+      throw new HttpError(403, "Voce nao possui permissao para criar lojas.");
     }
 
     const body = (await request.json()) as {
@@ -198,13 +116,13 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const user = await getSessionUser(request);
+    const user = await getSessionUserFromRequest(request);
     const email = user.email?.toLowerCase().trim() ?? null;
     const supabaseAdmin = createSupabaseAdminClient();
 
-    const canAccess = await hasAdminAccess(user.id, email, supabaseAdmin);
+    const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
     if (!canAccess) {
-      throw new HttpError(403, "Você não possui permissão para atualizar lojas.");
+      throw new HttpError(403, "Voce nao possui permissao para atualizar lojas.");
     }
 
     const body = (await request.json()) as {
@@ -230,7 +148,7 @@ export async function PATCH(request: Request) {
     }
 
     if (Object.keys(updates).length === 0) {
-      throw new HttpError(400, "Nenhuma alteração informada.");
+      throw new HttpError(400, "Nenhuma alteracao informada.");
     }
 
     const { data, error } = await supabaseAdmin
@@ -266,13 +184,13 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const user = await getSessionUser(request);
+    const user = await getSessionUserFromRequest(request);
     const email = user.email?.toLowerCase().trim() ?? null;
     const supabaseAdmin = createSupabaseAdminClient();
 
-    const canAccess = await hasAdminAccess(user.id, email, supabaseAdmin);
+    const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
     if (!canAccess) {
-      throw new HttpError(403, "Você não possui permissão para remover lojas.");
+      throw new HttpError(403, "Voce nao possui permissao para remover lojas.");
     }
 
     const { searchParams } = new URL(request.url);

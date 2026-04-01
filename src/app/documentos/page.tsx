@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Files, Filter, LayoutGrid, Table as TableIcon } from "lucide-react";
+import { Files } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { useLojas } from "@/hooks/useLojas";
+<<<<<<< HEAD
 
 type FormularioRecord = {
   id: string;
@@ -297,7 +298,7 @@ export default function DocumentosPage() {
   const [identificacaoFilter, setIdentificacaoFilter] = useState<string>("");
   const [identificacaoDebounced, setIdentificacaoDebounced] =
     useState<string>("");
-  const [anoFilter, setAnoFilter] = useState<string>("todos");
+  const [anoFilter, setAnoFilter] = useState<string>("2026");
   const [mesFilter, setMesFilter] = useState<string>("todos");
   const [somenteAssinados, setSomenteAssinados] = useState(false);
   const [somenteDisponiveisLote, setSomenteDisponiveisLote] = useState(false);
@@ -551,7 +552,7 @@ export default function DocumentosPage() {
           prestadorFilter: parsed.prestadorFilter ?? "todos",
           statusFilter: parsed.statusFilter ?? "todos",
           identificacaoFilter: parsed.identificacaoFilter ?? "",
-          anoFilter: parsed.anoFilter ?? "todos",
+          anoFilter: parsed.anoFilter ?? "2026",
           mesFilter: parsed.mesFilter ?? "todos",
           somenteAssinados: parsed.somenteAssinados ?? false,
           somenteDisponiveisLote: parsed.somenteDisponiveisLote ?? false,
@@ -699,6 +700,12 @@ export default function DocumentosPage() {
   }, [anoFilter, mesFilter]);
 
   useEffect(() => {
+    if (tipoFilter !== TIPO_ASSINAVEL && tipoLaudoFilter !== "todos") {
+      setTipoLaudoFilter("todos");
+    }
+  }, [tipoFilter, tipoLaudoFilter]);
+
+  useEffect(() => {
     setPage(1);
   }, [
     tipoFilter,
@@ -784,9 +791,6 @@ export default function DocumentosPage() {
         }
         if (lojaFilter !== "todos") {
           params.set("lojaId", lojaFilter);
-        }
-        if (prestadorFilter !== "todos") {
-          params.append("prestadorId", prestadorFilter);
         }
         if (statusFilter !== "todos") {
           params.set("status", statusFilter);
@@ -1346,7 +1350,7 @@ export default function DocumentosPage() {
     setPrestadorFilter("todos");
     setStatusFilter("todos");
     setIdentificacaoFilter("");
-    setAnoFilter("todos");
+    setAnoFilter("2026");
     setMesFilter("todos");
     setSomenteAssinados(false);
     setSomenteDisponiveisLote(false);
@@ -1358,19 +1362,19 @@ export default function DocumentosPage() {
         new Set(
           registros
             .map((registro) => registro.tipo)
-            .filter((tipo) => !(tipo in tipoLabel)),
+            .filter((tipo) => !(tipo in TIPO_LABEL)),
         ),
       );
 
       return [
         { value: "todos", label: "Todos os tipos" },
-        ...Object.entries(tipoLabel).map(([value, label]) => ({
+        ...Object.entries(TIPO_LABEL).map(([value, label]) => ({
           value,
           label,
         })),
         ...extras.map((tipo) => ({
           value: tipo,
-          label: humanizeTexto(tipo),
+          label: getTipoDescricao(tipo),
         })),
       ];
     },
@@ -1485,7 +1489,9 @@ export default function DocumentosPage() {
   const mesSelecionadoLabel =
     mesFilter === "todos"
       ? "Todos os meses"
-      : MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual";
+      : anoFilter !== "todos"
+        ? `${mesFilter}/${anoFilter}`
+        : MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual";
   const anoSelecionadoLabel =
     anoFilter === "todos" ? "Todos os anos" : anoFilter;
 
@@ -1671,361 +1677,77 @@ export default function DocumentosPage() {
         </div>
       )}
 
-      <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <Filter className="h-4 w-4 text-slate-400" />
-            Painel de filtros
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px]">
-            {(filterOptionsLoading || adminUsersLoading) && (
-              <span className="text-[11px] font-semibold text-slate-400">
-                Carregando opções de filtro...
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
-            >
-              Limpar filtros
-            </button>
-            <div className="inline-flex overflow-hidden rounded-full border border-slate-200 bg-slate-50 text-slate-600">
-              <button
-                type="button"
-                onClick={() => setViewMode("tabela")}
-                className={`flex items-center gap-1 px-3 py-1 text-xs font-semibold transition ${
-                  viewMode === "tabela"
-                    ? "bg-white text-slate-900"
-                    : "text-slate-500"
-                }`}
-                aria-pressed={viewMode === "tabela"}
-              >
-                <TableIcon className="h-4 w-4" />
-                Tabela
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("cards")}
-                className={`flex items-center gap-1 border-l border-slate-200 px-3 py-1 text-xs font-semibold transition ${
-                  viewMode === "cards"
-                    ? "bg-white text-slate-900"
-                    : "text-slate-500"
-                }`}
-                aria-pressed={viewMode === "cards"}
-              >
-                <LayoutGrid className="h-4 w-4" />
-                Cartões
-              </button>
-            </div>
-          </div>
-        </div>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <label className="text-xs font-semibold text-slate-600">
-            Identificação (Empresa/Prestador/Número do pedido)
-            <input
-              type="text"
-              value={identificacaoFilter}
-              onChange={(event) => setIdentificacaoFilter(event.target.value)}
-              placeholder="Busque pela empresa, prestador ou número do pedido"
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            />
-          </label>
-          <label className="text-xs font-semibold text-slate-600">
-            Tipo de formulário
-            <select
-              value={tipoFilter}
-              onChange={(event) => setTipoFilter(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            >
-              {tipoOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-slate-600">
-            Tipo de laudo
-            <select
-              value={tipoLaudoFilter}
-              onChange={(event) => setTipoLaudoFilter(event.target.value)}
-              disabled={filterOptionsLoading}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            >
-              {tipoLaudoOptions.map((tipoLaudo) => (
-                <option key={tipoLaudo} value={tipoLaudo}>
-                  {tipoLaudo === "todos" ? "Todos os tipos" : tipoLaudo}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-slate-600">
-            Status
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              disabled={filterOptionsLoading}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            >
-              {statusOptions.map((statusOption) => (
-                <option key={statusOption} value={statusOption}>
-                  {statusOption === "todos"
-                    ? "Todos os status"
-                    : formatStatusLabel(statusOption)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
-          {canManageDocuments && (
-            <label className="text-xs font-semibold text-slate-600">
-              Colaborador (quem enviou)
-              <select
-                value={userFilter}
-                onChange={(event) => setUserFilter(event.target.value)}
-                disabled={adminUsersLoading}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-              >
-                {colaboradorOptions.map((colaborador) => (
-                  <option key={colaborador.value} value={colaborador.value}>
-                    {colaborador.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {(canManageDocuments || lojaOptions.length > 1) && (
-            <label className="text-xs font-semibold text-slate-600">
-              Loja
-              <select
-                value={lojaFilter}
-                onChange={(event) => setLojaFilter(event.target.value)}
-                disabled={filterOptionsLoading}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-              >
-                {lojaOptions.map((loja) => (
-                  <option key={loja.value} value={loja.value}>
-                    {loja.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {prestadorOptions.length > 1 && (
-            <label className="text-xs font-semibold text-slate-600">
-              Prestador
-              <select
-                value={prestadorFilter}
-                onChange={(event) => setPrestadorFilter(event.target.value)}
-                disabled={filterOptionsLoading}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-              >
-                {prestadorOptions.map((prestador) => (
-                  <option key={prestador.value} value={prestador.value}>
-                    {prestador.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          <label className="text-xs font-semibold text-slate-600">
-            Ano de envio
-            <select
-              value={anoFilter}
-              onChange={(event) => setAnoFilter(event.target.value)}
-              disabled={filterOptionsLoading}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            >
-              <option value="todos">Todos os anos</option>
-              {anosDisponiveis.map((ano) => (
-                <option key={ano} value={ano}>
-                  {ano}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-slate-600">
-            Mês de envio
-            <select
-              value={mesFilter}
-              onChange={(event) => setMesFilter(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            >
-              <option value="todos">Todos os meses</option>
-              {MESES.map((mes) => (
-                <option key={mes.value} value={mes.value}>
-                  {mes.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="rounded-xl bg-slate-50 p-3 text-[11px] text-slate-500">
-            Os filtros acima são aplicados automaticamente. Período selecionado:{" "}
-            {anoSelecionadoLabel}, {mesSelecionadoLabel}.
-          </div>
-        </div>
-<div className="mt-4 grid gap-3 md:grid-cols-4">
-          <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-              checked={somenteAssinados}
-              onChange={(event) => setSomenteAssinados(event.target.checked)}
-            />
-            Mostrar apenas assinados
-          </label>
-          <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-              checked={somenteDisponiveisLote}
-              onChange={(event) =>
-                setSomenteDisponiveisLote(event.target.checked)
-              }
-            />
-            Apenas disponíveis para assinatura em lote
-          </label>
-          <div className="rounded-xl bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
-            Combine os filtros para chegar ao subconjunto desejado.
-          </div>
-        </div>
-      </div>
+      <DocumentosFilters
+        canManageDocuments={canManageDocuments}
+        filterOptionsLoading={filterOptionsLoading}
+        adminUsersLoading={adminUsersLoading}
+        viewMode={viewMode}
+        identificacaoFilter={identificacaoFilter}
+        tipoFilter={tipoFilter}
+        tipoLaudoFilter={tipoLaudoFilter}
+        statusFilter={statusFilter}
+        userFilter={userFilter}
+        lojaFilter={lojaFilter}
+        prestadorFilter={prestadorFilter}
+        anoFilter={anoFilter}
+        mesFilter={mesFilter}
+        somenteAssinados={somenteAssinados}
+        somenteDisponiveisLote={somenteDisponiveisLote}
+        tipoOptions={tipoOptions}
+        tipoLaudoOptions={tipoLaudoOptions}
+        statusOptions={statusOptions}
+        colaboradorOptions={colaboradorOptions}
+        lojaOptions={lojaOptions}
+        prestadorOptions={prestadorOptions}
+        anosDisponiveis={anosDisponiveis}
+        meses={MESES}
+        anoSelecionadoLabel={anoSelecionadoLabel}
+        mesSelecionadoLabel={mesSelecionadoLabel}
+        onResetFilters={resetFilters}
+        onViewModeChange={setViewMode}
+        onIdentificacaoFilterChange={setIdentificacaoFilter}
+        onTipoFilterChange={setTipoFilter}
+        onTipoLaudoFilterChange={setTipoLaudoFilter}
+        onStatusFilterChange={setStatusFilter}
+        onUserFilterChange={setUserFilter}
+        onLojaFilterChange={setLojaFilter}
+        onPrestadorFilterChange={setPrestadorFilter}
+        onAnoFilterChange={setAnoFilter}
+        onMesFilterChange={setMesFilter}
+        onSomenteAssinadosChange={setSomenteAssinados}
+        onSomenteDisponiveisLoteChange={setSomenteDisponiveisLote}
+        formatStatusLabel={formatStatusLabel}
+      />
 
       {canManageDocuments && (
-        <div className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Assinaturas disponíveis
-              </p>
-              <p className="text-sm text-slate-600">
-                {assinaturasPendentes.length > 0 ? (
-                  <>
-                    {assinaturasPendentes.length} documento(s) pendentes do tipo
-                    Registro e Laudos podem ser assinados.
-                  </>
-                ) : (
-                  <>Nenhum documento pendente para assinatura em lote.</>
-                )}
-              </p>
-              {hasSelection && (
-                <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
-                  {selectedIds.slice(0, 4).map((id) => (
-                    <span
-                      key={id}
-                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 font-mono text-[10px] text-slate-600"
-                    >
-                      {id.slice(0, 8)}...
-                      <button
-                        type="button"
-                        onClick={() => toggleSelecionar(id)}
-                        className="text-[10px] font-semibold text-slate-500 transition hover:text-slate-800"
-                        title="Remover da seleção"
-                      >
-                        x
-                      </button>
-                    </span>
-                  ))}
-                  {selectedIds.length > 4 && (
-                    <span className="text-[11px] text-slate-500">
-                      +{selectedIds.length - 4} outros
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2 text-[11px]">
-              <button
-                type="button"
-                onClick={selecionarTodos}
-                disabled={registrosFiltrados.length === 0}
-                className="rounded-full border border-slate-200 px-4 py-1.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {registrosFiltrados.length === 0
-                  ? "Nenhum registro"
-                  : "Selecionar todos"}
-              </button>
-              <button
-                type="button"
-                onClick={limparSelecao}
-                disabled={!hasSelection}
-                className="rounded-full border border-slate-200 px-4 py-1.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Limpar seleção
-              </button>
-              <button
-                type="button"
-                onClick={removerSelecionados}
-                disabled={!hasSelection || deletingBatch}
-                className="rounded-full border border-red-200 px-4 py-1.5 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {deletingBatch ? "Removendo..." : "Remover selecionados"}
-              </button>
-              <button
-                type="button"
-                onClick={iniciarAssinaturaEmLote}
-                disabled={assinaturasSelecionadasCount === 0 || startingBatch}
-                className="rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white shadow-sm shadow-emerald-200 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {startingBatch
-                  ? "Abrindo..."
-                  : assinaturasSelecionadasCount > 1
-                    ? "Assinar em lote"
-                    : "Assinar selecionados"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <DocumentosBatchActions
+          assinaturasPendentesCount={assinaturasPendentes.length}
+          selectedIds={selectedIds}
+          hasSelection={hasSelection}
+          registrosFiltradosCount={registrosFiltrados.length}
+          assinaturasSelecionadasCount={assinaturasSelecionadasCount}
+          deletingBatch={deletingBatch}
+          startingBatch={startingBatch}
+          onToggleSelecionar={toggleSelecionar}
+          onSelecionarTodos={selecionarTodos}
+          onLimparSelecao={limparSelecao}
+          onRemoverSelecionados={removerSelecionados}
+          onIniciarAssinaturaEmLote={iniciarAssinaturaEmLote}
+        />
       )}
 
-      {totalResultados > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-white p-3 text-xs text-slate-500 shadow-sm shadow-slate-200">
-          <span>
-            {totalResultados} resultado(s) · Página {page} de {totalPages}
-          </span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-              disabled={!canPrevPage}
-              className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
-              disabled={!canNextPage}
-              className="rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Próxima
-            </button>
-          </div>
-        </div>
-      )}
+      <DocumentosPagination
+        totalResultados={totalResultados}
+        page={page}
+        totalPages={totalPages}
+        canPrevPage={canPrevPage}
+        canNextPage={canNextPage}
+        onPrevPage={() => setPage((prev) => Math.max(prev - 1, 1))}
+        onNextPage={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+      />
 
       {totalResultados === 0 ? (
-        <div className="rounded-2xl bg-white p-8 text-center text-sm text-slate-500 shadow-sm shadow-slate-200">
-          <p className="text-base font-semibold text-slate-700">
-            Nenhum documento encontrado
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            Ajuste ou limpe os filtros para visualizar todos os registros.
-          </p>
-          <div className="mt-4 flex justify-center gap-2">
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="rounded-full border border-slate-300 px-4 py-1.5 text-xs text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-            >
-              Limpar filtros
-            </button>
-          </div>
-        </div>
+        <DocumentosEmptyState onResetFilters={resetFilters} />
       ) : viewMode === "tabela" ? (
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
           <div className="relative overflow-x-auto">

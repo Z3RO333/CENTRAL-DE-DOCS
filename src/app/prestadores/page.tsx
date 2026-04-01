@@ -1064,7 +1064,54 @@ const getDocumentoNome = (registro: {
       </section>
 
       <section className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
-        <div className="overflow-x-auto">
+        <div className="space-y-3 p-3 md:hidden">
+          {prestadoresLoading ? (
+            <p className="py-3 text-center text-sm text-slate-500">
+              Carregando prestadores...
+            </p>
+          ) : visiblePrestadores.length === 0 ? (
+            <p className="py-3 text-center text-sm text-slate-500">
+              Nenhum prestador encontrado.
+            </p>
+          ) : (
+            visiblePrestadores.map((prestador) => {
+              const isSelected = prestador.id === selectedPrestadorId;
+              const regrasCount = regrasPorPrestador[prestador.id]?.length ?? 0;
+              return (
+                <article
+                  key={prestador.id}
+                  className={`rounded-xl border p-3 text-sm ${
+                    isSelected
+                      ? "border-sky-200 bg-sky-50/40"
+                      : "border-slate-200 bg-white text-slate-700"
+                  }`}
+                >
+                  <p className="font-semibold text-slate-900">{prestador.nome}</p>
+                  <div className="mt-2 grid gap-1 text-xs text-slate-500">
+                    <p>Serviço: {prestador.tipo_servico}</p>
+                    <p>CNPJ: {prestador.cnpj}</p>
+                    <p>{prestador.usuarios.length} e-mail(s)</p>
+                    <p>{regrasCount} regra(s)</p>
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPrestadorId(prestador.id);
+                        setIsDetailsOpen(true);
+                      }}
+                      className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                      {isSelected ? "Selecionado" : "Ver detalhes"}
+                    </button>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[760px] text-sm">
             <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>
