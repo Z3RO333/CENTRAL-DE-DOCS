@@ -1707,7 +1707,7 @@ export default function DocumentosPage() {
 
       <div
         className={`flex flex-col gap-6 ${
-          copilotCollapsed ? "xl:pr-[96px]" : "xl:pr-[384px]"
+          copilotCollapsed ? "xl:mr-[96px]" : "xl:mr-[384px]"
         }`}
       >
         <div className="min-w-0 space-y-6">
