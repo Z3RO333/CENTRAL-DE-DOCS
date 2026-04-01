@@ -1704,91 +1704,76 @@ export default function DocumentosPage() {
         </div>
       )}
 
-      <DocumentosCopilot
-        currentFilters={{
-          tipo: tipoFilter !== "todos" ? tipoFilter : undefined,
-          tipoLaudo:
-            tipoLaudoFilter !== "todos" ? tipoLaudoFilter : undefined,
-          status: statusFilter !== "todos" ? statusFilter : undefined,
-          ano: anoFilter !== "todos" ? anoFilter : undefined,
-          mes: mesFilter !== "todos" ? mesFilter : undefined,
-          lojaId: lojaFilter !== "todos" ? lojaFilter : undefined,
-          prestadorId: prestadorFilter !== "todos" ? prestadorFilter : undefined,
-          termo: identificacaoFilter.trim() || undefined,
-          somenteAssinados,
-          somenteDisponiveisLote,
-        }}
-        onApplyFilters={applyCopilotFilters}
-      />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+        <div className="min-w-0 space-y-6">
+          <DocumentosFilters
+            canManageDocuments={canManageDocuments}
+            filterOptionsLoading={filterOptionsLoading}
+            adminUsersLoading={adminUsersLoading}
+            viewMode={viewMode}
+            identificacaoFilter={identificacaoFilter}
+            tipoFilter={tipoFilter}
+            tipoLaudoFilter={tipoLaudoFilter}
+            statusFilter={statusFilter}
+            userFilter={userFilter}
+            lojaFilter={lojaFilter}
+            prestadorFilter={prestadorFilter}
+            anoFilter={anoFilter}
+            mesFilter={mesFilter}
+            somenteAssinados={somenteAssinados}
+            somenteDisponiveisLote={somenteDisponiveisLote}
+            tipoOptions={tipoOptions}
+            tipoLaudoOptions={tipoLaudoOptions}
+            statusOptions={statusOptions}
+            colaboradorOptions={colaboradorOptions}
+            lojaOptions={lojaOptions}
+            prestadorOptions={prestadorOptions}
+            anosDisponiveis={anosDisponiveis}
+            meses={MESES}
+            anoSelecionadoLabel={anoSelecionadoLabel}
+            mesSelecionadoLabel={mesSelecionadoLabel}
+            onResetFilters={resetFilters}
+            onViewModeChange={setViewMode}
+            onIdentificacaoFilterChange={setIdentificacaoFilter}
+            onTipoFilterChange={setTipoFilter}
+            onTipoLaudoFilterChange={setTipoLaudoFilter}
+            onStatusFilterChange={setStatusFilter}
+            onUserFilterChange={setUserFilter}
+            onLojaFilterChange={setLojaFilter}
+            onPrestadorFilterChange={setPrestadorFilter}
+            onAnoFilterChange={setAnoFilter}
+            onMesFilterChange={setMesFilter}
+            onSomenteAssinadosChange={setSomenteAssinados}
+            onSomenteDisponiveisLoteChange={setSomenteDisponiveisLote}
+            formatStatusLabel={formatStatusLabel}
+          />
 
-      <DocumentosFilters
-        canManageDocuments={canManageDocuments}
-        filterOptionsLoading={filterOptionsLoading}
-        adminUsersLoading={adminUsersLoading}
-        viewMode={viewMode}
-        identificacaoFilter={identificacaoFilter}
-        tipoFilter={tipoFilter}
-        tipoLaudoFilter={tipoLaudoFilter}
-        statusFilter={statusFilter}
-        userFilter={userFilter}
-        lojaFilter={lojaFilter}
-        prestadorFilter={prestadorFilter}
-        anoFilter={anoFilter}
-        mesFilter={mesFilter}
-        somenteAssinados={somenteAssinados}
-        somenteDisponiveisLote={somenteDisponiveisLote}
-        tipoOptions={tipoOptions}
-        tipoLaudoOptions={tipoLaudoOptions}
-        statusOptions={statusOptions}
-        colaboradorOptions={colaboradorOptions}
-        lojaOptions={lojaOptions}
-        prestadorOptions={prestadorOptions}
-        anosDisponiveis={anosDisponiveis}
-        meses={MESES}
-        anoSelecionadoLabel={anoSelecionadoLabel}
-        mesSelecionadoLabel={mesSelecionadoLabel}
-        onResetFilters={resetFilters}
-        onViewModeChange={setViewMode}
-        onIdentificacaoFilterChange={setIdentificacaoFilter}
-        onTipoFilterChange={setTipoFilter}
-        onTipoLaudoFilterChange={setTipoLaudoFilter}
-        onStatusFilterChange={setStatusFilter}
-        onUserFilterChange={setUserFilter}
-        onLojaFilterChange={setLojaFilter}
-        onPrestadorFilterChange={setPrestadorFilter}
-        onAnoFilterChange={setAnoFilter}
-        onMesFilterChange={setMesFilter}
-        onSomenteAssinadosChange={setSomenteAssinados}
-        onSomenteDisponiveisLoteChange={setSomenteDisponiveisLote}
-        formatStatusLabel={formatStatusLabel}
-      />
+          {canManageDocuments && (
+            <DocumentosBatchActions
+              assinaturasPendentesCount={assinaturasPendentes.length}
+              selectedIds={selectedIds}
+              hasSelection={hasSelection}
+              registrosFiltradosCount={registrosFiltrados.length}
+              assinaturasSelecionadasCount={assinaturasSelecionadasCount}
+              deletingBatch={deletingBatch}
+              startingBatch={startingBatch}
+              onToggleSelecionar={toggleSelecionar}
+              onSelecionarTodos={selecionarTodos}
+              onLimparSelecao={limparSelecao}
+              onRemoverSelecionados={removerSelecionados}
+              onIniciarAssinaturaEmLote={iniciarAssinaturaEmLote}
+            />
+          )}
 
-      {canManageDocuments && (
-        <DocumentosBatchActions
-          assinaturasPendentesCount={assinaturasPendentes.length}
-          selectedIds={selectedIds}
-          hasSelection={hasSelection}
-          registrosFiltradosCount={registrosFiltrados.length}
-          assinaturasSelecionadasCount={assinaturasSelecionadasCount}
-          deletingBatch={deletingBatch}
-          startingBatch={startingBatch}
-          onToggleSelecionar={toggleSelecionar}
-          onSelecionarTodos={selecionarTodos}
-          onLimparSelecao={limparSelecao}
-          onRemoverSelecionados={removerSelecionados}
-          onIniciarAssinaturaEmLote={iniciarAssinaturaEmLote}
-        />
-      )}
-
-      <DocumentosPagination
-        totalResultados={totalResultados}
-        page={page}
-        totalPages={totalPages}
-        canPrevPage={canPrevPage}
-        canNextPage={canNextPage}
-        onPrevPage={() => setPage((prev) => Math.max(prev - 1, 1))}
-        onNextPage={() => setPage((prev) => Math.min(prev + 1, totalPages))}
-      />
+          <DocumentosPagination
+            totalResultados={totalResultados}
+            page={page}
+            totalPages={totalPages}
+            canPrevPage={canPrevPage}
+            canNextPage={canNextPage}
+            onPrevPage={() => setPage((prev) => Math.max(prev - 1, 1))}
+            onNextPage={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+          />
 
       {totalResultados === 0 ? (
         <DocumentosEmptyState onResetFilters={resetFilters} />
@@ -2173,6 +2158,26 @@ export default function DocumentosPage() {
           })}
         </div>
       )}
+        </div>
+        <aside className="hidden xl:block xl:sticky xl:top-6">
+          <DocumentosCopilot
+            currentFilters={{
+              tipo: tipoFilter !== "todos" ? tipoFilter : undefined,
+              tipoLaudo:
+                tipoLaudoFilter !== "todos" ? tipoLaudoFilter : undefined,
+              status: statusFilter !== "todos" ? statusFilter : undefined,
+              ano: anoFilter !== "todos" ? anoFilter : undefined,
+              mes: mesFilter !== "todos" ? mesFilter : undefined,
+              lojaId: lojaFilter !== "todos" ? lojaFilter : undefined,
+              prestadorId: prestadorFilter !== "todos" ? prestadorFilter : undefined,
+              termo: identificacaoFilter.trim() || undefined,
+              somenteAssinados,
+              somenteDisponiveisLote,
+            }}
+            onApplyFilters={applyCopilotFilters}
+          />
+        </aside>
+      </div>
     </div>
   );
 }

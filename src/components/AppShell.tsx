@@ -35,6 +35,7 @@ export default function AppShell({
   const { isAdmin, modules: modulesAccess, loading: documentsAccessLoading } =
     useDocumentsAccess();
   const showNav = pathname !== "/login";
+  const isDocumentsRoute = pathname?.startsWith("/documentos");
 
   const isAuthenticated = !!user;
   const canAccessDocuments =
@@ -308,7 +309,11 @@ export default function AppShell({
           </header>
 
           <main className="relative flex-1 px-4 pb-10 pt-6 md:px-8">
-            <div className="mx-auto flex w-full max-w-6xl flex-1">
+            <div
+              className={`mx-auto flex w-full flex-1 ${
+                isDocumentsRoute ? "max-w-[1700px]" : "max-w-6xl"
+              }`}
+            >
               <div className="relative w-full rounded-[28px] bg-white/95 p-6 shadow-[0_28px_70px_rgba(148,163,184,0.25)]">
                 {authError && (
                   <div className="mb-4 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-900">
