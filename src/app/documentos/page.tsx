@@ -321,6 +321,7 @@ export default function DocumentosPage() {
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [hasRestoredState, setHasRestoredState] = useState(false);
   const [hasRestoredCache, setHasRestoredCache] = useState(false);
+  const [copilotCollapsed, setCopilotCollapsed] = useState(false);
   const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const listStateRef = useRef<DocumentosListState | null>(null);
@@ -1704,7 +1705,13 @@ export default function DocumentosPage() {
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+      <div
+        className={`grid gap-6 xl:items-start ${
+          copilotCollapsed
+            ? "xl:grid-cols-[minmax(0,1fr)_72px]"
+            : "xl:grid-cols-[minmax(0,1fr)_360px]"
+        }`}
+      >
         <div className="min-w-0 space-y-6">
           <DocumentosFilters
             canManageDocuments={canManageDocuments}
@@ -2159,8 +2166,10 @@ export default function DocumentosPage() {
         </div>
       )}
         </div>
-        <aside className="hidden xl:block xl:sticky xl:top-6">
+        <aside className="hidden xl:block xl:sticky xl:top-6 xl:self-start">
           <DocumentosCopilot
+            collapsed={copilotCollapsed}
+            onToggleCollapsed={() => setCopilotCollapsed((value) => !value)}
             currentFilters={{
               tipo: tipoFilter !== "todos" ? tipoFilter : undefined,
               tipoLaudo:
