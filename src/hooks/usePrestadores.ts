@@ -38,6 +38,7 @@ export function usePrestadores(
 ): UsePrestadoresResult {
   const { assignedOnly = false, enabled = true } = options;
   const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [prestadores, setPrestadores] = useState<Prestador[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +56,7 @@ export function usePrestadores(
   }, []);
 
   const fetchPrestadores = useCallback(async (signal?: AbortSignal) => {
-    if (!enabled || !user) {
+    if (!enabled || !userId) {
       setPrestadores([]);
       setLoading(false);
       setError(null);
@@ -108,7 +109,7 @@ export function usePrestadores(
     } finally {
       setLoading(false);
     }
-  }, [assignedOnly, enabled, getAccessToken, user]);
+  }, [assignedOnly, enabled, getAccessToken, userId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -121,7 +122,7 @@ export function usePrestadores(
       if (!enabled) {
         throw new Error("Criacao de prestadores esta desabilitada.");
       }
-      if (!user) {
+      if (!userId) {
         throw new Error("Sessao expirada. Faca login novamente.");
       }
 
@@ -150,7 +151,7 @@ export function usePrestadores(
       setPrestadores((prev) => [prestador, ...prev]);
       return prestador;
     },
-    [enabled, getAccessToken, user],
+    [enabled, getAccessToken, userId],
   );
 
   return {

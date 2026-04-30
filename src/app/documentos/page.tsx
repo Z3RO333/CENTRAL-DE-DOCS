@@ -276,6 +276,7 @@ const getEdicaoInfo = (registro: FormularioRecord) => {
 export default function DocumentosPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
+  const userId = user?.id ?? null;
   const { isAdmin, role, loading: accessLoading, error: accessError } =
     useDocumentsAccess();
   const canViewAllDocuments = isAdmin;
@@ -285,7 +286,7 @@ export default function DocumentosPage() {
     loading: prestadoresUsuarioLoading,
   } = usePrestadores({
     assignedOnly: true,
-    enabled: Boolean(user) && !canViewAllDocuments && role !== "gerente_loja",
+    enabled: Boolean(userId) && !canViewAllDocuments && role !== "gerente_loja",
   });
   const { lojas } = useLojas({ enabled: canManageDocuments });
   const [loading, setLoading] = useState(true);
@@ -397,7 +398,7 @@ export default function DocumentosPage() {
   }, [getAccessToken]);
 
   useEffect(() => {
-    if (!user || authLoading || accessLoading || !canManageDocuments) {
+    if (!userId || authLoading || accessLoading || !canManageDocuments) {
       setAdminUsers([]);
       setAdminUsersLoading(false);
       return;
@@ -439,7 +440,7 @@ export default function DocumentosPage() {
     return () => {
       active = false;
     };
-  }, [user, authLoading, accessLoading, canManageDocuments, getAccessToken]);
+  }, [userId, authLoading, accessLoading, canManageDocuments, getAccessToken]);
 
   useEffect(() => {
     if (hasRestoredFilterOptions || typeof window === "undefined") {
@@ -740,12 +741,7 @@ export default function DocumentosPage() {
       return;
     }
 
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
-
-    if (!user) {
+    if (!userId) {
       router.replace("/login");
       return;
     }
@@ -779,7 +775,7 @@ export default function DocumentosPage() {
               });
             }
           } else {
-            params.set("userId", user.id);
+            params.set("userId", userId);
           }
         }
         if (canManageDocuments && userFilter !== "todos") {
@@ -870,7 +866,7 @@ export default function DocumentosPage() {
   }, [
     authLoading,
     accessLoading,
-    user,
+    userId,
     router,
     canViewAllDocuments,
     role,
@@ -896,7 +892,7 @@ export default function DocumentosPage() {
     if (authLoading || accessLoading) {
       return;
     }
-    if (!user) {
+    if (!userId) {
       return;
     }
     if (!canViewAllDocuments && role !== "gerente_loja" && prestadoresUsuarioLoading) {
@@ -909,7 +905,7 @@ export default function DocumentosPage() {
   }, [
     authLoading,
     accessLoading,
-    user,
+    userId,
     canViewAllDocuments,
     role,
     prestadoresUsuarioLoading,

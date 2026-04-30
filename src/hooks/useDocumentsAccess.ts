@@ -29,6 +29,7 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
   const [hasAccess, setHasAccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const userId = user?.id ?? null;
   const normalizedEmail = user?.email?.toLowerCase().trim() ?? null;
   const [modules, setModules] = useState<ModulesAccess>({
     documentos: false,
@@ -46,7 +47,7 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
   }, []);
 
   const fetchAccess = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       if (isMountedRef.current) {
         setHasAccess(false);
         setIsAdmin(false);
@@ -123,9 +124,9 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
 
       let dataResult: { modulo?: string | null }[] | null = null;
 
-      let { data, error } = await selectWithModule("user_id", user.id);
+      let { data, error } = await selectWithModule("user_id", userId);
       if (error && error.message?.toLowerCase().includes("modulo")) {
-        const fallback = await selectWithoutModule("user_id", user.id);
+        const fallback = await selectWithoutModule("user_id", userId);
         data =
           fallback.data?.map((item) => ({
             ...item,
@@ -137,7 +138,7 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         const fallback = await supabase
           .from("documentos_acesso")
           .select("id,modulo")
-          .eq("user_id", user.id);
+          .eq("user_id", userId);
         data = fallback.data ?? null;
         error = fallback.error;
       }
@@ -181,7 +182,7 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
 
       let isGerenteLoja = false;
       if (!resolvedIsAdmin) {
-        const gerenteById = await selectGerenteAccess("user_id", user.id);
+        const gerenteById = await selectGerenteAccess("user_id", userId);
         if (gerenteById.error?.message?.toLowerCase().includes("scope")) {
           isGerenteLoja = false;
         } else if (gerenteById.error) {
@@ -204,7 +205,7 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         baseModules.documentos = true;
         baseModules.dashboards = true;
         baseModules.perfil = true;
-      } else if (isGerenteLoja || hasAnyModulePermission || Boolean(user)) {
+      } else if (isGerenteLoja || hasAnyModulePermission || Boolean(userId)) {
         // Colaborador autenticado deve manter acesso ao fluxo de formularios/documentos.
         baseModules.documentos = true;
       }
@@ -249,7 +250,7 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         setLoading(false);
       }
     }
-  }, [user, normalizedEmail]);
+  }, [userId, normalizedEmail]);
 
   useEffect(() => {
     if (!authLoading) {

@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { User } from "@supabase/supabase-js";
@@ -24,6 +25,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const userIdentityRef = useRef<string | null>(null);
+
+  const setStableUser = useCallback((nextUser: User | null) => {
+    const nextIdentity = nextUser
+      ? `${nextUser.id}:${nextUser.email?.toLowerCase().trim() ?? ""}`
+      : null;
+
+    if (userIdentityRef.current === nextIdentity) {
+      return;
+    }
+
+    userIdentityRef.current = nextIdentity;
+    setUser(nextUser);
+  }, []);
 
   const loadUser = useCallback(async () => {
     setIsLoading(true);
@@ -34,16 +49,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw getUserError;
       }
 
-      setUser(data.user ?? null);
+      setStableUser(data.user ?? null);
       setError(null);
     } catch (err) {
       console.error("Falha ao recuperar sessão:", err);
-      setUser(null);
+      setStableUser(null);
       setError("Não conseguimos confirmar sua sessão. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [setStableUser]);
 
   useEffect(() => {
     void loadUser();
@@ -51,14 +66,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      setStableUser(session?.user ?? null);
       setError(null);
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [loadUser]);
+  }, [loadUser, setStableUser]);
 
   const value = useMemo(
     () => ({
