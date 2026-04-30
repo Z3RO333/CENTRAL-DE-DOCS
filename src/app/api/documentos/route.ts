@@ -106,7 +106,7 @@ export async function GET(request: Request) {
     const offsetParam = Number(searchParams.get("offset"));
     const limit = resolveLimit(searchParams.get("limit"));
     const offset = Number.isFinite(offsetParam) ? Math.max(offsetParam, 0) : 0;
-    let userFilter = filterUserId;
+    const userFilter = filterUserId;
 
     let query = supabaseAdmin
       .from("formularios")

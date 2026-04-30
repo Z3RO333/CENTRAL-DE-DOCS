@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 import { normalizeIds, sanitizeId, safeParseDados } from "@/lib/documentosApiUtils";
+import { toNullableArray } from "@/lib/documentosAggregateUtils";
 import { buildDocumentosAccessOr } from "@/lib/documentosAccessFilters";
 import {
   ApiHttpError as HttpError,
@@ -28,6 +29,12 @@ type PrestadorOption = {
   id: string;
   nome: string;
   tipo_servico: string | null;
+};
+
+type FilterOptionsAggRow = {
+  anos: number[] | null;
+  status: string[] | null;
+  tipo_laudo: string[] | null;
 };
 
 const parseDados = (raw: FormularioRow["dados"]) => safeParseDados(raw);
@@ -62,6 +69,52 @@ export async function GET(request: Request) {
         .filter(Boolean),
     );
     const filterUserId = searchParams.get("userId");
+
+    if (canAccess) {
+      const [
+        { data: aggregateData, error: aggregateError },
+        { data: lojasAll, error: lojasError },
+        { data: prestadoresAll, error: prestadoresError },
+      ] = await Promise.all([
+        supabaseAdmin.rpc("documentos_filter_options_agg", {
+          p_user_id: filterUserId || null,
+          p_prestador_ids: toNullableArray(filterPrestadores),
+          p_loja_ids: toNullableArray(filterLojas),
+        }),
+        supabaseAdmin
+          .from("lojas")
+          .select("id,nome,codigo")
+          .order("nome", { ascending: true }),
+        supabaseAdmin
+          .from("prestadores")
+          .select("id,nome,tipo_servico")
+          .order("nome", { ascending: true }),
+      ]);
+
+      if (aggregateError) {
+        throw aggregateError;
+      }
+      if (lojasError) {
+        throw lojasError;
+      }
+      if (prestadoresError) {
+        throw prestadoresError;
+      }
+
+      const aggregate = (aggregateData?.[0] as FilterOptionsAggRow | undefined) ?? {
+        anos: [],
+        status: [],
+        tipo_laudo: [],
+      };
+
+      return NextResponse.json({
+        anos: (aggregate.anos ?? []).map(String),
+        status: aggregate.status ?? [],
+        tipoLaudo: aggregate.tipo_laudo ?? [],
+        lojas: (lojasAll as LojaOption[]) ?? [],
+        prestadores: (prestadoresAll as PrestadorOption[]) ?? [],
+      });
+    }
 
     let query = supabaseAdmin
       .from("formularios")
@@ -132,25 +185,7 @@ export async function GET(request: Request) {
     let lojasDisponiveis: LojaOption[] = [];
     let prestadoresDisponiveis: PrestadorOption[] = [];
 
-    if (canAccess) {
-      const { data: lojasAll, error: lojasError } = await supabaseAdmin
-        .from("lojas")
-        .select("id,nome,codigo")
-        .order("nome", { ascending: true });
-      if (lojasError) {
-        throw lojasError;
-      }
-      lojasDisponiveis = (lojasAll as LojaOption[]) ?? [];
-
-      const { data: prestadoresAll, error: prestadoresError } = await supabaseAdmin
-        .from("prestadores")
-        .select("id,nome,tipo_servico")
-        .order("nome", { ascending: true });
-      if (prestadoresError) {
-        throw prestadoresError;
-      }
-      prestadoresDisponiveis = (prestadoresAll as PrestadorOption[]) ?? [];
-    } else {
+    {
       const lojaIds = new Set<string>();
       gerenteEntries.forEach((entry) => {
         if (entry.loja_id) {

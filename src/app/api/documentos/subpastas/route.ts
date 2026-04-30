@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 import { normalizeIds, safeParseDados, sanitizeId } from "@/lib/documentosApiUtils";
+import { resolveDateRange, toNullableArray } from "@/lib/documentosAggregateUtils";
 import { resolveServicoOficial } from "@/lib/servicosVocab";
 import { buildDocumentosAccessOr } from "@/lib/documentosAccessFilters";
 import {
@@ -30,6 +31,17 @@ type SubpastaNode = {
   children: SubpastaNode[];
 };
 
+type DateFilterQuery<T> = {
+  gte: (column: string, value: string) => T;
+  lt: (column: string, value: string) => T;
+};
+
+type SubpastaAggRow = {
+  tipo: string;
+  tipo_laudo: string | null;
+  total_documentos: number;
+  ultimo_envio_at: string | null;
+};
 
 const TIPO_LABEL: Record<string, string> = {
   retencao_trabalhista: "Retencao Trabalhista",
@@ -43,8 +55,8 @@ const readTipoLaudo = (dados: FormularioRow["dados"]) => {
   return value || "";
 };
 
-const applyDateFilter = (
-  query: any,
+const applyDateFilter = <T extends DateFilterQuery<T>>(
+  query: T,
   anoFilter: string | null,
   mesFilter: string | null,
 ) => {
@@ -68,6 +80,100 @@ const applyDateFilter = (
   const end = new Date(ano + 1, 0, 1);
   return query.gte("created_at", start.toISOString()).lt("created_at", end.toISOString());
 };
+
+function buildSubpastasFromAgg(rows: SubpastaAggRow[]): SubpastaNode[] {
+  const rootMap = new Map<string, SubpastaNode>();
+  const childMap = new Map<string, SubpastaNode>();
+
+  rows.forEach((row) => {
+    const tipo = row.tipo;
+    const rootKey = `tipo:${tipo}`;
+    if (!rootMap.has(rootKey)) {
+      rootMap.set(rootKey, {
+        key: rootKey,
+        nome: TIPO_LABEL[tipo] ?? tipo,
+        tipo,
+        tipoLaudo: null,
+        tipoLaudoValores: [],
+        totalDocumentos: 0,
+        ultimoEnvioAt: null,
+        children: [],
+      });
+    }
+
+    const root = rootMap.get(rootKey)!;
+    root.totalDocumentos += Number(row.total_documentos);
+    if (
+      row.ultimo_envio_at &&
+      (!root.ultimoEnvioAt || row.ultimo_envio_at > root.ultimoEnvioAt)
+    ) {
+      root.ultimoEnvioAt = row.ultimo_envio_at;
+    }
+
+    if (tipo !== "registro_laudos") {
+      return;
+    }
+
+    const tipoLaudoOriginal = row.tipo_laudo?.trim() ?? "";
+    const resolved =
+      tipoLaudoOriginal.length > 0
+        ? resolveServicoOficial(tipoLaudoOriginal)
+        : { canonical: "Sem tipo de laudo" };
+    const tipoLaudoCanonical = resolved.canonical || "Sem tipo de laudo";
+    const childKey = `tipo:${tipo}|laudo:${tipoLaudoCanonical.toLowerCase()}`;
+    if (!childMap.has(childKey)) {
+      childMap.set(childKey, {
+        key: childKey,
+        nome: tipoLaudoCanonical,
+        tipo,
+        tipoLaudo: tipoLaudoCanonical,
+        tipoLaudoValores: [],
+        totalDocumentos: 0,
+        ultimoEnvioAt: null,
+        children: [],
+      });
+    }
+
+    const child = childMap.get(childKey)!;
+    const valueForFilter =
+      tipoLaudoOriginal.length > 0 ? tipoLaudoOriginal : tipoLaudoCanonical;
+    if (!child.tipoLaudoValores.includes(valueForFilter)) {
+      child.tipoLaudoValores.push(valueForFilter);
+    }
+    child.totalDocumentos += Number(row.total_documentos);
+    if (
+      row.ultimo_envio_at &&
+      (!child.ultimoEnvioAt || row.ultimo_envio_at > child.ultimoEnvioAt)
+    ) {
+      child.ultimoEnvioAt = row.ultimo_envio_at;
+    }
+  });
+
+  const registroRoot = Array.from(rootMap.values()).find(
+    (item) => item.tipo === "registro_laudos",
+  );
+  if (registroRoot) {
+    registroRoot.children = Array.from(childMap.values()).sort((a, b) =>
+      a.nome.localeCompare(b.nome, "pt-BR"),
+    );
+  }
+
+  const orderedTipos = ["retencao_trabalhista", "registro_laudos", "notas_fiscais"];
+  return Array.from(rootMap.values()).sort((a, b) => {
+    const ai = orderedTipos.indexOf(a.tipo);
+    const bi = orderedTipos.indexOf(b.tipo);
+    if (ai === -1 && bi === -1) {
+      return a.nome.localeCompare(b.nome, "pt-BR");
+    }
+    if (ai === -1) {
+      return 1;
+    }
+    if (bi === -1) {
+      return -1;
+    }
+    return ai - bi;
+  });
+}
 
 export async function GET(request: Request) {
   try {
@@ -93,6 +199,27 @@ export async function GET(request: Request) {
     );
     const anoFilter = searchParams.get("ano");
     const mesFilter = searchParams.get("mes");
+    const { startAt, endAt } = resolveDateRange(anoFilter, mesFilter);
+
+    if (canAccess) {
+      const { data: aggregateData, error: aggregateError } =
+        await supabaseAdmin.rpc("documentos_subpastas_agg", {
+          p_loja_id: lojaId,
+          p_user_id: filterUserId || null,
+          p_prestador_ids: toNullableArray(filterPrestadores),
+          p_start_at: startAt,
+          p_end_at: endAt,
+        });
+      if (aggregateError) {
+        throw aggregateError;
+      }
+
+      return NextResponse.json({
+        subpastas: buildSubpastasFromAgg(
+          (aggregateData as SubpastaAggRow[] | null) ?? [],
+        ),
+      });
+    }
 
     let query = supabaseAdmin
       .from("formularios")

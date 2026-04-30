@@ -364,6 +364,11 @@ export default function FormularioPage() {
     };
   }, []);
 
+  const historicoRecentes = useMemo(
+    () => historico.slice(0, 5),
+    [historico],
+  );
+
   if (!config) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center text-sm text-slate-300">
@@ -445,11 +450,6 @@ export default function FormularioPage() {
     em_analise: "Em análise",
     assinado: "Assinado",
   };
-
-  const historicoRecentes = useMemo(
-    () => historico.slice(0, 5),
-    [historico],
-  );
 
   const formatStatus = (status: string) =>
     statusLabelMap[status] ?? status.replace(/_/g, " ");

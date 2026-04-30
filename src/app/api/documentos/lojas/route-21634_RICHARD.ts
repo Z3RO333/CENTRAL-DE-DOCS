@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 import { safeParseDados, sanitizeId } from "@/lib/documentosApiUtils";
+import { resolveDateRange, toNullableArray } from "@/lib/documentosAggregateUtils";
 import {
   ApiHttpError as HttpError,
   getGerenteAccessEntries,
@@ -19,6 +20,12 @@ type LojaRow = {
   id: string;
   nome: string;
   codigo: string | null;
+};
+
+type LojaAggRow = {
+  loja_id: string;
+  total_documentos: number;
+  ultimo_envio_at: string | null;
 };
 
 function getLojaIdFromDados(
@@ -58,6 +65,51 @@ export async function GET(request: Request) {
           .filter(Boolean),
       ),
     );
+    const { startAt, endAt } = resolveDateRange(anoFilter, mesFilter);
+
+    if (canAccess || !hasGerenteAccess) {
+      const { data: aggregateData, error: aggregateError } =
+        await supabaseAdmin.rpc("documentos_lojas_agg", {
+          p_user_id: canAccess ? filterUserId || null : user.id,
+          p_prestador_ids: toNullableArray(filterPrestadores),
+          p_start_at: startAt,
+          p_end_at: endAt,
+        });
+      if (aggregateError) {
+        throw aggregateError;
+      }
+
+      const groupedRows = (aggregateData as LojaAggRow[] | null) ?? [];
+      const lojaIds = groupedRows
+        .map((row) => sanitizeId(row.loja_id))
+        .filter(Boolean);
+      if (lojaIds.length === 0) {
+        return NextResponse.json({ lojas: [] });
+      }
+
+      const { data: lojasData, error: lojasError } = await supabaseAdmin
+        .from("lojas")
+        .select("id,nome,codigo")
+        .in("id", lojaIds)
+        .order("nome", { ascending: true });
+      if (lojasError) {
+        throw lojasError;
+      }
+
+      const statsMap = new Map(groupedRows.map((row) => [row.loja_id, row]));
+      const lojas = ((lojasData as LojaRow[] | null) ?? []).map((loja) => {
+        const stats = statsMap.get(loja.id);
+        return {
+          lojaId: loja.id,
+          lojaNome: loja.nome,
+          lojaCodigo: loja.codigo,
+          totalDocumentos: Number(stats?.total_documentos ?? 0),
+          ultimoEnvioAt: stats?.ultimo_envio_at ?? null,
+        };
+      });
+
+      return NextResponse.json({ lojas });
+    }
 
     let query = supabaseAdmin
       .from("formularios")
