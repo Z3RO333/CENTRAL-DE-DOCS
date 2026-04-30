@@ -316,7 +316,7 @@ export default function AppShell({
         </aside>
 
         <div
-          className={`flex min-h-screen flex-1 flex-col ${
+          className={`flex min-h-screen min-w-0 flex-1 flex-col ${
             isSidebarCollapsed ? "md:pl-20" : "md:pl-72"
           } ${isCopilotRoute ? "bg-transparent" : ""}`}
         >
@@ -342,12 +342,12 @@ export default function AppShell({
           </header>
 
           <main
-            className={`relative flex-1 px-4 pb-10 pt-6 md:px-8 ${
+            className={`relative min-w-0 flex-1 px-4 pb-10 pt-6 md:px-8 ${
               isCopilotRoute ? "bg-transparent" : ""
             }`}
           >
             <div
-              className={`mx-auto flex w-full flex-1 ${
+              className={`mx-auto flex min-w-0 w-full flex-1 ${
                 isDocumentsRoute
                   ? "max-w-[1700px]"
                   : isCopilotRoute
@@ -356,7 +356,7 @@ export default function AppShell({
               }`}
             >
               <div
-                className={`relative w-full p-6 ${
+                className={`relative min-w-0 w-full p-6 ${
                   isCopilotRoute
                     ? "overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,15,31,0.96),rgba(11,18,34,0.92))] text-white shadow-[0_28px_80px_rgba(2,6,23,0.55)]"
                     : "rounded-[28px] bg-white/95 shadow-[0_28px_70px_rgba(148,163,184,0.25)]"

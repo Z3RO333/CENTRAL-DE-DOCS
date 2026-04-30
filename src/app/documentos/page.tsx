@@ -1515,7 +1515,7 @@ export default function DocumentosPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 py-4">
+    <div className="flex min-w-0 flex-1 flex-col gap-6 py-4">
       {confirmDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6" onClick={() => setConfirmDialog(null)}>
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl shadow-slate-900/20" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">
@@ -1682,7 +1682,7 @@ export default function DocumentosPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-6">
+      <div className="flex min-w-0 flex-col gap-6">
         <div className="min-w-0 space-y-6">
           <DocumentosFilters
             canManageDocuments={canManageDocuments}
@@ -1757,8 +1757,8 @@ export default function DocumentosPage() {
       {totalResultados === 0 ? (
         <DocumentosEmptyState onResetFilters={resetFilters} />
       ) : viewMode === "tabela" ? (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
-          <div className="relative overflow-x-auto">
+        <div className="min-w-0 overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
+          <div className="relative max-w-full overflow-x-auto">
             <table className="w-full min-w-[1080px] divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
