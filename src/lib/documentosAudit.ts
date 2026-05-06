@@ -19,6 +19,24 @@ export type DocumentoAuditEvent = {
   created_at: string;
 };
 
+export function isDocumentoAuditUnavailable(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const maybeError = error as { code?: unknown; message?: unknown };
+  const code = typeof maybeError.code === "string" ? maybeError.code : "";
+  const message =
+    typeof maybeError.message === "string"
+      ? maybeError.message.toLowerCase()
+      : "";
+
+  return (
+    code === "42P01" ||
+    message.includes("documentos_auditoria") ||
+    message.includes("could not find the table")
+  );
+}
+
 export async function logDocumentoAuditEvent(input: {
   supabaseAdmin?: ReturnType<typeof createSupabaseAdminClient>;
   documentoId: string;
@@ -37,6 +55,9 @@ export async function logDocumentoAuditEvent(input: {
   });
 
   if (error) {
+    if (isDocumentoAuditUnavailable(error)) {
+      return;
+    }
     throw error;
   }
 }

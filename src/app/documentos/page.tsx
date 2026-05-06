@@ -2212,14 +2212,16 @@ export default function DocumentosPage() {
           onSearchAllYears={() => setAnoFilter("todos")}
           onRefresh={refreshDocumentosList}
         />
-      ) : viewMode === "tabela" ? (
-        <div className="min-w-0 overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
-          <div className="relative max-w-full overflow-x-auto">
-            <table className="w-full min-w-[1080px] divide-y divide-slate-100 text-sm">
+      ) : (
+        <>
+          {viewMode === "tabela" && (
+            <div className="hidden min-w-0 overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200 xl:block">
+              <div className="relative max-w-full overflow-x-auto">
+                <table className="w-full min-w-[1280px] divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   {canManageDocuments && (
-                    <th className="px-4 py-3 text-left">
+                    <th className="w-[52px] px-4 py-3 text-left">
                       <input
                         type="checkbox"
                         onChange={selecionarTodos}
@@ -2235,20 +2237,20 @@ export default function DocumentosPage() {
                       />
                     </th>
                   )}
-                  <th className="px-4 py-3 text-left">Documento</th>
-                  <th className="px-4 py-3 text-left">Identificação</th>
-                  <th className="px-4 py-3 text-left">Tipo</th>
-                  <th className="hidden px-4 py-3 text-left lg:table-cell">
+                  <th className="w-[240px] px-4 py-3 text-left">Documento</th>
+                  <th className="w-[300px] px-4 py-3 text-left">Identificação</th>
+                  <th className="w-[140px] px-4 py-3 text-left">Tipo</th>
+                  <th className="hidden w-[150px] px-4 py-3 text-left lg:table-cell">
                     Tipo de laudo
                   </th>
-                  <th className="hidden px-4 py-3 text-left xl:table-cell">
+                  <th className="hidden w-[230px] px-4 py-3 text-left xl:table-cell">
                     Observações
                   </th>
-                  <th className="px-4 py-3 text-left">Status</th>
-                  <th className="hidden px-4 py-3 text-left md:table-cell">
+                  <th className="w-[130px] px-4 py-3 text-left">Status</th>
+                  <th className="hidden w-[180px] px-4 py-3 text-left md:table-cell">
                     Enviado em
                   </th>
-                  <th className="sticky right-0 z-20 w-[190px] min-w-[190px] whitespace-nowrap border-l border-slate-100 bg-slate-50 px-4 py-3 text-right">
+                  <th className="sticky right-0 z-20 w-[180px] min-w-[180px] whitespace-nowrap border-l border-slate-100 bg-slate-50 px-4 py-3 text-right">
                     Ações
                   </th>
 </tr>
@@ -2405,7 +2407,7 @@ export default function DocumentosPage() {
                         )}
                       </td>
                       <td
-                        className="sticky right-0 z-10 w-[190px] min-w-[190px] whitespace-nowrap border-l border-slate-100 bg-white px-4 py-3"
+                        className="sticky right-0 z-10 w-[180px] min-w-[180px] whitespace-nowrap border-l border-slate-100 bg-white px-4 py-3"
                         onClick={(event) => event.stopPropagation()}
                       >
                         <div className="flex flex-col items-end gap-2 text-[11px]">
@@ -2476,12 +2478,18 @@ export default function DocumentosPage() {
                   );
                 })}
               </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {registrosFiltrados.map((registro) => {
+                </table>
+              </div>
+            </div>
+          )}
+          <div
+            className={
+              viewMode === "tabela"
+                ? "grid gap-4 xl:hidden"
+                : "grid gap-4 md:grid-cols-2"
+            }
+          >
+            {registrosFiltrados.map((registro) => {
             const identificacaoConfig = getIdentificacaoConfig(registro.tipo);
             const nomeDocumento = getDocumentoNome(registro);
                   const pageCount = getPageCount(registro);
@@ -2712,8 +2720,9 @@ export default function DocumentosPage() {
                 </div>
               </div>
             );
-          })}
-        </div>
+            })}
+          </div>
+        </>
       )}
       </div>
     </div>

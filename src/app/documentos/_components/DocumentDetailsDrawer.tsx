@@ -152,6 +152,121 @@ const getMetadataText = (event: TimelineEvent) => {
   return null;
 };
 
+const parseObservationItems = (value: string) => {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  const pedidoMatch = normalized.match(/pedido\s+de\s+compra:\s*([^.]+)\.?/i);
+  const pedidoCompra = pedidoMatch?.[1]?.trim() ?? null;
+  const withoutPedido = pedidoMatch
+    ? normalized.replace(pedidoMatch[0], "").trim()
+    : normalized;
+  const totalMatch = withoutPedido.match(
+    /(?:,\s*)?totalizando\s+(R\$\s*[\d.]+,\d{2})\.?$/i,
+  );
+  const valorTotal = totalMatch?.[1]?.trim() ?? null;
+  const withoutTotal = totalMatch
+    ? withoutPedido.replace(totalMatch[0], "").trim()
+    : withoutPedido;
+  const introMatch = withoutTotal.match(/^(.*?):\s*(?=1\.\s*)/);
+  const intro = introMatch?.[1]?.trim() ?? null;
+  const itemsText = introMatch
+    ? withoutTotal.slice(introMatch[0].length).trim()
+    : withoutTotal;
+  const items = Array.from(
+    itemsText.matchAll(/(?:^|;\s*)(\d+)\.\s*(.*?)(?=;\s*\d+\.\s*|$)/g),
+  ).map((match) => {
+    const raw = match[2].replace(/[.;]\s*$/, "").trim();
+    const osMatch = raw.match(/^\(([^)]+)\),?\s*(.*)$/);
+    const body = osMatch?.[2]?.trim() ?? raw;
+    const dataMatch = body.match(/conclu[ií]da em\s*([^,]+),?\s*/i);
+    const valorMatch = body.match(/no valor de\s*(R\$\s*[\d.]+,\d{2})/i);
+    const service = body
+      .replace(/conclu[ií]da em\s*[^,]+,?\s*/i, "")
+      .replace(/^referente\s+[àa]\s*/i, "")
+      .replace(/,\s*no valor de\s*R\$\s*[\d.]+,\d{2}/i, "")
+      .trim();
+
+    return {
+      numero: match[1],
+      os: osMatch?.[1]?.trim() ?? null,
+      data: dataMatch?.[1]?.trim() ?? null,
+      valor: valorMatch?.[1]?.trim() ?? null,
+      service: service || body,
+      raw,
+    };
+  });
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return {
+    intro,
+    items,
+    pedidoCompra,
+    valorTotal,
+  };
+};
+
+function FormattedObservation({ value }: { value: string }) {
+  const parsed = parseObservationItems(value);
+
+  if (!parsed) {
+    return (
+      <p className="mt-1 whitespace-pre-line break-words text-sm font-medium leading-6 text-slate-900">
+        {value}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-2 space-y-3 text-sm text-slate-700">
+      {parsed.intro ? (
+        <p className="font-semibold text-slate-900">{parsed.intro}.</p>
+      ) : null}
+      <div className="space-y-2">
+        {parsed.items.map((item) => (
+          <div
+            key={`${item.numero}-${item.os ?? item.raw}`}
+            className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-semibold text-slate-900">
+                Item {item.numero}
+                {item.os ? ` - ${item.os}` : ""}
+              </p>
+              {item.valor ? (
+                <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-slate-700">
+                  {item.valor}
+                </span>
+              ) : null}
+            </div>
+            {item.data ? (
+              <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Concluída em {item.data}
+              </p>
+            ) : null}
+            <p className="mt-2 leading-6 text-slate-700">{item.service}</p>
+          </div>
+        ))}
+      </div>
+      {(parsed.valorTotal || parsed.pedidoCompra) && (
+        <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-700">
+          {parsed.valorTotal ? (
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
+              Total: {parsed.valorTotal}
+            </span>
+          ) : null}
+          {parsed.pedidoCompra ? (
+            <span className="rounded-full bg-sky-50 px-3 py-1 text-sky-700">
+              Pedido de compra: {parsed.pedidoCompra}
+            </span>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function DocumentDetailsDrawer({
   documentId,
   fallbackRegistro,
@@ -371,9 +486,13 @@ export function DocumentDetailsDrawer({
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                       {campo.label}
                     </p>
-                    <p className="mt-1 break-words text-sm font-medium text-slate-900">
-                      {campo.value || "Não informado"}
-                    </p>
+                    {campo.label === "Observações" && campo.value ? (
+                      <FormattedObservation value={campo.value} />
+                    ) : (
+                      <p className="mt-1 break-words text-sm font-medium text-slate-900">
+                        {campo.value || "Não informado"}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>

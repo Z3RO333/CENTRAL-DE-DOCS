@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { buildDocumentosAccessOr } from "@/lib/documentosAccessFilters";
 import { safeParseDados, sanitizeId } from "@/lib/documentosApiUtils";
-import { logDocumentoAuditEvent, type DocumentoAuditEvent } from "@/lib/documentosAudit";
+import {
+  isDocumentoAuditUnavailable,
+  logDocumentoAuditEvent,
+  type DocumentoAuditEvent,
+} from "@/lib/documentosAudit";
 import {
   ApiHttpError as HttpError,
   getAuthorizedPrestadorIds,
@@ -31,6 +35,12 @@ type EntityRow = {
   codigo?: string | null;
   tipo_servico?: string | null;
 };
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isUuidLike = (value: string | null | undefined) =>
+  Boolean(value && UUID_PATTERN.test(value));
 
 const getCampoTexto = (
   dados: Record<string, unknown> | null,
@@ -138,14 +148,14 @@ export async function GET(
     const lojaId = getCampoTexto(dados, ["loja_id"]);
     const [lojaResult, prestadorResult, userResult, auditoriaResult] =
       await Promise.all([
-        lojaId
+        isUuidLike(lojaId)
           ? supabaseAdmin
               .from("lojas")
               .select("id,nome,codigo")
               .eq("id", lojaId)
               .maybeSingle()
           : Promise.resolve({ data: null, error: null }),
-        registro.prestador_id
+        isUuidLike(registro.prestador_id)
           ? supabaseAdmin
               .from("prestadores")
               .select("id,nome,tipo_servico")
@@ -164,22 +174,36 @@ export async function GET(
       ]);
 
     if (lojaResult.error) {
-      throw lojaResult.error;
+      console.error("Erro ao buscar loja do documento:", lojaResult.error);
     }
     if (prestadorResult.error) {
-      throw prestadorResult.error;
+      console.error(
+        "Erro ao buscar prestador do documento:",
+        prestadorResult.error,
+      );
     }
     if (userResult.error) {
       console.error("Erro ao buscar usuario do documento:", userResult.error);
     }
     if (auditoriaResult.error) {
-      throw auditoriaResult.error;
+      if (isDocumentoAuditUnavailable(auditoriaResult.error)) {
+        console.warn(
+          "Tabela documentos_auditoria indisponivel; usando timeline sintetica.",
+        );
+      } else {
+        console.error(
+          "Erro ao buscar auditoria do documento:",
+          auditoriaResult.error,
+        );
+      }
     }
 
     const loja = lojaResult.data as EntityRow | null;
     const prestador = prestadorResult.data as EntityRow | null;
     const enviadoPorUser = userResult.data.user;
-    const eventos = ((auditoriaResult.data as DocumentoAuditEvent[] | null) ?? [])
+    const eventos = ((auditoriaResult.error
+      ? []
+      : (auditoriaResult.data as DocumentoAuditEvent[] | null)) ?? [])
       .map((evento) => ({
         ...evento,
         metadata: evento.metadata ?? {},
