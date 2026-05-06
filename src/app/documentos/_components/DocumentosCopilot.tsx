@@ -24,15 +24,90 @@ type CopilotResponse = {
   error?: string;
 };
 
-const formatDate = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "--";
-  }
-  return date.toLocaleDateString("pt-BR");
+const formatPercent = (value: number) => `${value.toFixed(1)}%`;
+
+const filterLabels: Record<keyof DocumentoCopilotFilters, string> = {
+  termo: "Busca",
+  tipo: "Tipo",
+  tipoLaudo: "Tipo de laudo",
+  status: "Status",
+  ano: "Ano",
+  mes: "Mês",
+  lojaId: "Loja",
+  prestadorId: "Prestador",
+  somenteAssinados: "Assinados",
+  somenteDisponiveisLote: "Lote",
 };
 
-const formatPercent = (value: number) => `${value.toFixed(1)}%`;
+const tipoLabels: Record<string, string> = {
+  retencao_trabalhista: "Retenção Trabalhista",
+  registro_laudos: "Registro e Laudos",
+  notas_fiscais: "Notas Fiscais",
+};
+
+const statusLabels: Record<string, string> = {
+  pendente: "Pendente",
+  em_analise: "Em análise",
+  revisado: "Revisado",
+  assinado: "Assinado",
+};
+
+const buildFilterChips = (filters: DocumentoCopilotFilters) => {
+  return (Object.entries(filters) as [keyof DocumentoCopilotFilters, unknown][])
+    .filter(([, value]) => {
+      if (typeof value === "boolean") {
+        return value;
+      }
+      return typeof value === "string" && value.trim().length > 0;
+    })
+    .map(([key, value]) => {
+      let display = String(value);
+      if (key === "tipo" && typeof value === "string") {
+        display = tipoLabels[value] ?? value;
+      }
+      if (key === "status" && typeof value === "string") {
+        display = statusLabels[value] ?? value;
+      }
+      if (typeof value === "boolean") {
+        display =
+          key === "somenteDisponiveisLote"
+            ? "Disponíveis para lote"
+            : "Somente assinados";
+      }
+      return {
+        key,
+        label: filterLabels[key] ?? key,
+        value: display,
+      };
+    });
+};
+
+const buildDocumentosUrl = (filters: DocumentoCopilotFilters) => {
+  const params = new URLSearchParams();
+  const appendString = (key: string, value?: string) => {
+    if (value?.trim()) {
+      params.set(key, value.trim());
+    }
+  };
+
+  appendString("identificacao", filters.termo);
+  appendString("tipo", filters.tipo);
+  appendString("tipoLaudo", filters.tipoLaudo);
+  appendString("status", filters.status);
+  appendString("ano", filters.ano);
+  appendString("mes", filters.mes);
+  appendString("lojaId", filters.lojaId);
+  appendString("prestadorId", filters.prestadorId);
+  if (filters.somenteAssinados) {
+    params.set("somenteAssinados", "true");
+  }
+  if (filters.somenteDisponiveisLote) {
+    params.set("somenteDisponiveisLote", "true");
+  }
+  params.set("source", "copilot");
+
+  return `/documentos?${params.toString()}`;
+};
 
 export function DocumentosCopilot({
   currentFilters,
@@ -68,6 +143,7 @@ export function DocumentosCopilot({
     ...(insights?.tendenciaMensal.map((item) => item.total) ?? [0]),
     1,
   );
+  const appliedFilterChips = response ? buildFilterChips(response.filters) : [];
 
   const submit = async (text: string) => {
     const trimmed = text.trim();
@@ -175,6 +251,35 @@ export function DocumentosCopilot({
               <p className="text-sm text-slate-100">{response.reply}</p>
               <p className="text-xs leading-5 text-slate-300">{response.summary}</p>
             </div>
+
+            {appliedFilterChips.length > 0 && (
+              <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-cyan-100">
+                      Filtros detectados
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {appliedFilterChips.map((chip) => (
+                        <span
+                          key={chip.key}
+                          className="rounded-full border border-cyan-300/20 bg-slate-950/40 px-3 py-1 text-[11px] font-semibold text-cyan-50"
+                        >
+                          {chip.label}: {chip.value}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => router.push(buildDocumentosUrl(response.filters))}
+                    className="shrink-0 rounded-full bg-cyan-300 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:bg-cyan-200"
+                  >
+                    Aplicar na tela de documentos
+                  </button>
+                </div>
+              </div>
+            )}
 
             {insights && insights.totalDocumentos > 0 && (
               <div className="space-y-4 rounded-3xl border border-white/10 bg-slate-950/40 p-4">

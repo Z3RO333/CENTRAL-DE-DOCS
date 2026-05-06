@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Files } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
@@ -9,6 +9,7 @@ import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { useLojas } from "@/hooks/useLojas";
 import { DocumentosBatchActions } from "./_components/DocumentosBatchActions";
+import { DocumentDetailsDrawer } from "./_components/DocumentDetailsDrawer";
 import { DocumentosEmptyState } from "./_components/DocumentosEmptyState";
 import { DocumentosFilters } from "./_components/DocumentosFilters";
 import { DocumentosPagination } from "./_components/DocumentosPagination";
@@ -318,6 +319,9 @@ const getPrestadorNome = (registro: FormularioRecord) =>
 
 export default function DocumentosPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlFiltersSignature = searchParams.toString();
+  const hasUrlDrivenFilters = urlFiltersSignature.length > 0;
   const { user, isLoading: authLoading, error: authError } = useAuth();
   const userId = user?.id ?? null;
   const { isAdmin, role, loading: accessLoading, error: accessError } =
@@ -365,6 +369,9 @@ export default function DocumentosPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingBatch, setDeletingBatch] = useState(false);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
+    null,
+  );
   const [hasRestoredState, setHasRestoredState] = useState(false);
   const [hasRestoredCache, setHasRestoredCache] = useState(false);
   const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
@@ -550,6 +557,11 @@ export default function DocumentosPage() {
     if (hasRestoredState || typeof window === "undefined") {
       return;
     }
+    if (hasUrlDrivenFilters) {
+      setHasRestoredState(true);
+      setRestoredNotice(false);
+      return;
+    }
 
     const raw = window.sessionStorage.getItem(LIST_STATE_STORAGE_KEY);
     if (raw) {
@@ -624,10 +636,67 @@ export default function DocumentosPage() {
     }
 
     setHasRestoredState(true);
-  }, [hasRestoredState, pageSize]);
+  }, [hasRestoredState, hasUrlDrivenFilters, pageSize]);
+
+  useEffect(() => {
+    if (!urlFiltersSignature) {
+      return;
+    }
+
+    const params = new URLSearchParams(urlFiltersSignature);
+    let applied = false;
+    const applyStringFilter = (
+      key: string,
+      setter: (value: string) => void,
+      fallback = "todos",
+    ) => {
+      if (!params.has(key)) {
+        return;
+      }
+      const value = params.get(key)?.trim();
+      setter(value || fallback);
+      applied = true;
+    };
+
+    applyStringFilter("tipo", setTipoFilter);
+    applyStringFilter("tipoLaudo", setTipoLaudoFilter);
+    applyStringFilter("status", setStatusFilter);
+    applyStringFilter("userId", setUserFilter);
+    applyStringFilter("lojaId", setLojaFilter);
+    applyStringFilter("prestadorId", setPrestadorFilter);
+    applyStringFilter("ano", setAnoFilter);
+    applyStringFilter("mes", setMesFilter);
+    applyStringFilter("identificacao", setIdentificacaoFilter, "");
+
+    if (params.has("somenteAssinados")) {
+      setSomenteAssinados(params.get("somenteAssinados") === "true");
+      applied = true;
+    }
+    if (params.has("somenteDisponiveisLote")) {
+      setSomenteDisponiveisLote(
+        params.get("somenteDisponiveisLote") === "true",
+      );
+      applied = true;
+    }
+    if (params.has("documento")) {
+      const documentoId = params.get("documento")?.trim();
+      if (documentoId) {
+        setSelectedDocumentId(documentoId);
+      }
+    }
+
+    if (applied) {
+      setPage(1);
+      setRestoredNotice(false);
+    }
+  }, [urlFiltersSignature]);
 
   useEffect(() => {
     if (hasRestoredCache || typeof window === "undefined") {
+      return;
+    }
+    if (hasUrlDrivenFilters) {
+      setHasRestoredCache(true);
       return;
     }
 
@@ -657,7 +726,7 @@ export default function DocumentosPage() {
     }
 
     setHasRestoredCache(true);
-  }, [hasRestoredCache]);
+  }, [hasRestoredCache, hasUrlDrivenFilters]);
 
   useEffect(() => {
     if (!hasRestoredCache || typeof window === "undefined") {
@@ -748,7 +817,7 @@ export default function DocumentosPage() {
         window.clearTimeout(writeTimer);
       }
     };
-  }, [hasRestoredState]);
+  }, [hasRestoredState, hasUrlDrivenFilters]);
 
   useEffect(() => {
     if (anoFilter === "todos" && mesFilter !== "todos") {
@@ -992,6 +1061,29 @@ export default function DocumentosPage() {
     return registro.arquivo_assinado_path ?? registro.arquivo_path;
   };
 
+  const registrarAuditoriaDocumento = useCallback(
+    async (
+      registro: FormularioRecord,
+      eventType: "baixado",
+      metadata?: Record<string, unknown>,
+    ) => {
+      try {
+        const token = await getAccessToken();
+        await fetch(`/api/documentos/${registro.id}`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ eventType, metadata }),
+        });
+      } catch (err) {
+        console.warn("Nao foi possivel registrar auditoria do documento.", err);
+      }
+    },
+    [getAccessToken],
+  );
+
   const abrirDocumento = async (registro: FormularioRecord) => {
     const path = getPathParaVisualizacao(registro);
     if (!path) {
@@ -1033,6 +1125,9 @@ export default function DocumentosPage() {
         signedUrl,
         getDownloadFileName(registro, path),
       );
+      void registrarAuditoriaDocumento(registro, "baixado", {
+        arquivo_path: path,
+      });
     } catch (err) {
       console.error("Erro ao baixar documento:", err);
       setError("Não foi possível baixar o PDF. Verifique se o arquivo existe e tente novamente.");
@@ -1751,6 +1846,13 @@ export default function DocumentosPage() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const canPrevPage = page > 1;
   const canNextPage = page < totalPages;
+  const selectedRegistro = useMemo(
+    () =>
+      selectedDocumentId
+        ? registros.find((registro) => registro.id === selectedDocumentId) ?? null
+        : null,
+    [registros, selectedDocumentId],
+  );
 
   useEffect(() => {
     if (page > totalPages) {
@@ -1894,6 +1996,20 @@ export default function DocumentosPage() {
           </div>
         </div>
       )}
+      <DocumentDetailsDrawer
+        documentId={selectedDocumentId}
+        fallbackRegistro={selectedRegistro}
+        isOpen={Boolean(selectedDocumentId)}
+        canManageDocuments={canManageDocuments}
+        pdfAction={pdfAction}
+        reviewingId={reviewingId}
+        onClose={() => setSelectedDocumentId(null)}
+        onOpenPdf={(registro) => void abrirDocumento(registro)}
+        onDownloadPdf={(registro) => void baixarDocumento(registro)}
+        onEdit={(registro) => abrirEdicao(registro)}
+        onReview={(registro) => void marcarComoRevisado(registro)}
+        onSign={(registro) => router.push(`/documentos/${registro.id}`)}
+      />
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -2169,9 +2285,23 @@ export default function DocumentosPage() {
                     pdfAction?.id === registro.id && pdfAction.type === "download";
 
                   return (
-                    <tr key={registro.id} className="align-top">
+                    <tr
+                      key={registro.id}
+                      className="cursor-pointer align-top transition hover:bg-slate-50"
+                      tabIndex={0}
+                      onClick={() => setSelectedDocumentId(registro.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setSelectedDocumentId(registro.id);
+                        }
+                      }}
+                    >
                       {canManageDocuments && (
-                        <td className="px-4 py-3">
+                        <td
+                          className="px-4 py-3"
+                          onClick={(event) => event.stopPropagation()}
+                        >
                           <input
                             type="checkbox"
                             checked={isMarcado}
@@ -2274,7 +2404,10 @@ export default function DocumentosPage() {
                           </p>
                         )}
                       </td>
-                      <td className="sticky right-0 z-10 w-[190px] min-w-[190px] whitespace-nowrap border-l border-slate-100 bg-white px-4 py-3">
+                      <td
+                        className="sticky right-0 z-10 w-[190px] min-w-[190px] whitespace-nowrap border-l border-slate-100 bg-white px-4 py-3"
+                        onClick={(event) => event.stopPropagation()}
+                      >
                         <div className="flex flex-col items-end gap-2 text-[11px]">
                           <button
                             type="button"
@@ -2379,7 +2512,16 @@ export default function DocumentosPage() {
             return (
               <div
                 key={registro.id}
-                className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200"
+                className="cursor-pointer rounded-2xl bg-white p-4 shadow-sm shadow-slate-200 transition hover:-translate-y-0.5 hover:shadow-md"
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedDocumentId(registro.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelectedDocumentId(registro.id);
+                  }
+                }}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -2399,7 +2541,10 @@ export default function DocumentosPage() {
                     ) : null}
                   </div>
                   {canManageDocuments && (
-                    <label className="flex items-center gap-2 text-xs text-slate-500">
+                    <label
+                      className="flex items-center gap-2 text-xs text-slate-500"
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       <input
                         type="checkbox"
                         checked={isMarcado}
@@ -2501,7 +2646,10 @@ export default function DocumentosPage() {
                     )}
                   </div>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2 text-[11px]">
+                <div
+                  className="mt-4 flex flex-wrap gap-2 text-[11px]"
+                  onClick={(event) => event.stopPropagation()}
+                >
                   <button
                     type="button"
                     onClick={() => void abrirDocumento(registro)}

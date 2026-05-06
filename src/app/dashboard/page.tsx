@@ -4,7 +4,20 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
-import { BriefcaseBusiness, Eye, FileBadge, ReceiptText } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+  Eye,
+  FileBadge,
+  FileText,
+  ReceiptText,
+  Signature,
+  Store,
+  TriangleAlert,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
@@ -21,6 +34,18 @@ type DashboardCard = {
   icon: LucideIcon;
   accent: string;
   border: string;
+};
+
+type DocumentosKpis = {
+  totalDocumentos: number;
+  pendentes: number;
+  emAnalise: number;
+  assinados: number;
+  semLoja: number;
+  semPrestador: number;
+  enviadosHoje: number;
+  enviadosNoMes: number;
+  aguardandoAssinatura: number;
 };
 
 const STATUS_LABEL_MAP: Record<string, string> = {
@@ -158,6 +183,13 @@ export default function DashboardPage() {
   const [regrasErro, setRegrasErro] = useState<string | null>(null);
   const [dashboardTab, setDashboardTab] = useState<"formularios" | "monitoramento">(
     "formularios",
+  );
+  const [documentosKpis, setDocumentosKpis] = useState<DocumentosKpis | null>(
+    null,
+  );
+  const [documentosKpisLoading, setDocumentosKpisLoading] = useState(true);
+  const [documentosKpisErro, setDocumentosKpisErro] = useState<string | null>(
+    null,
   );
 
   useEffect(() => {
@@ -332,6 +364,53 @@ export default function DashboardPage() {
     [user, prestadoresDoUsuario, canViewAllDocuments],
   );
 
+  const carregarDocumentosKpis = useCallback(async (signal?: AbortSignal) => {
+    if (!user) {
+      return;
+    }
+    setDocumentosKpisLoading(true);
+    setDocumentosKpisErro(null);
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        throw sessionError;
+      }
+      const token = data.session?.access_token;
+      if (!token) {
+        throw new Error("Sessão expirada. Faça login novamente.");
+      }
+      const response = await fetch("/api/documentos/kpis", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        signal,
+      });
+      const payload = (await response.json()) as {
+        kpis?: DocumentosKpis;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Não foi possível carregar KPIs.");
+      }
+      if (!signal?.aborted) {
+        setDocumentosKpis(payload.kpis ?? null);
+      }
+    } catch (err) {
+      if (signal?.aborted) {
+        return;
+      }
+      console.error("Erro ao carregar KPIs de documentos:", err);
+      setDocumentosKpisErro(
+        err instanceof Error ? err.message : "Não foi possível carregar KPIs.",
+      );
+      setDocumentosKpis(null);
+    } finally {
+      if (!signal?.aborted) {
+        setDocumentosKpisLoading(false);
+      }
+    }
+  }, [user]);
+
   const carregarRegras = useCallback(async (signal?: AbortSignal) => {
     if (!user) {
       return;
@@ -406,6 +485,20 @@ export default function DashboardPage() {
     canViewAllDocuments,
     prestadoresLoading,
     carregarHistorico,
+  ]);
+
+  useEffect(() => {
+    if (user && !accessLoading && canAccessFormularios) {
+      const controller = new AbortController();
+      void carregarDocumentosKpis(controller.signal);
+      return () => controller.abort();
+    }
+    return undefined;
+  }, [
+    accessLoading,
+    canAccessFormularios,
+    carregarDocumentosKpis,
+    user,
   ]);
 
   useEffect(() => {
@@ -694,6 +787,49 @@ export default function DashboardPage() {
       };
     });
   }, [historicoFiltrado, prestadoresDoUsuario, regrasPorPrestador]);
+
+  const kpiCards = useMemo(
+    () => [
+      {
+        label: "Total de documentos",
+        value: documentosKpis?.totalDocumentos ?? 0,
+        icon: FileText,
+      },
+      { label: "Pendentes", value: documentosKpis?.pendentes ?? 0, icon: Clock },
+      {
+        label: "Em análise",
+        value: documentosKpis?.emAnalise ?? 0,
+        icon: TriangleAlert,
+      },
+      {
+        label: "Assinados",
+        value: documentosKpis?.assinados ?? 0,
+        icon: CheckCircle2,
+      },
+      { label: "Sem loja", value: documentosKpis?.semLoja ?? 0, icon: Store },
+      {
+        label: "Sem prestador",
+        value: documentosKpis?.semPrestador ?? 0,
+        icon: Building2,
+      },
+      {
+        label: "Enviados hoje",
+        value: documentosKpis?.enviadosHoje ?? 0,
+        icon: CalendarDays,
+      },
+      {
+        label: "Enviados no mês",
+        value: documentosKpis?.enviadosNoMes ?? 0,
+        icon: CalendarDays,
+      },
+      {
+        label: "Aguardando assinatura",
+        value: documentosKpis?.aguardandoAssinatura ?? 0,
+        icon: Signature,
+      },
+    ],
+    [documentosKpis],
+  );
   return isBlocked ? (
     <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
       {authError ?? "Carregando formularios..."}
@@ -749,7 +885,7 @@ export default function DashboardPage() {
               Filtros globais
             </p>
             <span className="text-[11px] text-slate-500">
-              Ajuste os filtros para todas as visualizações do documentos.
+              Ajuste os filtros para todas as visualizações dos documentos.
             </span>
           </div>
         </div>
@@ -800,6 +936,49 @@ export default function DashboardPage() {
           </label>
         </div>
       </div>
+      <section className="rounded-2xl bg-white/80 p-4 shadow-sm shadow-slate-100/80">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              KPIs de documentos
+            </p>
+            <span className="text-[11px] text-slate-500">
+              Indicadores operacionais respeitando seu escopo de acesso.
+            </span>
+          </div>
+          {documentosKpisLoading ? (
+            <span className="text-[11px] font-semibold text-slate-400">
+              Atualizando...
+            </span>
+          ) : null}
+        </div>
+        {documentosKpisErro ? (
+          <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">
+            {documentosKpisErro}
+          </p>
+        ) : null}
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {kpiCards.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={item.label}
+                className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    {item.label}
+                  </p>
+                  <Icon className="h-4 w-4 text-slate-400" />
+                </div>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">
+                  {documentosKpisLoading ? "--" : item.value}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
       {dashboardTab === "formularios" ? (
         <>
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">

@@ -9,6 +9,7 @@ import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { useLojas } from "@/hooks/useLojas";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { supabase } from "@/lib/supabaseClient";
+import { fixMojibakeText } from "@/lib/textEncoding";
 
 type LojaPasta = {
   lojaId: string;
@@ -36,6 +37,8 @@ type SubpastaNode = {
   tipo: string;
   tipoLaudo: string | null;
   tipoLaudoValores: string[];
+  ano: string | null;
+  mes: string | null;
   totalDocumentos: number;
   ultimoEnvioAt: string | null;
   children: SubpastaNode[];
@@ -116,6 +119,18 @@ const resolveSignedPdfPath = (path?: string | null) => {
     return null;
   }
   return path.endsWith(".pdf.p7s") ? path.slice(0, -4) : path;
+};
+
+const getDocumentoNome = (doc: DocumentoItem) => {
+  const anexos = doc.dados?.anexos;
+  if (Array.isArray(anexos) && anexos.length > 0) {
+    const primeiro = anexos[0] as { nome?: unknown } | null;
+    if (primeiro?.nome && typeof primeiro.nome === "string") {
+      return fixMojibakeText(primeiro.nome);
+    }
+  }
+  const path = doc.arquivo_assinado_path ?? doc.arquivo_path;
+  return path ? fixMojibakeText(path.split("/").pop() ?? path) : doc.id;
 };
 
 export default function DocumentosPorLojaPage() {
@@ -404,7 +419,7 @@ export default function DocumentosPorLojaPage() {
           if (!first) {
             return null;
           }
-          if (first.tipo === "registro_laudos" && first.children.length > 0) {
+          if (first.children.length > 0) {
             return first.children[0].key;
           }
           return first.key;
@@ -454,6 +469,11 @@ export default function DocumentosPorLojaPage() {
     [selectedSubpastaKey, subpastaMap],
   );
 
+  const selectedLoja = useMemo(
+    () => lojas.find((loja) => loja.lojaId === selectedLojaId) ?? null,
+    [lojas, selectedLojaId],
+  );
+
   useEffect(() => {
     if (!userId || !selectedLojaId || !selectedSubpasta) {
       setDocs([]);
@@ -488,12 +508,11 @@ export default function DocumentosPorLojaPage() {
           params.set("mes", selectedMes);
         }
         params.set("tipo", selectedSubpasta.tipo);
-        if (selectedSubpasta.tipoLaudoValores.length > 0) {
-          selectedSubpasta.tipoLaudoValores.forEach((value) => {
-            params.append("tipoLaudo", value);
-          });
-        } else if (selectedSubpasta.tipoLaudo) {
-          params.set("tipoLaudo", selectedSubpasta.tipoLaudo);
+        if (selectedSubpasta.ano) {
+          params.set("ano", selectedSubpasta.ano);
+        }
+        if (selectedSubpasta.mes) {
+          params.set("mes", selectedSubpasta.mes);
         }
 
         const response = await fetch(`/api/documentos?${params.toString()}`, {
@@ -695,42 +714,62 @@ export default function DocumentosPorLojaPage() {
   const renderSubpastasPanel = () => (
     <div className="rounded-xl border border-slate-100 px-3 py-2">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Subpastas
+        Explorador
       </p>
-      <div className="mt-2 space-y-2">
-        {subpastas.map((item) => (
-          <div key={item.key}>
-            <button
-              type="button"
-              onClick={() => setSelectedSubpastaKey(item.key)}
-              className={`w-full rounded-lg px-3 py-2 text-left text-xs font-semibold transition ${
-                selectedSubpastaKey === item.key
-                  ? "bg-sky-50 text-sky-700"
-                  : "text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              {item.nome} ({item.totalDocumentos})
-            </button>
-            {item.children.length > 0 && (
-              <div className="mt-1 space-y-1 pl-3">
-                {item.children.map((child) => (
-                  <button
-                    key={child.key}
-                    type="button"
-                    onClick={() => setSelectedSubpastaKey(child.key)}
-                    className={`w-full rounded-lg px-3 py-1.5 text-left text-xs transition ${
-                      selectedSubpastaKey === child.key
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    {child.nome} ({child.totalDocumentos})
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+      <div className="mt-2 space-y-3">
+        {subpastas.map((item) => {
+          const lastSend = formatLastSend(item.ultimoEnvioAt);
+          return (
+            <div key={item.key} className="rounded-xl bg-slate-50/70 p-2">
+              <button
+                type="button"
+                onClick={() => setSelectedSubpastaKey(item.key)}
+                className={`w-full rounded-lg px-3 py-2 text-left text-xs font-semibold transition ${
+                  selectedSubpastaKey === item.key
+                    ? "bg-sky-50 text-sky-700"
+                    : "text-slate-700 hover:bg-white"
+                }`}
+              >
+                <span className="block">{item.nome}</span>
+                <span className="mt-1 block text-[11px] font-normal text-slate-500">
+                  {item.totalDocumentos} documento(s)
+                </span>
+                <span className={`block text-[11px] font-normal ${lastSend.tone}`}>
+                  {lastSend.label}
+                </span>
+              </button>
+              {item.children.length > 0 && (
+                <div className="mt-2 space-y-1 pl-3">
+                  {item.children.map((child) => {
+                    const childLastSend = formatLastSend(child.ultimoEnvioAt);
+                    return (
+                      <button
+                        key={child.key}
+                        type="button"
+                        onClick={() => setSelectedSubpastaKey(child.key)}
+                        className={`w-full rounded-lg px-3 py-2 text-left text-xs transition ${
+                          selectedSubpastaKey === child.key
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "text-slate-600 hover:bg-white"
+                        }`}
+                      >
+                        <span className="font-semibold">{child.nome}</span>
+                        <span className="ml-1 text-[11px] text-slate-500">
+                          {child.totalDocumentos}
+                        </span>
+                        <span
+                          className={`mt-1 block text-[11px] ${childLastSend.tone}`}
+                        >
+                          {childLastSend.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -751,10 +790,10 @@ export default function DocumentosPorLojaPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">
-            Documentos Por Loja
+            Documentos por loja
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Cada pasta representa uma loja com documentos vinculados.
+            Navegue por loja, tipo de documento e ano/mês de envio.
           </p>
         </div>
         <Link
@@ -894,13 +933,34 @@ export default function DocumentosPorLojaPage() {
               Selecione uma loja para listar os documentos.
             </p>
           ) : subpastasLoading && subpastas.length === 0 ? (
-            <p className="text-sm text-slate-500">Carregando subpastas...</p>
+            <p className="text-sm text-slate-500">Carregando explorador...</p>
           ) : subpastas.length === 0 ? (
             <p className="text-sm text-slate-500">
-              Nenhuma subpasta encontrada nessa loja.
+              Nenhum agrupamento encontrado nessa loja.
             </p>
           ) : (
             <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                <span className="font-semibold text-slate-700">
+                  {selectedLoja
+                    ? selectedLoja.lojaCodigo
+                      ? `${selectedLoja.lojaNome} - ${selectedLoja.lojaCodigo}`
+                      : selectedLoja.lojaNome
+                    : "Loja"}
+                </span>
+                <span>&gt;</span>
+                <span className="font-semibold text-slate-700">
+                  {selectedSubpasta
+                    ? tipoLabel[selectedSubpasta.tipo] ?? selectedSubpasta.tipo
+                    : "Tipo"}
+                </span>
+                <span>&gt;</span>
+                <span className="font-semibold text-slate-700">
+                  {selectedSubpasta?.ano && selectedSubpasta?.mes
+                    ? selectedSubpasta.nome
+                    : "Todos os meses"}
+                </span>
+              </div>
               {renderSubpastasPanel()}
               {docsLoading && docs.length === 0 ? (
                 <p className="text-sm text-slate-500">Carregando documentos...</p>
@@ -917,10 +977,11 @@ export default function DocumentosPorLojaPage() {
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">
-                      {tipoLabel[doc.tipo] ?? doc.tipo}
+                      {getDocumentoNome(doc)}
                     </p>
                     <p className="text-[11px] text-slate-500">
-                      Status: {statusLabel[doc.status] ?? doc.status} - Enviado em{" "}
+                      {tipoLabel[doc.tipo] ?? doc.tipo} · Status:{" "}
+                      {statusLabel[doc.status] ?? doc.status} · Enviado em{" "}
                       {formatDateTime(doc.created_at)}
                     </p>
                     <p className="text-[11px] text-slate-500">

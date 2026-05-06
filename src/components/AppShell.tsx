@@ -17,6 +17,7 @@ import {
   FolderOpen,
   HelpCircle,
   Menu,
+  CircleAlert,
   ChevronLeft,
   ChevronRight,
   X,
@@ -63,71 +64,99 @@ export default function AppShell({
     return <>{children}</>;
   }
 
-  const navItems = [
+  const navGroups = [
     {
-      href: "/dashboard",
-      label: "Formulários",
-      icon: LayoutDashboard,
-      isActive: pathname === "/dashboard",
-      isVisible: canAccessDocuments,
+      title: "Operação",
+      items: [
+        {
+          href: "/dashboard",
+          label: "Início",
+          icon: LayoutDashboard,
+          isActive: pathname === "/dashboard",
+          isVisible: canAccessDocuments,
+        },
+        {
+          href: "/documentos",
+          label: "Documentos",
+          icon: FileText,
+          isActive:
+            pathname?.startsWith("/documentos") &&
+            !pathname?.startsWith("/documentos/por-loja") &&
+            !pathname?.startsWith("/documentos/pendencias"),
+          isVisible: canAccessDocuments,
+        },
+        {
+          href: "/documentos/por-loja",
+          label: "Por loja",
+          icon: FolderOpen,
+          isActive: pathname?.startsWith("/documentos/por-loja"),
+          isVisible: canAccessDocuments,
+        },
+        {
+          href: "/documentos/pendencias",
+          label: "Pendências",
+          icon: CircleAlert,
+          isActive: pathname?.startsWith("/documentos/pendencias"),
+          isVisible: canAccessDocuments,
+        },
+        {
+          href: "/copilot",
+          label: "Copiloto",
+          icon: Bot,
+          isActive: pathname?.startsWith("/copilot"),
+          isVisible: canAccessDocuments,
+        },
+      ],
     },
     {
-      href: "/documentos",
-      label: "Documentos",
-      icon: FileText,
-      isActive:
-        pathname?.startsWith("/documentos") &&
-        !pathname?.startsWith("/documentos/por-loja"),
-      isVisible: canAccessDocuments,
+      title: "Administração",
+      items: [
+        {
+          href: "/usuarios",
+          label: "Usuários",
+          icon: ShieldCheck,
+          isActive: pathname?.startsWith("/usuarios"),
+          isVisible: isAdmin,
+        },
+        {
+          href: "/lojas",
+          label: "Lojas",
+          icon: Store,
+          isActive: pathname?.startsWith("/lojas"),
+          isVisible: isAdmin,
+        },
+        {
+          href: "/prestadores",
+          label: "Prestadores",
+          icon: Building2,
+          isActive: pathname?.startsWith("/prestadores"),
+          isVisible: isAdmin,
+        },
+      ],
     },
     {
-      href: "/copilot",
-      label: "Copiloto",
-      icon: Bot,
-      isActive: pathname?.startsWith("/copilot"),
-      isVisible: canAccessDocuments,
+      title: "Análises",
+      items: [
+        {
+          href: "/dashboard/analises",
+          label: "Gráficos",
+          icon: BarChart3,
+          isActive: pathname?.startsWith("/dashboard/analises"),
+          isVisible: canAccessDashboards,
+        },
+      ],
     },
     {
-      href: "/documentos/por-loja",
-      label: "Documentos por Loja",
-      icon: FolderOpen,
-      isActive: pathname?.startsWith("/documentos/por-loja"),
-      isVisible: canAccessDocuments,
-    },
-    {
-      href: "/lojas",
-      label: "Lojas",
-      icon: Store,
-      isActive: pathname?.startsWith("/lojas"),
-      isVisible: isAdmin,
-    },
-    {
-      href: "/prestadores",
-      label: "Prestadores",
-      icon: Building2,
-      isActive: pathname?.startsWith("/prestadores"),
-      isVisible: isAdmin,
-    },
-    {
-      href: "/dashboard/analises",
-      label: "Gráficos",
-      icon: BarChart3,
-      isActive: pathname?.startsWith("/dashboard/analises"),
-      isVisible: canAccessDashboards,
-    },
-    {
-      href: "/usuarios",
-      label: "Usuários",
-      icon: ShieldCheck,
-      isActive: pathname?.startsWith("/usuarios"),
-      isVisible: isAdmin,
-    },
-    {
-      href: "/perfil",
-      label: "Perfil",
-      icon: UserRound,
-      isActive: pathname?.startsWith("/perfil"),
-      isVisible: canAccessPerfil,
+      title: "Conta",
+      items: [
+        {
+          href: "/perfil",
+          label: "Perfil",
+          icon: UserRound,
+          isActive: pathname?.startsWith("/perfil"),
+          isVisible: canAccessPerfil,
+        },
+      ],
     },
   ];
 
@@ -233,14 +262,26 @@ export default function AppShell({
           </div>
 
           <nav
-            className={`flex flex-1 flex-col gap-1 px-4 ${
+            className={`flex flex-1 flex-col gap-4 px-4 ${
               isSidebarCollapsed ? "md:px-2" : ""
             }`}
           >
-            {navItems
-              .filter((item) => item.isVisible)
-              .map((item) => {
-                const Icon = item.icon;
+            {navGroups.map((group) => {
+              const visibleItems = group.items.filter((item) => item.isVisible);
+              if (visibleItems.length === 0) {
+                return null;
+              }
+              return (
+                <div key={group.title} className="space-y-1">
+                  <p
+                    className={`px-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 ${
+                      isSidebarCollapsed ? "md:hidden" : ""
+                    }`}
+                  >
+                    {group.title}
+                  </p>
+                  {visibleItems.map((item) => {
+                    const Icon = item.icon;
                 return (
                   <Link
                     key={item.href}
@@ -260,7 +301,10 @@ export default function AppShell({
                     </span>
                   </Link>
                 );
-              })}
+                  })}
+                </div>
+              );
+            })}
           </nav>
 
           <div className={`px-4 pb-6 pt-4 ${isSidebarCollapsed ? "md:px-2" : ""}`}>

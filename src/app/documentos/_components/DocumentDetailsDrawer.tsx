@@ -1,0 +1,482 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  CheckCircle2,
+  Download,
+  ExternalLink,
+  FileText,
+  History,
+  LoaderCircle,
+  PenLine,
+  Signature,
+  X,
+} from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+
+export type DrawerFormularioRecord = {
+  id: string;
+  tipo: string;
+  status: string;
+  arquivo_path: string;
+  arquivo_assinado_path?: string | null;
+  created_at: string;
+  dados: Record<string, unknown> | null;
+  assinado_por?: string | null;
+  prestador_id?: string | null;
+  user_id?: string | null;
+  nome_arquivo?: string | null;
+};
+
+type TimelineEvent = {
+  id: string;
+  event_type: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+type DetailsPayload = {
+  documento: DrawerFormularioRecord;
+  detalhes: {
+    loja: { id: string; nome: string | null; codigo: string | null } | null;
+    prestador: {
+      id: string;
+      nome: string | null;
+      tipo_servico: string | null;
+    } | null;
+    enviadoPor: {
+      id: string;
+      email: string | null;
+      name: string | null;
+    } | null;
+  };
+  timeline: TimelineEvent[];
+  error?: string;
+};
+
+type DocumentDetailsDrawerProps = {
+  documentId: string | null;
+  fallbackRegistro: DrawerFormularioRecord | null;
+  isOpen: boolean;
+  canManageDocuments: boolean;
+  pdfAction: { id: string; type: "open" | "download" } | null;
+  reviewingId: string | null;
+  onClose: () => void;
+  onOpenPdf: (registro: DrawerFormularioRecord) => void;
+  onDownloadPdf: (registro: DrawerFormularioRecord) => void;
+  onEdit: (registro: DrawerFormularioRecord) => void;
+  onReview: (registro: DrawerFormularioRecord) => void;
+  onSign: (registro: DrawerFormularioRecord) => void;
+};
+
+const TIPO_ASSINAVEL = "registro_laudos";
+
+const tipoLabel: Record<string, string> = {
+  retencao_trabalhista: "Retenção Trabalhista",
+  registro_laudos: "Registro e Laudos",
+  notas_fiscais: "Notas Fiscais",
+};
+
+const statusLabel: Record<string, string> = {
+  pendente: "Pendente",
+  em_analise: "Em análise",
+  revisado: "Revisado",
+  assinado: "Assinado",
+};
+
+const eventLabel: Record<string, string> = {
+  documento_criado: "Documento criado",
+  documento_editado: "Documento editado",
+  status_alterado: "Status alterado",
+  loja_alterada: "Loja alterada",
+  prestador_alterado: "Prestador alterado",
+  assinado: "Documento assinado",
+  baixado: "PDF baixado",
+};
+
+const humanize = (value: string) =>
+  value
+    .split("_")
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+    .join(" ");
+
+const formatDateTime = (value: string | null | undefined) => {
+  if (!value) {
+    return "--";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "--";
+  }
+  return date.toLocaleString("pt-BR");
+};
+
+const getCampoTexto = (
+  dados: Record<string, unknown> | null | undefined,
+  campos: string[],
+) => {
+  if (!dados) {
+    return null;
+  }
+  for (const campo of campos) {
+    const value = dados[campo];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return null;
+};
+
+const getMetadataText = (event: TimelineEvent) => {
+  const from = event.metadata?.from;
+  const to = event.metadata?.to;
+  if (
+    (event.event_type === "status_alterado" ||
+      event.event_type === "loja_alterada" ||
+      event.event_type === "prestador_alterado") &&
+    (typeof from === "string" || typeof to === "string")
+  ) {
+    return `${from || "sem valor"} -> ${to || "sem valor"}`;
+  }
+  if (event.event_type === "documento_editado") {
+    return "Dados do documento atualizados.";
+  }
+  if (event.event_type === "assinado") {
+    return "Arquivo assinado vinculado ao documento.";
+  }
+  if (event.event_type === "baixado") {
+    return "Download registrado para rastreabilidade.";
+  }
+  return null;
+};
+
+export function DocumentDetailsDrawer({
+  documentId,
+  fallbackRegistro,
+  isOpen,
+  canManageDocuments,
+  pdfAction,
+  reviewingId,
+  onClose,
+  onOpenPdf,
+  onDownloadPdf,
+  onEdit,
+  onReview,
+  onSign,
+}: DocumentDetailsDrawerProps) {
+  const [payload, setPayload] = useState<DetailsPayload | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const getAccessToken = useCallback(async () => {
+    const { data, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      throw sessionError;
+    }
+    const token = data.session?.access_token;
+    if (!token) {
+      throw new Error("Sessão expirada. Faça login novamente.");
+    }
+    return token;
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen || !documentId) {
+      setPayload(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    let active = true;
+    const loadDetails = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const token = await getAccessToken();
+        const response = await fetch(`/api/documentos/${documentId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const nextPayload = (await response.json()) as DetailsPayload;
+        if (!response.ok) {
+          throw new Error(
+            nextPayload.error ?? "Não foi possível carregar o documento.",
+          );
+        }
+        if (active) {
+          setPayload(nextPayload);
+        }
+      } catch (err) {
+        if (active) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Não foi possível carregar o documento.",
+          );
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadDetails();
+    return () => {
+      active = false;
+    };
+  }, [documentId, getAccessToken, isOpen]);
+
+  const registro = payload?.documento ?? fallbackRegistro;
+  const details = payload?.detalhes;
+  const timeline = payload?.timeline ?? [];
+
+  const campos = useMemo(() => {
+    if (!registro) {
+      return [];
+    }
+
+    const dados = registro.dados;
+    const lojaLabel = details?.loja
+      ? details.loja.codigo
+        ? `${details.loja.nome ?? "Loja"} - ${details.loja.codigo}`
+        : details.loja.nome
+      : getCampoTexto(dados, ["loja_nome", "loja_id"]);
+    const prestadorLabel = details?.prestador
+      ? details.prestador.tipo_servico
+        ? `${details.prestador.nome ?? "Prestador"} - ${details.prestador.tipo_servico}`
+        : details.prestador.nome
+      : getCampoTexto(dados, ["prestador"]);
+    const enviadoPor = details?.enviadoPor
+      ? details.enviadoPor.name || details.enviadoPor.email || details.enviadoPor.id
+      : registro.user_id ?? null;
+
+    return [
+      { label: "Tipo", value: tipoLabel[registro.tipo] ?? humanize(registro.tipo) },
+      { label: "Status", value: statusLabel[registro.status] ?? humanize(registro.status) },
+      { label: "Loja", value: lojaLabel },
+      { label: "Prestador", value: prestadorLabel },
+      { label: "Número da NF", value: getCampoTexto(dados, ["numero_nf"]) },
+      { label: "Número do pedido", value: getCampoTexto(dados, ["numero_pedido"]) },
+      { label: "CNPJ", value: getCampoTexto(dados, ["cnpj", "cnpj_emitente"]) },
+      { label: "Responsável", value: getCampoTexto(dados, ["responsavel"]) },
+      { label: "Data de envio", value: formatDateTime(registro.created_at) },
+      { label: "Enviado por", value: enviadoPor },
+      {
+        label: "Nome do arquivo",
+        value:
+          registro.nome_arquivo ||
+          getCampoTexto(dados, ["nome_arquivo"]) ||
+          registro.arquivo_assinado_path?.split("/").pop() ||
+          registro.arquivo_path?.split("/").pop(),
+      },
+      {
+        label: "Observações",
+        value: getCampoTexto(dados, ["observacoes", "descricao"]),
+        wide: true,
+      },
+    ];
+  }, [details, registro]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  const opening = Boolean(
+    registro && pdfAction?.id === registro.id && pdfAction.type === "open",
+  );
+  const downloading = Boolean(
+    registro && pdfAction?.id === registro.id && pdfAction.type === "download",
+  );
+  const canReview =
+    canManageDocuments &&
+    registro?.tipo !== TIPO_ASSINAVEL &&
+    registro?.status !== "revisado" &&
+    registro?.status !== "assinado";
+  const canSign =
+    canManageDocuments &&
+    registro?.tipo === TIPO_ASSINAVEL &&
+    registro?.status !== "assinado";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex justify-end bg-slate-900/40"
+      onClick={onClose}
+    >
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="documento-detalhes-title"
+        className="flex h-full w-full max-w-2xl flex-col overflow-hidden bg-white shadow-2xl shadow-slate-900/30"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <FileText className="h-4 w-4 text-slate-400" />
+              Detalhes do documento
+            </div>
+            <h2
+              id="documento-detalhes-title"
+              className="mt-1 truncate text-lg font-semibold text-slate-900"
+            >
+              {registro?.nome_arquivo ||
+                registro?.arquivo_assinado_path?.split("/").pop() ||
+                registro?.arquivo_path?.split("/").pop() ||
+                documentId ||
+                "Documento"}
+            </h2>
+            {registro && (
+              <p className="mt-1 font-mono text-[11px] text-slate-400">
+                {registro.id}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full bg-slate-100 p-2 text-slate-600 transition hover:bg-slate-200"
+            aria-label="Fechar detalhes"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+
+        <div className="flex-1 overflow-y-auto px-5 py-5">
+          {loading && !payload ? (
+            <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+              Carregando detalhes...
+            </div>
+          ) : null}
+
+          {error ? (
+            <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          ) : null}
+
+          {registro ? (
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2">
+                {campos.map((campo) => (
+                  <div
+                    key={campo.label}
+                    className={campo.wide ? "sm:col-span-2" : ""}
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      {campo.label}
+                    </p>
+                    <p className="mt-1 break-words text-sm font-medium text-slate-900">
+                      {campo.value || "Não informado"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <section className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4">
+                <div className="flex items-center gap-2">
+                  <History className="h-4 w-4 text-slate-500" />
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Timeline
+                  </p>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {timeline.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                      Nenhum evento registrado ainda.
+                    </p>
+                  ) : (
+                    timeline.map((event) => {
+                      const metadataText = getMetadataText(event);
+                      return (
+                        <div
+                          key={event.id}
+                          className="border-l-2 border-sky-200 pl-3"
+                        >
+                          <p className="text-sm font-semibold text-slate-900">
+                            {eventLabel[event.event_type] ??
+                              humanize(event.event_type)}
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            {formatDateTime(event.created_at)}
+                            {event.actor_email ? ` por ${event.actor_email}` : ""}
+                          </p>
+                          {metadataText ? (
+                            <p className="mt-1 text-xs text-slate-500">
+                              {metadataText}
+                            </p>
+                          ) : null}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </section>
+            </div>
+          ) : null}
+        </div>
+
+        {registro ? (
+          <footer className="border-t border-slate-100 bg-white px-5 py-4">
+            <div className="flex flex-wrap justify-end gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => onOpenPdf(registro)}
+                disabled={opening || downloading}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <ExternalLink className="h-4 w-4" />
+                {opening ? "Abrindo..." : "Ver PDF"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onDownloadPdf(registro)}
+                disabled={opening || downloading}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Download className="h-4 w-4" />
+                {downloading ? "Baixando..." : "Baixar PDF"}
+              </button>
+              {canManageDocuments ? (
+                <button
+                  type="button"
+                  onClick={() => onEdit(registro)}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  <PenLine className="h-4 w-4" />
+                  Editar dados
+                </button>
+              ) : null}
+              {canReview ? (
+                <button
+                  type="button"
+                  onClick={() => onReview(registro)}
+                  disabled={reviewingId === registro.id}
+                  className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-2 font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  {reviewingId === registro.id ? "Salvando..." : "Revisar"}
+                </button>
+              ) : null}
+              {canSign ? (
+                <button
+                  type="button"
+                  onClick={() => onSign(registro)}
+                  className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-2 font-semibold text-white transition hover:bg-sky-500"
+                >
+                  <Signature className="h-4 w-4" />
+                  Revisar/Assinar
+                </button>
+              ) : null}
+            </div>
+          </footer>
+        ) : null}
+      </aside>
+    </div>
+  );
+}

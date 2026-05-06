@@ -130,6 +130,17 @@ type EntityRow = {
   nome: string | null;
 };
 
+type LojaLookupRow = {
+  id: string;
+  nome: string | null;
+  codigo: string | null;
+};
+
+type PrestadorLookupRow = {
+  id: string;
+  nome: string | null;
+};
+
 type InsightCount = {
   key: string;
   label: string;
@@ -636,6 +647,113 @@ const stripKnownFilters = (filters: DocumentoCopilotFilters) => {
   return cleaned;
 };
 
+const extractLojaMention = (message: string) => {
+  const normalized = normalizeText(message).toLowerCase();
+  const match = normalized.match(/\bloja\s+([a-z0-9._-]+)/i);
+  return match?.[1] ?? null;
+};
+
+const applyDeterministicFilters = (
+  filters: DocumentoCopilotFilters,
+  message: string,
+) => {
+  const normalized = normalizeText(message).toLowerCase();
+  const next = { ...filters };
+
+  if (!next.tipo) {
+    if (/\bnotas?\s+fiscais?\b/.test(normalized)) {
+      next.tipo = "notas_fiscais";
+    } else if (/\blaudos?\b|\bregistro\s+e\s+laudos?\b/.test(normalized)) {
+      next.tipo = "registro_laudos";
+    } else if (/\bretencao\s+trabalhista\b/.test(normalized)) {
+      next.tipo = "retencao_trabalhista";
+    }
+  }
+
+  if (!next.status) {
+    const status = normalizeStatusValue(normalized);
+    if (status) {
+      next.status = status;
+    }
+  }
+
+  if (!next.mes) {
+    Object.entries(MONTH_LABELS).some(([value, label]) => {
+      if (normalized.includes(normalizeText(label).toLowerCase())) {
+        next.mes = value;
+        return true;
+      }
+      return false;
+    });
+  }
+
+  if (!next.ano) {
+    const yearMatch = normalized.match(/\b(20\d{2})\b/);
+    if (yearMatch) {
+      next.ano = yearMatch[1];
+    } else if (next.mes) {
+      next.ano = String(new Date().getFullYear());
+    }
+  }
+
+  return next;
+};
+
+const resolveEntityFilters = async (input: {
+  filters: DocumentoCopilotFilters;
+  message: string;
+  supabaseAdmin: ReturnType<typeof createSupabaseAdminClient>;
+}) => {
+  const { message, supabaseAdmin } = input;
+  const filters = { ...input.filters };
+  const lojaToken = filters.lojaId?.trim() || extractLojaMention(message);
+
+  if (lojaToken) {
+    const normalizedToken = normalizeText(lojaToken).toLowerCase();
+    const { data: lojasData, error: lojasError } = await supabaseAdmin
+      .from("lojas")
+      .select("id,nome,codigo")
+      .limit(2000);
+    if (lojasError) {
+      throw lojasError;
+    }
+    const lojas = ((lojasData as LojaLookupRow[]) ?? []) as LojaLookupRow[];
+    const match = lojas.find((loja) => {
+      const values = [loja.id, loja.codigo ?? "", loja.nome ?? ""].map((value) =>
+        normalizeText(value).toLowerCase(),
+      );
+      return values.some((value) => value === normalizedToken);
+    });
+    if (match) {
+      filters.lojaId = match.id;
+    }
+  }
+
+  if (filters.prestadorId) {
+    const normalizedPrestador = normalizeText(filters.prestadorId).toLowerCase();
+    const { data: prestadoresData, error: prestadoresError } =
+      await supabaseAdmin
+        .from("prestadores")
+        .select("id,nome")
+        .limit(2000);
+    if (prestadoresError) {
+      throw prestadoresError;
+    }
+    const prestadores = ((prestadoresData as PrestadorLookupRow[]) ?? []) as PrestadorLookupRow[];
+    const match = prestadores.find((prestador) => {
+      const values = [prestador.id, prestador.nome ?? ""].map((value) =>
+        normalizeText(value).toLowerCase(),
+      );
+      return values.some((value) => value === normalizedPrestador);
+    });
+    if (match) {
+      filters.prestadorId = match.id;
+    }
+  }
+
+  return filters;
+};
+
 const buildSearchSummary = (filters: DocumentoCopilotFilters) => {
   const partes: string[] = [];
   if (filters.tipo) {
@@ -833,7 +951,6 @@ const queryDocumentoCandidates = async (input: {
   supabaseAdmin?: ReturnType<typeof createSupabaseAdminClient>;
 }) => {
   const {
-    filters,
     supabaseAdmin = createSupabaseAdminClient(),
   } = input;
 
@@ -1002,9 +1119,15 @@ export async function runDocumentoCopilot(
     filters?: DocumentoCopilotFilters;
   }>(raw, {});
 
-  const filters = stripKnownFilters(parsed.filters ?? {});
-  const hasParsedFilters = hasAnyFilter(filters);
+  let filters = stripKnownFilters(parsed.filters ?? {});
   const message = request.message?.trim() ?? "";
+  filters = applyDeterministicFilters(filters, message);
+  filters = await resolveEntityFilters({
+    filters,
+    message,
+    supabaseAdmin,
+  });
+  const hasParsedFilters = hasAnyFilter(filters);
   const fallbackTerm = normalizeText(message);
   if (!filters.termo && fallbackTerm && !hasParsedFilters) {
     filters.termo = fallbackTerm;

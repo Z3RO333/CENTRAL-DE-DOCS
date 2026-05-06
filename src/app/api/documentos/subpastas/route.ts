@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
-import { normalizeIds, safeParseDados, sanitizeId } from "@/lib/documentosApiUtils";
-import { resolveDateRange, toNullableArray } from "@/lib/documentosAggregateUtils";
-import { resolveServicoOficial } from "@/lib/servicosVocab";
 import { buildDocumentosAccessOr } from "@/lib/documentosAccessFilters";
+import { normalizeIds, sanitizeId } from "@/lib/documentosApiUtils";
 import {
   ApiHttpError as HttpError,
   getAuthorizedPrestadorIds,
@@ -11,7 +8,7 @@ import {
   getSessionUserFromRequest,
   hasDocumentosAccess,
 } from "@/lib/apiAuth";
-import { fixMojibakeText, normalizeDisplayData } from "@/lib/textEncoding";
+import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 
 type FormularioRow = {
   created_at: string;
@@ -27,6 +24,8 @@ type SubpastaNode = {
   tipo: string;
   tipoLaudo: string | null;
   tipoLaudoValores: string[];
+  ano: string | null;
+  mes: string | null;
   totalDocumentos: number;
   ultimoEnvioAt: string | null;
   children: SubpastaNode[];
@@ -37,12 +36,7 @@ type DateFilterQuery<T> = {
   lt: (column: string, value: string) => T;
 };
 
-type SubpastaAggRow = {
-  tipo: string;
-  tipo_laudo: string | null;
-  total_documentos: number;
-  ultimo_envio_at: string | null;
-};
+const PAGE_SIZE = 1000;
 
 const TIPO_LABEL: Record<string, string> = {
   retencao_trabalhista: "Retencao Trabalhista",
@@ -50,13 +44,19 @@ const TIPO_LABEL: Record<string, string> = {
   notas_fiscais: "Notas Fiscais",
 };
 
-const readTipoLaudo = (dados: FormularioRow["dados"]) => {
-  const parsed = normalizeDisplayData(safeParseDados(dados)) as Record<
-    string,
-    unknown
-  > | null;
-  const value = typeof parsed?.tipo_laudo === "string" ? parsed.tipo_laudo.trim() : "";
-  return value || "";
+const MESES: Record<string, string> = {
+  "01": "Janeiro",
+  "02": "Fevereiro",
+  "03": "Marco",
+  "04": "Abril",
+  "05": "Maio",
+  "06": "Junho",
+  "07": "Julho",
+  "08": "Agosto",
+  "09": "Setembro",
+  "10": "Outubro",
+  "11": "Novembro",
+  "12": "Dezembro",
 };
 
 const applyDateFilter = <T extends DateFilterQuery<T>>(
@@ -76,109 +76,112 @@ const applyDateFilter = <T extends DateFilterQuery<T>>(
     if (!Number.isNaN(mes) && mes >= 1 && mes <= 12) {
       const start = new Date(ano, mes - 1, 1);
       const end = new Date(ano, mes, 1);
-      return query.gte("created_at", start.toISOString()).lt("created_at", end.toISOString());
+      return query
+        .gte("created_at", start.toISOString())
+        .lt("created_at", end.toISOString());
     }
     return query;
   }
   const start = new Date(ano, 0, 1);
   const end = new Date(ano + 1, 0, 1);
-  return query.gte("created_at", start.toISOString()).lt("created_at", end.toISOString());
+  return query
+    .gte("created_at", start.toISOString())
+    .lt("created_at", end.toISOString());
 };
 
-function buildSubpastasFromAgg(rows: SubpastaAggRow[]): SubpastaNode[] {
-  const rootMap = new Map<string, SubpastaNode>();
-  const childMap = new Map<string, SubpastaNode>();
+const touchStats = (node: SubpastaNode, createdAt: string) => {
+  node.totalDocumentos += 1;
+  if (!node.ultimoEnvioAt || createdAt > node.ultimoEnvioAt) {
+    node.ultimoEnvioAt = createdAt;
+  }
+};
+
+const createNode = (input: {
+  key: string;
+  nome: string;
+  tipo: string;
+  ano?: string | null;
+  mes?: string | null;
+}): SubpastaNode => ({
+  key: input.key,
+  nome: input.nome,
+  tipo: input.tipo,
+  tipoLaudo: null,
+  tipoLaudoValores: [],
+  ano: input.ano ?? null,
+  mes: input.mes ?? null,
+  totalDocumentos: 0,
+  ultimoEnvioAt: null,
+  children: [],
+});
+
+function buildExplorerFromRows(rows: FormularioRow[]): SubpastaNode[] {
+  const tipoMap = new Map<string, SubpastaNode>();
+  const monthMap = new Map<string, SubpastaNode>();
 
   rows.forEach((row) => {
     const tipo = row.tipo;
-    const rootKey = `tipo:${tipo}`;
-    if (!rootMap.has(rootKey)) {
-      rootMap.set(rootKey, {
-        key: rootKey,
-        nome: TIPO_LABEL[tipo] ?? tipo,
-        tipo,
-        tipoLaudo: null,
-        tipoLaudoValores: [],
-        totalDocumentos: 0,
-        ultimoEnvioAt: null,
-        children: [],
-      });
+    const tipoKey = `tipo:${tipo}`;
+    if (!tipoMap.has(tipoKey)) {
+      tipoMap.set(
+        tipoKey,
+        createNode({
+          key: tipoKey,
+          nome: TIPO_LABEL[tipo] ?? tipo,
+          tipo,
+        }),
+      );
     }
 
-    const root = rootMap.get(rootKey)!;
-    root.totalDocumentos += Number(row.total_documentos);
-    if (
-      row.ultimo_envio_at &&
-      (!root.ultimoEnvioAt || row.ultimo_envio_at > root.ultimoEnvioAt)
-    ) {
-      root.ultimoEnvioAt = row.ultimo_envio_at;
-    }
+    const tipoNode = tipoMap.get(tipoKey)!;
+    touchStats(tipoNode, row.created_at);
 
-    if (tipo !== "registro_laudos") {
+    const createdAt = new Date(row.created_at);
+    if (Number.isNaN(createdAt.getTime())) {
       return;
     }
 
-    const tipoLaudoOriginal = row.tipo_laudo
-      ? fixMojibakeText(row.tipo_laudo.trim())
-      : "";
-    const resolved =
-      tipoLaudoOriginal.length > 0
-        ? resolveServicoOficial(tipoLaudoOriginal)
-        : { canonical: "Sem tipo de laudo" };
-    const tipoLaudoCanonical = resolved.canonical || "Sem tipo de laudo";
-    const childKey = `tipo:${tipo}|laudo:${tipoLaudoCanonical.toLowerCase()}`;
-    if (!childMap.has(childKey)) {
-      childMap.set(childKey, {
-        key: childKey,
-        nome: tipoLaudoCanonical,
+    const ano = String(createdAt.getFullYear());
+    const mes = String(createdAt.getMonth() + 1).padStart(2, "0");
+    const monthKey = `${tipoKey}|periodo:${ano}-${mes}`;
+    if (!monthMap.has(monthKey)) {
+      const monthNode = createNode({
+        key: monthKey,
+        nome: `${MESES[mes] ?? mes}/${ano}`,
         tipo,
-        tipoLaudo: tipoLaudoCanonical,
-        tipoLaudoValores: [],
-        totalDocumentos: 0,
-        ultimoEnvioAt: null,
-        children: [],
+        ano,
+        mes,
       });
+      monthMap.set(monthKey, monthNode);
+      tipoNode.children.push(monthNode);
     }
-
-    const child = childMap.get(childKey)!;
-    const valueForFilter =
-      tipoLaudoOriginal.length > 0 ? tipoLaudoOriginal : tipoLaudoCanonical;
-    if (!child.tipoLaudoValores.includes(valueForFilter)) {
-      child.tipoLaudoValores.push(valueForFilter);
-    }
-    child.totalDocumentos += Number(row.total_documentos);
-    if (
-      row.ultimo_envio_at &&
-      (!child.ultimoEnvioAt || row.ultimo_envio_at > child.ultimoEnvioAt)
-    ) {
-      child.ultimoEnvioAt = row.ultimo_envio_at;
-    }
+    touchStats(monthMap.get(monthKey)!, row.created_at);
   });
-
-  const registroRoot = Array.from(rootMap.values()).find(
-    (item) => item.tipo === "registro_laudos",
-  );
-  if (registroRoot) {
-    registroRoot.children = Array.from(childMap.values()).sort((a, b) =>
-      a.nome.localeCompare(b.nome, "pt-BR"),
-    );
-  }
 
   const orderedTipos = ["retencao_trabalhista", "registro_laudos", "notas_fiscais"];
-  return Array.from(rootMap.values()).sort((a, b) => {
-    const ai = orderedTipos.indexOf(a.tipo);
-    const bi = orderedTipos.indexOf(b.tipo);
-    if (ai === -1 && bi === -1) {
-      return a.nome.localeCompare(b.nome, "pt-BR");
-    }
-    if (ai === -1) {
-      return 1;
-    }
-    if (bi === -1) {
-      return -1;
-    }
-    return ai - bi;
-  });
+  return Array.from(tipoMap.values())
+    .map((node) => ({
+      ...node,
+      children: node.children.sort((a, b) => {
+        const dateA = `${a.ano ?? "0000"}-${a.mes ?? "00"}`;
+        const dateB = `${b.ano ?? "0000"}-${b.mes ?? "00"}`;
+        return dateB.localeCompare(dateA);
+      }),
+    }))
+    .sort((a, b) => {
+      const ai = orderedTipos.indexOf(a.tipo);
+      const bi = orderedTipos.indexOf(b.tipo);
+      if (ai === -1 && bi === -1) {
+        return a.nome.localeCompare(b.nome, "pt-BR");
+      }
+      if (ai === -1) {
+        return 1;
+      }
+      if (bi === -1) {
+        return -1;
+      }
+      return ai - bi;
+    });
 }
 
 export async function GET(request: Request) {
@@ -188,7 +191,11 @@ export async function GET(request: Request) {
     const supabaseAdmin = createSupabaseAdminClient();
     const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
     const allowedPrestadores = await getAuthorizedPrestadorIds(email, supabaseAdmin);
-    const gerenteEntries = await getGerenteAccessEntries(user.id, email, supabaseAdmin);
+    const gerenteEntries = await getGerenteAccessEntries(
+      user.id,
+      email,
+      supabaseAdmin,
+    );
 
     const { searchParams } = new URL(request.url);
     const lojaId = sanitizeId((searchParams.get("lojaId") ?? "").trim());
@@ -205,31 +212,10 @@ export async function GET(request: Request) {
     );
     const anoFilter = searchParams.get("ano");
     const mesFilter = searchParams.get("mes");
-    const { startAt, endAt } = resolveDateRange(anoFilter, mesFilter);
-
-    if (canAccess) {
-      const { data: aggregateData, error: aggregateError } =
-        await supabaseAdmin.rpc("documentos_subpastas_agg", {
-          p_loja_id: lojaId,
-          p_user_id: filterUserId || null,
-          p_prestador_ids: toNullableArray(filterPrestadores),
-          p_start_at: startAt,
-          p_end_at: endAt,
-        });
-      if (aggregateError) {
-        throw aggregateError;
-      }
-
-      return NextResponse.json({
-        subpastas: buildSubpastasFromAgg(
-          (aggregateData as SubpastaAggRow[] | null) ?? [],
-        ),
-      });
-    }
 
     let query = supabaseAdmin
       .from("formularios")
-      .select("created_at,tipo,dados,user_id,prestador_id")
+      .select("created_at,tipo,dados,user_id,prestador_id", { count: "exact" })
       .eq("dados->>loja_id", lojaId)
       .order("created_at", { ascending: false });
 
@@ -243,14 +229,12 @@ export async function GET(request: Request) {
         allowedPrestadores,
         gerenteEntries,
         userId: user.id,
-        filterUserId,
+        filterUserId: filterUserId || user.id,
         filterPrestadores,
         filterLojas: [lojaId],
       });
       query = query.or(accessOr.join(","));
-    }
-
-    if (canAccess && filterPrestadores.length > 0) {
+    } else if (filterPrestadores.length > 0) {
       if (filterPrestadores.length === 1) {
         query = query.eq("prestador_id", filterPrestadores[0]);
       } else {
@@ -260,112 +244,35 @@ export async function GET(request: Request) {
 
     query = applyDateFilter(query, anoFilter, mesFilter);
 
-    const rows: FormularioRow[] = [];
-    let offset = 0;
-    while (true) {
-      const { data: batch, error } = await query.range(offset, offset + 999);
-      if (error) {
-        throw error;
-      }
-      const current = (batch as FormularioRow[]) ?? [];
-      rows.push(...current);
-      if (current.length < 1000) {
-        break;
-      }
-      offset += 1000;
-    }
-
-    const rootMap = new Map<string, SubpastaNode>();
-    const childMap = new Map<string, SubpastaNode>();
-
-    const touchStats = (item: SubpastaNode, createdAt: string) => {
-      item.totalDocumentos += 1;
-      if (!item.ultimoEnvioAt || createdAt > item.ultimoEnvioAt) {
-        item.ultimoEnvioAt = createdAt;
-      }
-    };
-
-    rows.forEach((row) => {
-      const tipo = row.tipo;
-      const rootKey = `tipo:${tipo}`;
-      if (!rootMap.has(rootKey)) {
-        rootMap.set(rootKey, {
-          key: rootKey,
-          nome: TIPO_LABEL[tipo] ?? tipo,
-          tipo,
-          tipoLaudo: null,
-          tipoLaudoValores: [],
-          totalDocumentos: 0,
-          ultimoEnvioAt: null,
-          children: [],
-        });
-      }
-      const root = rootMap.get(rootKey)!;
-      touchStats(root, row.created_at);
-
-      if (tipo === "registro_laudos") {
-        const tipoLaudoOriginal = readTipoLaudo(row.dados);
-        const resolved =
-          tipoLaudoOriginal.length > 0
-            ? resolveServicoOficial(tipoLaudoOriginal)
-            : { canonical: "Sem tipo de laudo" };
-        const tipoLaudoCanonical = resolved.canonical || "Sem tipo de laudo";
-        const childKey = `tipo:${tipo}|laudo:${tipoLaudoCanonical.toLowerCase()}`;
-        if (!childMap.has(childKey)) {
-          childMap.set(childKey, {
-            key: childKey,
-            nome: tipoLaudoCanonical,
-            tipo,
-            tipoLaudo: tipoLaudoCanonical,
-            tipoLaudoValores: [],
-            totalDocumentos: 0,
-            ultimoEnvioAt: null,
-            children: [],
-          });
-        }
-        const child = childMap.get(childKey)!;
-        const valueForFilter =
-          tipoLaudoOriginal.length > 0 ? tipoLaudoOriginal : tipoLaudoCanonical;
-        if (!child.tipoLaudoValores.includes(valueForFilter)) {
-          child.tipoLaudoValores.push(valueForFilter);
-        }
-        touchStats(child, row.created_at);
-      }
-    });
-
-    const registroRoot = Array.from(rootMap.values()).find(
-      (item) => item.tipo === "registro_laudos",
+    const { data: firstPage, error, count } = await query.range(
+      0,
+      PAGE_SIZE - 1,
     );
-    if (registroRoot) {
-      const laudos = Array.from(childMap.values()).sort((a, b) =>
-        a.nome.localeCompare(b.nome, "pt-BR"),
-      );
-      registroRoot.children = laudos;
+    if (error) {
+      throw error;
     }
 
-    const orderedTipos = ["retencao_trabalhista", "registro_laudos", "notas_fiscais"];
-    const roots = Array.from(rootMap.values()).sort((a, b) => {
-      const ai = orderedTipos.indexOf(a.tipo);
-      const bi = orderedTipos.indexOf(b.tipo);
-      if (ai === -1 && bi === -1) {
-        return a.nome.localeCompare(b.nome, "pt-BR");
+    const rows = ((firstPage as FormularioRow[]) ?? []) as FormularioRow[];
+    const total = count ?? rows.length;
+    for (let offset = rows.length; offset < total; offset += PAGE_SIZE) {
+      const { data: batch, error: batchError } = await query.range(
+        offset,
+        Math.min(offset + PAGE_SIZE - 1, total - 1),
+      );
+      if (batchError) {
+        throw batchError;
       }
-      if (ai === -1) {
-        return 1;
-      }
-      if (bi === -1) {
-        return -1;
-      }
-      return ai - bi;
-    });
+      rows.push(...(((batch as FormularioRow[]) ?? []) as FormularioRow[]));
+    }
 
-    return NextResponse.json({ subpastas: roots });
+    return NextResponse.json({ subpastas: buildExplorerFromRows(rows) });
   } catch (err) {
-    console.error("Erro ao listar subpastas:", err);
+    console.error("Erro ao listar explorador de loja:", err);
     if (err instanceof HttpError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
-    const message = err instanceof Error ? err.message : "Erro ao listar subpastas.";
+    const message =
+      err instanceof Error ? err.message : "Erro ao listar explorador de loja.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
