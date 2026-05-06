@@ -13,6 +13,7 @@ import { DocumentosEmptyState } from "./_components/DocumentosEmptyState";
 import { DocumentosFilters } from "./_components/DocumentosFilters";
 import { DocumentosPagination } from "./_components/DocumentosPagination";
 import { TIPO_LABEL } from "./_lib/documentosShared";
+import { fixMojibakeText } from "@/lib/textEncoding";
 
 type FormularioRecord = {
   id: string;
@@ -24,6 +25,7 @@ type FormularioRecord = {
   dados: Record<string, unknown> | null;
   assinado_por?: string | null;
   prestador_id?: string | null;
+  user_id?: string | null;
 };
 
 type EditField = {
@@ -216,7 +218,7 @@ const getCampoTexto = (
   for (const campo of campos) {
     const valor = dados[campo];
     if (typeof valor === "string" && valor.trim()) {
-      return valor.trim();
+      return fixMojibakeText(valor.trim());
     }
   }
   return null;
@@ -245,14 +247,40 @@ const getDocumentoNome = (registro: FormularioRecord) => {
   if (Array.isArray(anexos) && anexos.length > 0) {
     const primeiro = anexos[0] as { nome?: unknown } | null;
     if (primeiro && typeof primeiro.nome === "string" && primeiro.nome.trim()) {
-      return primeiro.nome.trim();
+      return fixMojibakeText(primeiro.nome.trim());
     }
   }
   const path = registro.arquivo_assinado_path ?? registro.arquivo_path;
   if (path) {
-    return path.split("/").pop() ?? path;
+    return fixMojibakeText(path.split("/").pop() ?? path);
   }
   return registro.id;
+};
+
+const getDownloadFileName = (registro: FormularioRecord, path: string) => {
+  const documentName = getDocumentoNome(registro);
+  if (documentName && documentName !== registro.id) {
+    return documentName;
+  }
+  return path.split("/").pop() ?? "documento.pdf";
+};
+
+const downloadSignedUrlAsBlob = async (signedUrl: string, fileName: string) => {
+  const response = await fetch(signedUrl);
+  if (!response.ok) {
+    throw new Error("Nao foi possivel baixar o arquivo.");
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = fileName;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
 };
 
 const formatDateTime = (value: string) => {
@@ -272,6 +300,21 @@ const getEdicaoInfo = (registro: FormularioRecord) => {
   const editedAt = editedAtRaw ? formatDateTime(editedAtRaw) : null;
   return { editedBy, editedAt };
 };
+
+const getNumeroNf = (registro: FormularioRecord) =>
+  getCampoTexto(registro.dados, ["numero_nf"]);
+
+const getNumeroPedido = (registro: FormularioRecord) =>
+  getCampoTexto(registro.dados, ["numero_pedido"]);
+
+const getCnpjDocumento = (registro: FormularioRecord) =>
+  getCampoTexto(registro.dados, ["cnpj", "cnpj_emitente"]);
+
+const getLojaNome = (registro: FormularioRecord) =>
+  getCampoTexto(registro.dados, ["loja_nome"]);
+
+const getPrestadorNome = (registro: FormularioRecord) =>
+  getCampoTexto(registro.dados, ["prestador"]);
 
 export default function DocumentosPage() {
   const router = useRouter();
@@ -303,7 +346,7 @@ export default function DocumentosPage() {
   const [identificacaoFilter, setIdentificacaoFilter] = useState<string>("");
   const [identificacaoDebounced, setIdentificacaoDebounced] =
     useState<string>("");
-  const [anoFilter, setAnoFilter] = useState<string>("2026");
+  const [anoFilter, setAnoFilter] = useState<string>("todos");
   const [mesFilter, setMesFilter] = useState<string>("todos");
   const [somenteAssinados, setSomenteAssinados] = useState(false);
   const [somenteDisponiveisLote, setSomenteDisponiveisLote] = useState(false);
@@ -313,6 +356,12 @@ export default function DocumentosPage() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(25);
   const [totalCount, setTotalCount] = useState(0);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [restoredNotice, setRestoredNotice] = useState(false);
+  const [pdfAction, setPdfAction] = useState<{
+    id: string;
+    type: "open" | "download";
+  } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingBatch, setDeletingBatch] = useState(false);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
@@ -342,6 +391,7 @@ export default function DocumentosPage() {
     useState(false);
   const [adminUsers, setAdminUsers] = useState<AdminUserOption[]>([]);
   const [adminUsersLoading, setAdminUsersLoading] = useState(false);
+  const hasLoadedOnceRef = useRef(false);
 
   const getAccessToken = useCallback(async () => {
     const { data: sessionData, error: sessionError } =
@@ -557,7 +607,7 @@ export default function DocumentosPage() {
           prestadorFilter: parsed.prestadorFilter ?? "todos",
           statusFilter: parsed.statusFilter ?? "todos",
           identificacaoFilter: parsed.identificacaoFilter ?? "",
-          anoFilter: parsed.anoFilter ?? "2026",
+          anoFilter: parsed.anoFilter ?? "todos",
           mesFilter: parsed.mesFilter ?? "todos",
           somenteAssinados: parsed.somenteAssinados ?? false,
           somenteDisponiveisLote: parsed.somenteDisponiveisLote ?? false,
@@ -567,13 +617,14 @@ export default function DocumentosPage() {
           pageSize:
             parsed.pageSize && parsed.pageSize > 0 ? parsed.pageSize : pageSize,
         };
+        setRestoredNotice(true);
       } catch {
         window.sessionStorage.removeItem(LIST_STATE_STORAGE_KEY);
       }
     }
 
     setHasRestoredState(true);
-  }, [hasRestoredState]);
+  }, [hasRestoredState, pageSize]);
 
   useEffect(() => {
     if (hasRestoredCache || typeof window === "undefined") {
@@ -599,6 +650,7 @@ export default function DocumentosPage() {
         if (typeof parsed.page === "number" && parsed.page > 0) {
           setPage(parsed.page);
         }
+        setRestoredNotice(true);
       } catch {
         window.sessionStorage.removeItem(LIST_CACHE_STORAGE_KEY);
       }
@@ -753,7 +805,8 @@ export default function DocumentosPage() {
     let active = true;
 
     const load = async () => {
-      if (!hasLoadedOnce) {
+      const loadedOnce = hasLoadedOnceRef.current;
+      if (!loadedOnce) {
         setLoading(true);
       } else {
         setIsFetching(true);
@@ -849,10 +902,11 @@ export default function DocumentosPage() {
         }
       } finally {
         if (active) {
-          if (!hasLoadedOnce) {
+          if (!loadedOnce) {
             setLoading(false);
           }
           setIsFetching(false);
+          hasLoadedOnceRef.current = true;
           setHasLoadedOnce(true);
         }
       }
@@ -869,6 +923,7 @@ export default function DocumentosPage() {
     userId,
     router,
     canViewAllDocuments,
+    canManageDocuments,
     role,
     getAccessToken,
     prestadoresUsuarioLoading,
@@ -886,6 +941,7 @@ export default function DocumentosPage() {
     identificacaoDebounced,
     somenteAssinados,
     somenteDisponiveisLote,
+    refreshNonce,
   ]);
 
   useEffect(() => {
@@ -944,14 +1000,21 @@ export default function DocumentosPage() {
     }
 
     try {
+      setPdfAction({ id: registro.id, type: "open" });
+      setError(null);
       const signedUrl = await getSignedFileUrl(path);
-      const opened = window.open(signedUrl, "_blank", "noopener,noreferrer");
-      if (!opened) {
-        setError("Não foi possível abrir o documento. Verifique o bloqueador de pop-up.");
-      }
+      const anchor = document.createElement("a");
+      anchor.href = signedUrl;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
     } catch (err) {
       console.error("Erro ao abrir documento:", err);
-      setError("Não foi possível abrir o documento. Tente novamente.");
+      setError("Não foi possível abrir o PDF. Verifique se o arquivo existe e tente novamente.");
+    } finally {
+      setPdfAction(null);
     }
   };
 
@@ -963,16 +1026,18 @@ export default function DocumentosPage() {
     }
 
     try {
+      setPdfAction({ id: registro.id, type: "download" });
+      setError(null);
       const signedUrl = await getSignedFileUrl(path);
-      const link = document.createElement("a");
-      link.href = signedUrl;
-      link.download = path.split("/").pop() ?? "documento.pdf";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      await downloadSignedUrlAsBlob(
+        signedUrl,
+        getDownloadFileName(registro, path),
+      );
     } catch (err) {
       console.error("Erro ao baixar documento:", err);
-      setError("Não foi possível gerar o link de download.");
+      setError("Não foi possível baixar o PDF. Verifique se o arquivo existe e tente novamente.");
+    } finally {
+      setPdfAction(null);
     }
   };
 
@@ -1260,30 +1325,27 @@ export default function DocumentosPage() {
     [registrosFiltrados],
   );
 
-  const registrosRecentes = useMemo(() => registros.slice(0, 3), [registros]);
-
   const resumoStatus = useMemo(() => {
-    const total = registrosFiltrados.length;
     const assinados = registrosFiltrados.filter(
       (registro) => registro.status === "assinado",
+    ).length;
+    const emAnalise = registrosFiltrados.filter(
+      (registro) => registro.status === "em_analise",
     ).length;
     const pendentes = registrosFiltrados.filter(
       (registro) => registro.status !== "assinado" && registro.status !== "revisado",
     ).length;
-    const assinaveis = registrosFiltrados.filter(
-      (registro) => registro.tipo === TIPO_ASSINAVEL,
-    ).length;
-    return { total, pendentes, assinados, assinaveis };
+    const now = new Date();
+    const esteMes = registrosFiltrados.filter((registro) => {
+      const createdAt = new Date(registro.created_at);
+      return (
+        !Number.isNaN(createdAt.getTime()) &&
+        createdAt.getFullYear() === now.getFullYear() &&
+        createdAt.getMonth() === now.getMonth()
+      );
+    }).length;
+    return { pendentes, emAnalise, assinados, esteMes };
   }, [registrosFiltrados]);
-
-  const contagemPorTipo = useMemo(
-    () =>
-      registros.reduce<Record<string, number>>((acc, registro) => {
-        acc[registro.tipo] = (acc[registro.tipo] ?? 0) + 1;
-        return acc;
-      }, {}),
-    [registros],
-  );
 
   useEffect(() => {
     const idsDisponiveis = new Set(registrosFiltrados.map((item) => item.id));
@@ -1342,7 +1404,7 @@ export default function DocumentosPage() {
     setSelectedIds([]);
   };
 
-  const resetFilters = () => {
+  const resetFilters = useCallback(() => {
     setTipoFilter("todos");
     setTipoLaudoFilter("todos");
     setUserFilter("todos");
@@ -1350,12 +1412,76 @@ export default function DocumentosPage() {
     setPrestadorFilter("todos");
     setStatusFilter("todos");
     setIdentificacaoFilter("");
-    setAnoFilter("2026");
+    setAnoFilter("todos");
     setMesFilter("todos");
     setSomenteAssinados(false);
     setSomenteDisponiveisLote(false);
     setPage(1);
-  };
+    setRestoredNotice(false);
+  }, []);
+
+  const refreshDocumentosList = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(LIST_CACHE_STORAGE_KEY);
+    }
+    setRestoredNotice(false);
+    setRefreshNonce((prev) => prev + 1);
+  }, []);
+
+  const clearRestoredFilters = useCallback(() => {
+    resetFilters();
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(LIST_STATE_STORAGE_KEY);
+      window.sessionStorage.removeItem(LIST_CACHE_STORAGE_KEY);
+    }
+    setRestoredNotice(false);
+    setRefreshNonce((prev) => prev + 1);
+  }, [resetFilters]);
+
+  const aplicarFiltroRapido = useCallback(
+    (
+      filter:
+        | "todos"
+        | "pendentes"
+        | "assinados"
+        | "notas_fiscais"
+        | "laudos"
+        | "este_mes",
+    ) => {
+      if (filter === "todos") {
+        resetFilters();
+        return;
+      }
+
+      if (filter === "pendentes") {
+        setStatusFilter("pendente");
+        setSomenteAssinados(false);
+        return;
+      }
+
+      if (filter === "assinados") {
+        setStatusFilter("assinado");
+        setSomenteAssinados(true);
+        return;
+      }
+
+      if (filter === "notas_fiscais") {
+        setTipoFilter("notas_fiscais");
+        setTipoLaudoFilter("todos");
+        return;
+      }
+
+      if (filter === "laudos") {
+        setTipoFilter("registro_laudos");
+        return;
+      }
+
+      const now = new Date();
+      setAnoFilter(String(now.getFullYear()));
+      setMesFilter(String(now.getMonth() + 1).padStart(2, "0"));
+    },
+    [resetFilters],
+  );
 
   const tipoOptions = useMemo(
     () => {
@@ -1407,7 +1533,7 @@ export default function DocumentosPage() {
       seen.add(status);
       return true;
     });
-  }, [registros]);
+  }, [filterOptions.status, registros]);
 
   const tipoLaudoOptions = useMemo(() => {
     if (filterOptions.tipoLaudo.length > 0) {
@@ -1478,6 +1604,144 @@ export default function DocumentosPage() {
     ];
   }, [filterOptions.prestadores, prestadoresDoUsuario]);
 
+  const colaboradorLabelById = useMemo(() => {
+    const map = new Map<string, string>();
+    adminUsers.forEach((item) => {
+      const name = item.name?.trim();
+      map.set(item.id, name || item.email || item.id);
+    });
+    return map;
+  }, [adminUsers]);
+
+  const mesSelecionadoLabel =
+    mesFilter === "todos"
+      ? "Todos os meses"
+      : anoFilter !== "todos"
+        ? `${mesFilter}/${anoFilter}`
+        : MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual";
+
+  const activeFilterChips = useMemo(() => {
+    const chips: {
+      key: string;
+      label: string;
+      value: string;
+      onRemove: () => void;
+    }[] = [];
+
+    if (tipoFilter !== "todos") {
+      chips.push({
+        key: "tipo",
+        label: "Tipo",
+        value: getTipoDescricao(tipoFilter),
+        onRemove: () => setTipoFilter("todos"),
+      });
+    }
+    if (statusFilter !== "todos") {
+      chips.push({
+        key: "status",
+        label: "Status",
+        value: formatStatusLabel(statusFilter),
+        onRemove: () => setStatusFilter("todos"),
+      });
+    }
+    if (lojaFilter !== "todos") {
+      chips.push({
+        key: "loja",
+        label: "Loja",
+        value:
+          lojaOptions.find((option) => option.value === lojaFilter)?.label ??
+          lojaFilter,
+        onRemove: () => setLojaFilter("todos"),
+      });
+    }
+    if (prestadorFilter !== "todos") {
+      chips.push({
+        key: "prestador",
+        label: "Prestador",
+        value:
+          prestadorOptions.find((option) => option.value === prestadorFilter)
+            ?.label ?? prestadorFilter,
+        onRemove: () => setPrestadorFilter("todos"),
+      });
+    }
+    if (userFilter !== "todos") {
+      chips.push({
+        key: "colaborador",
+        label: "Colaborador",
+        value:
+          colaboradorOptions.find((option) => option.value === userFilter)
+            ?.label ?? userFilter,
+        onRemove: () => setUserFilter("todos"),
+      });
+    }
+    if (tipoLaudoFilter !== "todos") {
+      chips.push({
+        key: "tipo-laudo",
+        label: "Tipo de laudo",
+        value: tipoLaudoFilter,
+        onRemove: () => setTipoLaudoFilter("todos"),
+      });
+    }
+    if (anoFilter !== "todos") {
+      chips.push({
+        key: "ano",
+        label: "Ano",
+        value: anoFilter,
+        onRemove: () => setAnoFilter("todos"),
+      });
+    }
+    if (mesFilter !== "todos") {
+      chips.push({
+        key: "mes",
+        label: "Mes",
+        value: mesSelecionadoLabel,
+        onRemove: () => setMesFilter("todos"),
+      });
+    }
+    if (identificacaoFilter.trim()) {
+      chips.push({
+        key: "busca",
+        label: "Busca",
+        value: identificacaoFilter.trim(),
+        onRemove: () => setIdentificacaoFilter(""),
+      });
+    }
+    if (somenteAssinados) {
+      chips.push({
+        key: "somente-assinados",
+        label: "Assinados",
+        value: "Somente assinados",
+        onRemove: () => setSomenteAssinados(false),
+      });
+    }
+    if (somenteDisponiveisLote) {
+      chips.push({
+        key: "lote",
+        label: "Lote",
+        value: "Disponiveis para lote",
+        onRemove: () => setSomenteDisponiveisLote(false),
+      });
+    }
+
+    return chips;
+  }, [
+    anoFilter,
+    colaboradorOptions,
+    identificacaoFilter,
+    lojaFilter,
+    lojaOptions,
+    mesFilter,
+    mesSelecionadoLabel,
+    prestadorFilter,
+    prestadorOptions,
+    somenteAssinados,
+    somenteDisponiveisLote,
+    statusFilter,
+    tipoFilter,
+    tipoLaudoFilter,
+    userFilter,
+  ]);
+
   const showErrorMessage = error ?? authError ?? accessError;
   const hasSelection = selectedIds.length > 0;
   const assinaturasSelecionadasCount = selectedIds.filter((id) =>
@@ -1487,14 +1751,6 @@ export default function DocumentosPage() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const canPrevPage = page > 1;
   const canNextPage = page < totalPages;
-  const mesSelecionadoLabel =
-    mesFilter === "todos"
-      ? "Todos os meses"
-      : anoFilter !== "todos"
-        ? `${mesFilter}/${anoFilter}`
-        : MESES.find((mes) => mes.value === mesFilter)?.label ?? "Atual";
-  const anoSelecionadoLabel =
-    anoFilter === "todos" ? "Todos os anos" : anoFilter;
 
   useEffect(() => {
     if (page > totalPages) {
@@ -1678,6 +1934,53 @@ export default function DocumentosPage() {
         </div>
       )}
 
+      {restoredNotice && (
+        <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4 text-sm text-sky-800 shadow-sm shadow-sky-100">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="font-medium">Filtros anteriores restaurados.</p>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <button
+                type="button"
+                onClick={clearRestoredFilters}
+                className="rounded-full border border-sky-200 bg-white px-3 py-1.5 font-semibold text-sky-700 transition hover:border-sky-300"
+              >
+                Limpar filtros
+              </button>
+              <button
+                type="button"
+                onClick={refreshDocumentosList}
+                className="rounded-full bg-sky-600 px-3 py-1.5 font-semibold text-white transition hover:bg-sky-500"
+              >
+                Atualizar lista
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {[
+          { label: "Total", value: totalResultados, detail: "no filtro atual" },
+          { label: "Pendentes", value: resumoStatus.pendentes, detail: "nesta pagina" },
+          { label: "Em analise", value: resumoStatus.emAnalise, detail: "nesta pagina" },
+          { label: "Assinados", value: resumoStatus.assinados, detail: "nesta pagina" },
+          { label: "Este mes", value: resumoStatus.esteMes, detail: "nesta pagina" },
+        ].map((item) => (
+          <div
+            key={item.label}
+            className="rounded-2xl bg-white p-4 shadow-sm shadow-slate-200"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {item.label}
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-slate-900">
+              {item.value}
+            </p>
+            <p className="text-[11px] text-slate-500">{item.detail}</p>
+          </div>
+        ))}
+      </div>
+
       <div className="flex min-w-0 flex-col gap-6">
         <div className="min-w-0 space-y-6">
           <DocumentosFilters
@@ -1704,9 +2007,9 @@ export default function DocumentosPage() {
             prestadorOptions={prestadorOptions}
             anosDisponiveis={anosDisponiveis}
             meses={MESES}
-            anoSelecionadoLabel={anoSelecionadoLabel}
-            mesSelecionadoLabel={mesSelecionadoLabel}
+            activeFilterCount={activeFilterChips.length}
             onResetFilters={resetFilters}
+            onQuickFilter={aplicarFiltroRapido}
             onViewModeChange={setViewMode}
             onIdentificacaoFilterChange={setIdentificacaoFilter}
             onTipoFilterChange={setTipoFilter}
@@ -1722,6 +2025,41 @@ export default function DocumentosPage() {
             formatStatusLabel={formatStatusLabel}
           />
         </div>
+
+          {activeFilterChips.length > 0 && (
+            <div className="rounded-2xl bg-white p-3 shadow-sm shadow-slate-200">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Filtros ativos
+                </span>
+                {activeFilterChips.map((chip) => (
+                  <span
+                    key={chip.key}
+                    className="inline-flex max-w-full items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
+                  >
+                    <span className="truncate">
+                      {chip.label}: {chip.value}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={chip.onRemove}
+                      className="rounded-full bg-white px-1 text-slate-500 transition hover:text-slate-900"
+                      aria-label={`Remover filtro ${chip.label}`}
+                    >
+                      x
+                    </button>
+                  </span>
+                ))}
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  Limpar todos os filtros
+                </button>
+              </div>
+            </div>
+          )}
 
           {canManageDocuments && (
             <DocumentosBatchActions
@@ -1743,6 +2081,7 @@ export default function DocumentosPage() {
           <DocumentosPagination
             totalResultados={totalResultados}
             page={page}
+            pageSize={pageSize}
             totalPages={totalPages}
             canPrevPage={canPrevPage}
             canNextPage={canNextPage}
@@ -1751,7 +2090,12 @@ export default function DocumentosPage() {
           />
 
       {totalResultados === 0 ? (
-        <DocumentosEmptyState onResetFilters={resetFilters} />
+        <DocumentosEmptyState
+          hasYearFilter={anoFilter !== "todos"}
+          onResetFilters={resetFilters}
+          onSearchAllYears={() => setAnoFilter("todos")}
+          onRefresh={refreshDocumentosList}
+        />
       ) : viewMode === "tabela" ? (
         <div className="min-w-0 overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
           <div className="relative max-w-full overflow-x-auto">
@@ -1808,10 +2152,21 @@ export default function DocumentosPage() {
                   const edicaoInfo = getEdicaoInfo(registro);
                   const tipoLaudo = getTipoLaudo(registro);
                   const observacoes = getObservacoes(registro);
+                  const numeroNf = getNumeroNf(registro);
+                  const numeroPedido = getNumeroPedido(registro);
+                  const cnpjDocumento = getCnpjDocumento(registro);
+                  const lojaNome = getLojaNome(registro);
+                  const prestadorNome = getPrestadorNome(registro);
+                  const enviadoPor = registro.user_id
+                    ? colaboradorLabelById.get(registro.user_id) ?? registro.user_id
+                    : null;
                   const isSelecionavel =
                     registro.tipo === TIPO_ASSINAVEL &&
                     registro.status !== "assinado";
                   const isMarcado = selectedIds.includes(registro.id);
+                  const opening = pdfAction?.id === registro.id && pdfAction.type === "open";
+                  const downloading =
+                    pdfAction?.id === registro.id && pdfAction.type === "download";
 
                   return (
                     <tr key={registro.id} className="align-top">
@@ -1851,6 +2206,33 @@ export default function DocumentosPage() {
                             {identificacaoComplemento}
                           </p>
                         )}
+                        <div className="mt-2 flex max-w-[320px] flex-wrap gap-1.5 text-[11px] text-slate-500">
+                          {lojaNome && (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                              Loja: {lojaNome}
+                            </span>
+                          )}
+                          {prestadorNome && (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                              Prestador: {prestadorNome}
+                            </span>
+                          )}
+                          {numeroNf && (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                              NF: {numeroNf}
+                            </span>
+                          )}
+                          {numeroPedido && (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                              Pedido: {numeroPedido}
+                            </span>
+                          )}
+                          {cnpjDocumento && (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                              CNPJ: {cnpjDocumento}
+                            </span>
+                          )}
+                        </div>
                         {edicaoInfo && (
                           <p className="mt-1 text-[11px] font-semibold text-amber-700">
                             Documento alterado por {edicaoInfo.editedBy ?? "admin"}
@@ -1886,22 +2268,29 @@ export default function DocumentosPage() {
                       </td>
                       <td className="hidden px-4 py-3 text-xs text-slate-500 md:table-cell">
                         {formatDateTime(registro.created_at)}
+                        {enviadoPor && (
+                          <p className="mt-1 max-w-[180px] truncate text-[11px] text-slate-400">
+                            por {enviadoPor}
+                          </p>
+                        )}
                       </td>
                       <td className="sticky right-0 z-10 w-[190px] min-w-[190px] whitespace-nowrap border-l border-slate-100 bg-white px-4 py-3">
                         <div className="flex flex-col items-end gap-2 text-[11px]">
                           <button
                             type="button"
                             onClick={() => void abrirDocumento(registro)}
+                            disabled={opening || downloading}
                             className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                           >
-                            Abrir
+                            {opening ? "Abrindo..." : "Ver PDF"}
                           </button>
                           <button
                             type="button"
                             onClick={() => void baixarDocumento(registro)}
+                            disabled={opening || downloading}
                             className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                           >
-                            Baixar
+                            {downloading ? "Baixando..." : "Baixar PDF"}
                           </button>
                           {canManageDocuments &&
                             registro.tipo !== TIPO_ASSINAVEL &&
@@ -1971,10 +2360,21 @@ export default function DocumentosPage() {
             const edicaoInfo = getEdicaoInfo(registro);
             const tipoLaudo = getTipoLaudo(registro);
             const observacoes = getObservacoes(registro);
+            const numeroNf = getNumeroNf(registro);
+            const numeroPedido = getNumeroPedido(registro);
+            const cnpjDocumento = getCnpjDocumento(registro);
+            const lojaNome = getLojaNome(registro);
+            const prestadorNome = getPrestadorNome(registro);
+            const enviadoPor = registro.user_id
+              ? colaboradorLabelById.get(registro.user_id) ?? registro.user_id
+              : null;
             const isSelecionavel =
               registro.tipo === TIPO_ASSINAVEL &&
               registro.status !== "assinado";
             const isMarcado = selectedIds.includes(registro.id);
+            const opening = pdfAction?.id === registro.id && pdfAction.type === "open";
+            const downloading =
+              pdfAction?.id === registro.id && pdfAction.type === "download";
 
             return (
               <div
@@ -2023,6 +2423,33 @@ export default function DocumentosPage() {
                         {identificacaoComplemento}
                       </p>
                     )}
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-500">
+                      {lojaNome && (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                          Loja: {lojaNome}
+                        </span>
+                      )}
+                      {prestadorNome && (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                          Prestador: {prestadorNome}
+                        </span>
+                      )}
+                      {numeroNf && (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                          NF: {numeroNf}
+                        </span>
+                      )}
+                      {numeroPedido && (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                          Pedido: {numeroPedido}
+                        </span>
+                      )}
+                      {cnpjDocumento && (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                          CNPJ: {cnpjDocumento}
+                        </span>
+                      )}
+                    </div>
                     {edicaoInfo && (
                       <p className="mt-1 text-[11px] font-semibold text-amber-700">
                         Documento alterado por {edicaoInfo.editedBy ?? "admin"}
@@ -2067,22 +2494,29 @@ export default function DocumentosPage() {
                     <span className="text-[11px] text-slate-500">
                       {formatDateTime(registro.created_at)}
                     </span>
+                    {enviadoPor && (
+                      <span className="text-[11px] text-slate-400">
+                        por {enviadoPor}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2 text-[11px]">
                   <button
                     type="button"
                     onClick={() => void abrirDocumento(registro)}
+                    disabled={opening || downloading}
                     className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                   >
-                    Abrir
+                    {opening ? "Abrindo..." : "Ver PDF"}
                   </button>
                   <button
                     type="button"
                     onClick={() => void baixarDocumento(registro)}
+                    disabled={opening || downloading}
                     className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                   >
-                    Baixar
+                    {downloading ? "Baixando..." : "Baixar PDF"}
                   </button>
                   {canManageDocuments &&
                     registro.tipo !== TIPO_ASSINAVEL &&

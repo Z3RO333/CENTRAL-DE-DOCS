@@ -1,6 +1,7 @@
 import {
   DEFAULT_LIMIT,
   MAX_LIMIT,
+  buildDocumentosTextSearchOr,
   normalizeIds,
   safeParseDados,
   sanitizeId,
@@ -14,6 +15,7 @@ import {
   type GerenteAccessRow,
 } from "@/lib/apiAuth";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
+import { fixMojibakeText, normalizeDisplayData } from "@/lib/textEncoding";
 
 export const DOCUMENTO_COPILOT_LIMIT = 8;
 
@@ -209,7 +211,7 @@ const getCampoTexto = (
   for (const campo of campos) {
     const valor = dados[campo];
     if (typeof valor === "string" && valor.trim()) {
-      return valor.trim();
+      return fixMojibakeText(valor.trim());
     }
   }
 
@@ -266,12 +268,12 @@ const getNomeDocumento = (registro: Row) => {
   if (Array.isArray(anexos) && anexos.length > 0) {
     const primeiro = anexos[0] as { nome?: unknown } | null;
     if (primeiro && typeof primeiro.nome === "string" && primeiro.nome.trim()) {
-      return primeiro.nome.trim();
+      return fixMojibakeText(primeiro.nome.trim());
     }
   }
 
   const path = registro.arquivo_assinado_path ?? registro.arquivo_path;
-  return path.split("/").pop() ?? registro.id;
+  return fixMojibakeText(path.split("/").pop() ?? registro.id);
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -567,24 +569,8 @@ const buildTemporalReply = (input: {
   return null;
 };
 
-const buildTextSearchOr = (term: string) => {
-  const sanitized = normalizeText(term);
-  if (!sanitized) {
-    return null;
-  }
-  const pattern = `%${sanitized}%`;
-  return [
-    `dados->>empresa.ilike.${pattern}`,
-    `dados->>prestador.ilike.${pattern}`,
-    `dados->>responsavel.ilike.${pattern}`,
-    `dados->>numero_pedido.ilike.${pattern}`,
-    `dados->>numero_nf.ilike.${pattern}`,
-    `dados->>descricao.ilike.${pattern}`,
-    `dados->>observacoes.ilike.${pattern}`,
-    `dados->>tipo_laudo.ilike.${pattern}`,
-    `dados->>loja_nome.ilike.${pattern}`,
-  ];
-};
+const buildTextSearchOr = (term: string) =>
+  buildDocumentosTextSearchOr(normalizeText(term));
 
 const parseJsonObject = <T,>(raw: string, fallback: T): T => {
   try {
@@ -881,7 +867,10 @@ const queryDocumentoCandidates = async (input: {
   }
 
   const rows = rowsRaw.map((registro) => {
-    const dados = safeParseDados(registro.dados);
+    const dados = normalizeDisplayData(safeParseDados(registro.dados)) as Record<
+      string,
+      unknown
+    > | null;
     const lojaId = getLojaId(dados);
     return {
       id: registro.id,
@@ -937,7 +926,10 @@ const queryDocumentoCandidates = async (input: {
       .select("id,nome")
       .in("id", prestadorIds);
     (prestadoresData as EntityRow[] | null)?.forEach((item) => {
-      prestadoresMap.set(item.id, item.nome ?? null);
+      prestadoresMap.set(
+        item.id,
+        item.nome ? fixMojibakeText(item.nome) : null,
+      );
     });
   }
 

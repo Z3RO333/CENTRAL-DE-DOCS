@@ -10,6 +10,7 @@ import { usePrestadores } from "@/hooks/usePrestadores";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { supabase } from "@/lib/supabaseClient";
 import { isInPeriodo, type PrestadorRegra } from "@/lib/prestadorRegras";
+import { fixMojibakeText } from "@/lib/textEncoding";
 
 type DashboardCard = {
   slug: string;
@@ -95,12 +96,12 @@ const getDocumentoNome = (registro: {
   if (Array.isArray(anexos) && anexos.length > 0) {
     const primeiro = anexos[0] as { nome?: unknown } | null;
     if (primeiro && typeof primeiro.nome === "string" && primeiro.nome.trim()) {
-      return primeiro.nome.trim();
+      return fixMojibakeText(primeiro.nome.trim());
     }
   }
   const path = registro.arquivo_assinado_path ?? registro.arquivo_path;
   if (path) {
-    return path.split("/").pop() ?? path;
+    return fixMojibakeText(path.split("/").pop() ?? path);
   }
   return registro.id;
 };

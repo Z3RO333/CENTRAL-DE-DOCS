@@ -5,6 +5,7 @@ import {
   getSessionUserFromRequest,
   hasDocumentosAccess,
 } from "@/lib/apiAuth";
+import { fixMojibakeText } from "@/lib/textEncoding";
 
 type PrestadorRow = {
   id: string;
@@ -24,6 +25,17 @@ function normalizeEmails(values: string[]) {
         .filter((value) => Boolean(value)),
     ),
   );
+}
+
+function normalizePrestador(item: PrestadorRow) {
+  return {
+    id: item.id,
+    nome: fixMojibakeText(item.nome),
+    cnpj: item.cnpj,
+    tipo_servico: fixMojibakeText(item.tipo_servico),
+    usuarios: item.usuarios ?? [],
+    created_at: item.created_at,
+  };
 }
 
 export async function GET(request: Request) {
@@ -63,14 +75,17 @@ export async function GET(request: Request) {
     }
 
     const prestadores =
-      data?.map((item) => ({
-        id: item.id as string,
-        nome: item.nome as string,
-        cnpj: item.cnpj as string,
-        tipo_servico: item.tipo_servico as string,
-        usuarios: (item.usuarios as string[] | null) ?? [],
-        created_at: item.created_at as string,
-      })) ?? [];
+      data?.map((item) =>
+        normalizePrestador({
+          id: item.id as string,
+          nome: item.nome as string,
+          cnpj: item.cnpj as string,
+          tipo_servico: item.tipo_servico as string,
+          usuarios: (item.usuarios as string[] | null) ?? [],
+          created_at: item.created_at as string,
+          created_by: null,
+        }),
+      ) ?? [];
 
     return NextResponse.json({ prestadores });
   } catch (err) {
@@ -107,9 +122,11 @@ export async function POST(request: Request) {
       usuarios?: string[];
     };
 
-    const nome = body.nome?.trim();
+    const nome = body.nome ? fixMojibakeText(body.nome.trim()) : undefined;
     const cnpj = body.cnpj?.trim();
-    const tipoServico = body.tipo_servico?.trim();
+    const tipoServico = body.tipo_servico
+      ? fixMojibakeText(body.tipo_servico.trim())
+      : undefined;
     const usuarios = normalizeEmails(body.usuarios ?? []);
 
     if (!nome) {
@@ -147,10 +164,7 @@ export async function POST(request: Request) {
     const prestador: PrestadorRow = data as PrestadorRow;
 
     return NextResponse.json({
-      prestador: {
-        ...prestador,
-        usuarios: prestador.usuarios ?? [],
-      },
+      prestador: normalizePrestador(prestador),
     });
   } catch (err) {
     console.error("Erro ao criar prestador:", err);
@@ -250,10 +264,7 @@ export async function PATCH(request: Request) {
     const prestador: PrestadorRow = data as PrestadorRow;
 
     return NextResponse.json({
-      prestador: {
-        ...prestador,
-        usuarios: prestador.usuarios ?? [],
-      },
+      prestador: normalizePrestador(prestador),
     });
   } catch (err) {
     console.error("Erro ao atualizar prestador:", err);

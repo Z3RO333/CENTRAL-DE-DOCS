@@ -33,3 +33,43 @@ export const resolveLimit = (raw: string | null) => {
   }
   return Math.min(Math.max(limitParam, 1), MAX_LIMIT);
 };
+
+const DOCUMENTOS_TEXT_SEARCH_COLUMNS = [
+  "dados->>empresa",
+  "dados->>prestador",
+  "dados->>responsavel",
+  "dados->>numero_pedido",
+  "dados->>numero_nf",
+  "dados->>cnpj",
+  "dados->>cnpj_emitente",
+  "dados->>descricao",
+  "dados->>observacoes",
+  "dados->>tipo_laudo",
+  "dados->>loja_nome",
+  "dados->anexos->0->>nome",
+  "arquivo_path",
+  "arquivo_assinado_path",
+];
+
+const normalizeSearchTerm = (value: string) =>
+  value.replace(/[,()]/g, " ").replace(/\s+/g, " ").trim();
+
+export const buildDocumentosTextSearchOr = (term: string) => {
+  const sanitized = normalizeSearchTerm(term);
+  if (!sanitized) {
+    return null;
+  }
+
+  const variants = new Set([sanitized]);
+  const digitsOnly = sanitized.replace(/\D/g, "");
+  if (digitsOnly.length >= 3) {
+    variants.add(digitsOnly);
+  }
+
+  return Array.from(variants).flatMap((variant) => {
+    const pattern = `%${variant}%`;
+    return DOCUMENTOS_TEXT_SEARCH_COLUMNS.map(
+      (column) => `${column}.ilike.${pattern}`,
+    );
+  });
+};

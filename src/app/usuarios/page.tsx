@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Search } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, Search, X } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { useDocumentPermissions } from "@/hooks/useDocumentPermissions";
@@ -94,6 +94,7 @@ export default function UsuariosPage() {
   const [usersError, setUsersError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
+  const [currentPage, setCurrentPage] = useState(1);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [editingRole, setEditingRole] = useState<
     "admin" | "colaborador" | "gerente_loja"
@@ -104,6 +105,10 @@ export default function UsuariosPage() {
   );
   const [savingRole, setSavingRole] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
+  const [lojaSearchTerm, setLojaSearchTerm] = useState("");
+  const [expandedLojaIds, setExpandedLojaIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [gerenteEntries, setGerenteEntries] = useState<GerenteAccessEntry[]>([]);
   const [gerenteEntriesLoading, setGerenteEntriesLoading] = useState(false);
   const [gerenteEntriesError, setGerenteEntriesError] = useState<string | null>(
@@ -313,6 +318,15 @@ export default function UsuariosPage() {
       }
       return prev.filter((id) => id !== lojaId);
     });
+    setExpandedLojaIds((prev) => {
+      const next = new Set(prev);
+      if (enabled) {
+        next.add(lojaId);
+      } else {
+        next.delete(lojaId);
+      }
+      return next;
+    });
     setLojaAccess((prev) => {
       const next = { ...prev };
       if (enabled) {
@@ -426,10 +440,30 @@ export default function UsuariosPage() {
     });
   }, [users, searchTerm]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const visibleUsers = useMemo(
-    () => filteredUsers.slice(0, pageSize),
-    [filteredUsers, pageSize],
+    () =>
+      filteredUsers.slice(
+        (currentPage - 1) * pageSize,
+        currentPage * pageSize,
+      ),
+    [currentPage, filteredUsers, pageSize],
   );
+
+  const showingFrom =
+    filteredUsers.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const showingTo = Math.min(currentPage * pageSize, filteredUsers.length);
 
   const openEditor = useCallback(
     (target: AppUser) => {
@@ -443,6 +477,8 @@ export default function UsuariosPage() {
       setEditingRole(admin ? "admin" : gerente ? "gerente_loja" : "colaborador");
       setSelectedLojas(gerenteConfig.selected);
       setLojaAccess(gerenteConfig.access);
+      setLojaSearchTerm("");
+      setExpandedLojaIds(new Set(gerenteConfig.selected.slice(0, 3)));
       setFeedback(null);
     },
     [
@@ -452,6 +488,75 @@ export default function UsuariosPage() {
       isUserGerente,
     ],
   );
+
+  const closeEditor = useCallback(() => {
+    setEditingUser(null);
+    setLojaSearchTerm("");
+    setExpandedLojaIds(new Set());
+  }, []);
+
+  useEffect(() => {
+    if (!editingUser) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeEditor();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [closeEditor, editingUser]);
+
+  const lojasFiltradasNoModal = useMemo(() => {
+    if (!lojaSearchTerm.trim()) {
+      return lojas;
+    }
+    const query = normalizeText(lojaSearchTerm.trim());
+    return lojas.filter((loja) => {
+      const nome = normalizeText(loja.nome);
+      const codigo = normalizeText(loja.codigo ?? "");
+      return nome.includes(query) || codigo.includes(query);
+    });
+  }, [lojaSearchTerm, lojas]);
+
+  const selecionarLojasVisiveis = useCallback(() => {
+    const visibleIds = lojasFiltradasNoModal.map((loja) => loja.id);
+    if (visibleIds.length === 0) {
+      return;
+    }
+    setSelectedLojas((prev) => Array.from(new Set([...prev, ...visibleIds])));
+    setLojaAccess((prev) => {
+      const next = { ...prev };
+      visibleIds.forEach((lojaId) => {
+        if (!next[lojaId]) {
+          next[lojaId] = { canViewAll: true, prestadorIds: [] };
+        }
+      });
+      return next;
+    });
+    setExpandedLojaIds((prev) => new Set([...prev, ...visibleIds.slice(0, 5)]));
+  }, [lojasFiltradasNoModal]);
+
+  const limparLojasSelecionadas = useCallback(() => {
+    setSelectedLojas([]);
+    setLojaAccess({});
+    setExpandedLojaIds(new Set());
+  }, []);
+
+  const toggleLojaExpanded = useCallback((lojaId: string) => {
+    setExpandedLojaIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(lojaId)) {
+        next.delete(lojaId);
+      } else {
+        next.add(lojaId);
+      }
+      return next;
+    });
+  }, []);
 
   const handleSaveRole = useCallback(async () => {
     if (!editingUser) {
@@ -489,7 +594,7 @@ export default function UsuariosPage() {
       await saveUserRole(editingUser, editingRole, accessList);
       await refreshPermissions();
       await fetchGerenteEntries();
-      setEditingUser(null);
+      closeEditor();
       setFeedback({ kind: "success", message: "Funcao atualizada com sucesso." });
     } catch (err) {
       setFeedback({
@@ -505,6 +610,7 @@ export default function UsuariosPage() {
     editingRole,
     fetchGerenteEntries,
     lojaAccess,
+    closeEditor,
     refreshPermissions,
     saveUserRole,
     selectedLojas,
@@ -588,6 +694,34 @@ export default function UsuariosPage() {
               ))}
             </select>
           </label>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+          <span>
+            Mostrando {showingFrom}-{showingTo} de {filteredUsers.length} registros
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage <= 1}
+              className="rounded-full border border-slate-200 px-3 py-1 font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
+              disabled={currentPage >= totalPages}
+              className="rounded-full border border-slate-200 px-3 py-1 font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Próxima
+            </button>
+          </div>
         </div>
       </section>
 
@@ -696,18 +830,41 @@ export default function UsuariosPage() {
       </section>
 
       {editingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-100/80 px-4 py-6">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Editar usuario
-              </p>
-              <p className="mt-1 text-lg font-semibold text-slate-900">
-                {getDisplayName(editingUser)}
-              </p>
-              <p className="text-xs text-slate-500">{editingUser.email}</p>
-            </div>
-            <div className="mt-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-3 py-4"
+          onClick={closeEditor}
+        >
+          <div
+            className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="usuario-editor-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-100 bg-white px-5 py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Editar usuario
+                </p>
+                <p
+                  id="usuario-editor-title"
+                  className="mt-1 text-lg font-semibold text-slate-900"
+                >
+                  {getDisplayName(editingUser)}
+                </p>
+                <p className="text-xs text-slate-500">{editingUser.email}</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeEditor}
+                className="rounded-full bg-slate-100 p-2 text-slate-600 transition hover:bg-slate-200"
+                aria-label="Fechar modal"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </header>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4">
               <label className="text-xs font-semibold text-slate-600">
                 Funcao
                 <select
@@ -719,8 +876,7 @@ export default function UsuariosPage() {
                       | "gerente_loja";
                     setEditingRole(value);
                     if (value !== "gerente_loja") {
-                      setSelectedLojas([]);
-                      setLojaAccess({});
+                      limparLojasSelecionadas();
                     }
                   }}
                   className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
@@ -731,125 +887,205 @@ export default function UsuariosPage() {
                 </select>
               </label>
               <p className="mt-2 text-[11px] text-slate-500">
-                Administradores veem todas as telas. Colaboradores veem apenas os
-                documentos do grupo vinculado ao e-mail. Gerentes veem apenas os
-                documentos das lojas autorizadas e, se configurado, apenas dos
-                prestadores selecionados.
+                Gerentes veem apenas os documentos das lojas autorizadas e, se
+                configurado, apenas dos prestadores selecionados.
               </p>
+
               {editingRole === "gerente_loja" && (
-                <div className="mt-4 space-y-3">
-                  <p className="text-xs font-semibold text-slate-600">Lojas</p>
+                <div className="mt-5 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-600">
+                        Lojas
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        {selectedLojas.length} lojas selecionadas
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={selecionarLojasVisiveis}
+                        disabled={lojasFiltradasNoModal.length === 0}
+                        className="rounded-full border border-slate-200 px-3 py-1.5 font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Selecionar todas visiveis
+                      </button>
+                      <button
+                        type="button"
+                        onClick={limparLojasSelecionadas}
+                        disabled={selectedLojas.length === 0}
+                        className="rounded-full border border-slate-200 px-3 py-1.5 font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Limpar selecao
+                      </button>
+                    </div>
+                  </div>
+
+                  <label className="text-xs font-semibold text-slate-600">
+                    Buscar loja por nome ou codigo
+                    <div className="mt-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                      <input
+                        type="search"
+                        value={lojaSearchTerm}
+                        onChange={(event) => setLojaSearchTerm(event.target.value)}
+                        placeholder="Digite nome ou codigo da loja"
+                        className="w-full text-sm text-slate-700 outline-none"
+                      />
+                      <Search className="h-4 w-4 text-slate-400" />
+                    </div>
+                  </label>
+
                   {lojas.length === 0 ? (
-                    <span className="mt-2 block text-[11px] font-normal text-slate-500">
+                    <span className="block rounded-xl bg-slate-50 p-3 text-[11px] text-slate-500">
                       Cadastre uma loja antes de atribuir o gerente.
                     </span>
                   ) : (
-                    <div className="grid gap-2">
-                      {lojas.map((loja) => {
-                        const checked = selectedLojas.includes(loja.id);
+                    <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 p-2">
+                      {lojasFiltradasNoModal.length === 0 ? (
+                        <p className="px-2 py-3 text-xs text-slate-500">
+                          Nenhuma loja encontrada.
+                        </p>
+                      ) : (
+                        <div className="grid gap-1 sm:grid-cols-2">
+                          {lojasFiltradasNoModal.map((loja) => {
+                            const checked = selectedLojas.includes(loja.id);
+                            return (
+                              <label
+                                key={loja.id}
+                                className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(event) =>
+                                    toggleLojaSelection(
+                                      loja.id,
+                                      event.target.checked,
+                                    )
+                                  }
+                                  className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                />
+                                <span className="min-w-0 truncate">
+                                  {loja.nome}
+                                  {loja.codigo ? ` - ${loja.codigo}` : ""}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedLojas.length > 0 && (
+                    <div className="space-y-2">
+                      {selectedLojas.map((lojaId) => {
+                        const loja = lojas.find((item) => item.id === lojaId);
+                        const config = lojaAccess[lojaId] ?? {
+                          canViewAll: true,
+                          prestadorIds: [],
+                        };
+                        const isExpanded = expandedLojaIds.has(lojaId);
+
                         return (
-                          <label
-                            key={loja.id}
-                            className="flex items-center gap-2 text-xs text-slate-600"
+                          <div
+                            key={lojaId}
+                            className="overflow-hidden rounded-2xl border border-slate-200 text-xs text-slate-600"
                           >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(event) =>
-                                toggleLojaSelection(loja.id, event.target.checked)
-                              }
-                              className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                            />
-                            <span>
-                              {loja.nome}
-                              {loja.codigo ? ` - ${loja.codigo}` : ""}
-                            </span>
-                          </label>
+                            <button
+                              type="button"
+                              onClick={() => toggleLojaExpanded(lojaId)}
+                              className="flex w-full items-center justify-between gap-3 bg-slate-50 px-3 py-2 text-left"
+                            >
+                              <span className="min-w-0 truncate font-semibold text-slate-700">
+                                {loja?.nome ?? "Loja"}
+                              </span>
+                              {isExpanded ? (
+                                <ChevronUp className="h-4 w-4 shrink-0 text-slate-500" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                              )}
+                            </button>
+
+                            {isExpanded && (
+                              <div className="space-y-3 p-3">
+                                <label className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={config.canViewAll}
+                                    onChange={(event) =>
+                                      toggleLojaViewAll(
+                                        lojaId,
+                                        event.target.checked,
+                                      )
+                                    }
+                                    className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                  />
+                                  Ver todos os prestadores
+                                </label>
+
+                                {!config.canViewAll && (
+                                  <div className="space-y-2">
+                                    {prestadoresLoading ? (
+                                      <span className="text-[11px] text-slate-500">
+                                        Carregando prestadores...
+                                      </span>
+                                    ) : prestadores.length === 0 ? (
+                                      <span className="text-[11px] text-slate-500">
+                                        Nenhum prestador cadastrado.
+                                      </span>
+                                    ) : (
+                                      <div className="max-h-52 overflow-y-auto rounded-xl bg-slate-50 p-2">
+                                        <div className="grid gap-2 sm:grid-cols-2">
+                                          {prestadores.map((prestador) => {
+                                            const checked =
+                                              config.prestadorIds.includes(
+                                                prestador.id,
+                                              );
+                                            return (
+                                              <label
+                                                key={prestador.id}
+                                                className="flex min-w-0 items-center gap-2 text-[11px] text-slate-600"
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={checked}
+                                                  onChange={(event) =>
+                                                    togglePrestadorForLoja(
+                                                      lojaId,
+                                                      prestador.id,
+                                                      event.target.checked,
+                                                    )
+                                                  }
+                                                  className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                                />
+                                                <span className="truncate">
+                                                  {prestador.nome}
+                                                </span>
+                                              </label>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
                   )}
-
-                  {selectedLojas.map((lojaId) => {
-                    const loja = lojas.find((item) => item.id === lojaId);
-                    const config = lojaAccess[lojaId] ?? {
-                      canViewAll: true,
-                      prestadorIds: [],
-                    };
-
-                    return (
-                      <div
-                        key={lojaId}
-                        className="rounded-2xl border border-slate-200 p-3 text-xs text-slate-600"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-semibold text-slate-700">
-                            {loja?.nome ?? "Loja"}
-                          </span>
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={config.canViewAll}
-                              onChange={(event) =>
-                                toggleLojaViewAll(lojaId, event.target.checked)
-                              }
-                              className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                            />
-                            Ver todos os prestadores
-                          </label>
-                        </div>
-
-                        {!config.canViewAll && (
-                          <div className="mt-3 space-y-2">
-                            {prestadoresLoading ? (
-                              <span className="text-[11px] text-slate-500">
-                                Carregando prestadores...
-                              </span>
-                            ) : prestadores.length === 0 ? (
-                              <span className="text-[11px] text-slate-500">
-                                Nenhum prestador cadastrado.
-                              </span>
-                            ) : (
-                              <div className="grid gap-2 sm:grid-cols-2">
-                                {prestadores.map((prestador) => {
-                                  const checked = config.prestadorIds.includes(
-                                    prestador.id,
-                                  );
-                                  return (
-                                    <label
-                                      key={prestador.id}
-                                      className="flex items-center gap-2 text-[11px] text-slate-600"
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={checked}
-                                        onChange={(event) =>
-                                          togglePrestadorForLoja(
-                                            lojaId,
-                                            prestador.id,
-                                            event.target.checked,
-                                          )
-                                        }
-                                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                                      />
-                                      <span>{prestador.nome}</span>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
                 </div>
               )}
             </div>
-            <div className="mt-6 flex justify-end gap-2 text-xs">
+
+            <footer className="sticky bottom-0 z-10 flex justify-end gap-2 border-t border-slate-100 bg-white px-5 py-4 text-xs">
               <button
                 type="button"
-                onClick={() => setEditingUser(null)}
+                onClick={closeEditor}
                 className="rounded-full border border-slate-200 px-4 py-2 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
               >
                 Cancelar
@@ -862,7 +1098,7 @@ export default function UsuariosPage() {
               >
                 {savingRole ? "Salvando..." : "Salvar"}
               </button>
-            </div>
+            </footer>
           </div>
         </div>
       )}

@@ -8,6 +8,7 @@ import {
   getSessionUserFromRequest,
   hasDocumentosAccess,
 } from "@/lib/apiAuth";
+import { fixMojibakeText } from "@/lib/textEncoding";
 
 type FormularioRow = {
   created_at: string;
@@ -101,8 +102,8 @@ export async function GET(request: Request) {
         const stats = statsMap.get(loja.id);
         return {
           lojaId: loja.id,
-          lojaNome: loja.nome,
-          lojaCodigo: loja.codigo,
+          lojaNome: fixMojibakeText(loja.nome),
+          lojaCodigo: loja.codigo ? fixMojibakeText(loja.codigo) : null,
           totalDocumentos: Number(stats?.total_documentos ?? 0),
           ultimoEnvioAt: stats?.ultimo_envio_at ?? null,
         };
@@ -263,8 +264,8 @@ export async function GET(request: Request) {
         const stats = grouped.get(lojaId)!;
         return {
           lojaId,
-          lojaNome: loja?.nome ?? "Loja",
-          lojaCodigo: loja?.codigo ?? null,
+          lojaNome: loja?.nome ? fixMojibakeText(loja.nome) : "Loja",
+          lojaCodigo: loja?.codigo ? fixMojibakeText(loja.codigo) : null,
           totalDocumentos: stats.total,
           ultimoEnvioAt: stats.lastCreatedAt,
         };

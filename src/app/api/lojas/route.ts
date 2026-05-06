@@ -5,6 +5,7 @@ import {
   getSessionUserFromRequest,
   hasDocumentosAccess,
 } from "@/lib/apiAuth";
+import { fixMojibakeText } from "@/lib/textEncoding";
 
 type LojaRow = {
   id: string;
@@ -18,6 +19,16 @@ function normalizeEmails(values: string[]) {
   return values
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
+}
+
+function normalizeLoja(item: LojaRow) {
+  return {
+    id: item.id,
+    nome: fixMojibakeText(item.nome),
+    codigo: item.codigo ? fixMojibakeText(item.codigo) : null,
+    usuarios: item.usuarios ?? [],
+    created_at: item.created_at,
+  };
 }
 
 export async function GET(request: Request) {
@@ -35,13 +46,15 @@ export async function GET(request: Request) {
     }
 
     const lojas =
-      data?.map((item) => ({
-        id: item.id as string,
-        nome: item.nome as string,
-        codigo: (item.codigo as string | null) ?? null,
-        usuarios: (item.usuarios as string[] | null) ?? [],
-        created_at: item.created_at as string,
-      })) ?? [];
+      data?.map((item) =>
+        normalizeLoja({
+          id: item.id as string,
+          nome: item.nome as string,
+          codigo: (item.codigo as string | null) ?? null,
+          usuarios: (item.usuarios as string[] | null) ?? [],
+          created_at: item.created_at as string,
+        }),
+      ) ?? [];
 
     return NextResponse.json({ lojas });
   } catch (err) {
@@ -72,13 +85,13 @@ export async function POST(request: Request) {
       usuarios?: string[];
     };
 
-    const nome = body.nome?.trim();
+    const nome = body.nome ? fixMojibakeText(body.nome.trim()) : undefined;
     if (!nome) {
       throw new HttpError(400, "Informe o nome da loja.");
     }
 
     const usuarios = normalizeEmails(body.usuarios ?? []);
-    const codigo = body.codigo?.trim() || null;
+    const codigo = body.codigo ? fixMojibakeText(body.codigo.trim()) || null : null;
 
     const { data, error } = await supabaseAdmin
       .from("lojas")
@@ -95,13 +108,13 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
-      loja: {
+      loja: normalizeLoja({
         id: data.id as string,
         nome: data.nome as string,
         codigo: (data.codigo as string | null) ?? null,
         usuarios: (data.usuarios as string[] | null) ?? [],
         created_at: data.created_at as string,
-      },
+      }),
     });
   } catch (err) {
     console.error("Erro ao criar loja:", err);
@@ -138,10 +151,10 @@ export async function PATCH(request: Request) {
 
     const updates: Record<string, unknown> = {};
     if (typeof body.nome === "string" && body.nome.trim()) {
-      updates.nome = body.nome.trim();
+      updates.nome = fixMojibakeText(body.nome.trim());
     }
     if (typeof body.codigo === "string") {
-      updates.codigo = body.codigo.trim() || null;
+      updates.codigo = fixMojibakeText(body.codigo.trim()) || null;
     }
     if (Array.isArray(body.usuarios)) {
       updates.usuarios = normalizeEmails(body.usuarios);
@@ -163,13 +176,13 @@ export async function PATCH(request: Request) {
     }
 
     return NextResponse.json({
-      loja: {
+      loja: normalizeLoja({
         id: data.id as string,
         nome: data.nome as string,
         codigo: (data.codigo as string | null) ?? null,
         usuarios: (data.usuarios as string[] | null) ?? [],
         created_at: data.created_at as string,
-      },
+      }),
     });
   } catch (err) {
     console.error("Erro ao atualizar loja:", err);

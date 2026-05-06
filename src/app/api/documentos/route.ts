@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 import {
+  buildDocumentosTextSearchOr,
   normalizeIds,
   resolveLimit,
   safeParseDados,
@@ -14,6 +15,7 @@ import {
   getSessionUserFromRequest,
   hasDocumentosAccess,
 } from "@/lib/apiAuth";
+import { normalizeDisplayData } from "@/lib/textEncoding";
 
 type FormularioRow = {
   id: string;
@@ -49,7 +51,10 @@ function mapRows(rows: FormularioRow[]): DocumentRecord[] {
     arquivo_path: item.arquivo_path,
     arquivo_assinado_path: item.arquivo_assinado_path ?? null,
     created_at: item.created_at,
-    dados: safeParseDados(item.dados),
+    dados: normalizeDisplayData(safeParseDados(item.dados)) as Record<
+      string,
+      unknown
+    > | null,
     assinado_por: item.assinado_por ?? null,
     user_id: item.user_id,
     prestador_id: item.prestador_id ?? null,
@@ -186,17 +191,9 @@ export async function GET(request: Request) {
     }
 
     if (identificacaoFilter) {
-      const sanitized = identificacaoFilter.replace(/,/g, " ").trim();
-      if (sanitized) {
-        const pattern = `%${sanitized}%`;
-        query = query.or(
-          [
-            `dados->>empresa.ilike.${pattern}`,
-            `dados->>prestador.ilike.${pattern}`,
-            `dados->>responsavel.ilike.${pattern}`,
-            `dados->>numero_pedido.ilike.${pattern}`,
-          ].join(","),
-        );
+      const textSearchOr = buildDocumentosTextSearchOr(identificacaoFilter);
+      if (textSearchOr) {
+        query = query.or(textSearchOr.join(","));
       }
     }
 

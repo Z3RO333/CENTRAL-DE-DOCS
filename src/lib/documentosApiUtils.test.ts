@@ -6,6 +6,7 @@ import {
   resolveLimit,
   safeParseDados,
 } from "@/lib/documentosApiUtils";
+import { fixMojibakeText, normalizeDisplayData } from "@/lib/textEncoding";
 
 describe("documentosApiUtils", () => {
   it("safeParseDados retorna objeto valido quando JSON e valido", () => {
@@ -38,5 +39,25 @@ describe("documentosApiUtils", () => {
       "ab",
       "a-b",
     ]);
+  });
+
+  it("fixMojibakeText corrige acentos lidos como Windows-1252", () => {
+    expect(fixMojibakeText("Relat\u00c3\u00b3rio")).toBe("Relatório");
+    expect(fixMojibakeText("SEGURAN\u00c3\u2021A")).toBe("SEGURANÇA");
+    expect(fixMojibakeText("REFRIGERA\u00c3\u2021\u00c3\u0192O")).toBe(
+      "REFRIGERAÇÃO",
+    );
+  });
+
+  it("normalizeDisplayData corrige textos em objetos e listas", () => {
+    expect(
+      normalizeDisplayData({
+        prestador: "Din\u00c3\u00a2mica Servi\u00c3\u00a7os",
+        anexos: [{ nome: "Laborat\u00c3\u00b3rio.pdf" }],
+      }),
+    ).toEqual({
+      prestador: "Dinâmica Serviços",
+      anexos: [{ nome: "Laboratório.pdf" }],
+    });
   });
 });

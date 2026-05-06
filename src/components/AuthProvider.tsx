@@ -43,6 +43,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadUser = useCallback(async () => {
     setIsLoading(true);
     try {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!sessionData.session) {
+        setStableUser(null);
+        setError(null);
+        return;
+      }
+
       const { data, error: getUserError } = await supabase.auth.getUser();
 
       if (getUserError) {

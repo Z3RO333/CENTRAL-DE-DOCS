@@ -2,12 +2,17 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Pencil, Search, Trash2 } from "lucide-react";
+import { Pencil, Search, Trash2, X } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { useLojas, type Loja } from "@/hooks/useLojas";
 
 const PAGE_SIZES = [10, 20, 50];
+
+type FeedbackState = {
+  kind: "success" | "error";
+  message: string;
+} | null;
 
 const normalizeEmails = (value: string) =>
   value
@@ -30,7 +35,8 @@ export default function LojasPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [editingLoja, setEditingLoja] = useState<Loja | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -67,9 +73,29 @@ export default function LojasPage() {
   }, [lojas, searchTerm]);
 
   const visibleLojas = useMemo(
-    () => filteredLojas.slice(0, pageSize),
-    [filteredLojas, pageSize],
+    () =>
+      filteredLojas.slice(
+        (currentPage - 1) * pageSize,
+        currentPage * pageSize,
+      ),
+    [currentPage, filteredLojas, pageSize],
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLojas.length / pageSize));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const showingFrom =
+    filteredLojas.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const showingTo = Math.min(currentPage * pageSize, filteredLojas.length);
 
   const resetForm = useCallback(() => {
     setFormNome("");
@@ -103,11 +129,12 @@ export default function LojasPage() {
       });
       setIsCreateOpen(false);
       resetForm();
-      setFeedback("Loja criada com sucesso.");
+      setFeedback({ kind: "success", message: "Loja criada com sucesso." });
     } catch (err) {
-      setFeedback(
-        err instanceof Error ? err.message : "Falha ao criar a loja.",
-      );
+      setFeedback({
+        kind: "error",
+        message: err instanceof Error ? err.message : "Falha ao criar a loja.",
+      });
     } finally {
       setSaving(false);
     }
@@ -129,11 +156,13 @@ export default function LojasPage() {
       });
       setEditingLoja(null);
       resetForm();
-      setFeedback("Loja atualizada com sucesso.");
+      setFeedback({ kind: "success", message: "Loja atualizada com sucesso." });
     } catch (err) {
-      setFeedback(
-        err instanceof Error ? err.message : "Falha ao atualizar a loja.",
-      );
+      setFeedback({
+        kind: "error",
+        message:
+          err instanceof Error ? err.message : "Falha ao atualizar a loja.",
+      });
     } finally {
       setSaving(false);
     }
@@ -146,11 +175,13 @@ export default function LojasPage() {
     setFeedback(null);
     try {
       await removeLoja(loja.id);
-      setFeedback("Loja removida.");
+      setFeedback({ kind: "success", message: "Loja removida." });
     } catch (err) {
-      setFeedback(
-        err instanceof Error ? err.message : "Falha ao remover a loja.",
-      );
+      setFeedback({
+        kind: "error",
+        message:
+          err instanceof Error ? err.message : "Falha ao remover a loja.",
+      });
     }
   };
 
@@ -190,9 +221,21 @@ export default function LojasPage() {
         </button>
       </header>
 
-      {(lojasError || feedback) && (
+      {lojasError && (
         <div className="rounded-2xl bg-red-50 px-4 py-3 text-xs text-red-700">
-          {lojasError || feedback}
+          {lojasError}
+        </div>
+      )}
+
+      {feedback && (
+        <div
+          className={`rounded-2xl px-4 py-3 text-xs ${
+            feedback.kind === "success"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-red-50 text-red-700"
+          }`}
+        >
+          {feedback.message}
         </div>
       )}
 
@@ -225,6 +268,34 @@ export default function LojasPage() {
               ))}
             </select>
           </label>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+          <span>
+            Mostrando {showingFrom}-{showingTo} de {filteredLojas.length} registros
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage <= 1}
+              className="rounded-full border border-slate-200 px-3 py-1 font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
+              disabled={currentPage >= totalPages}
+              className="rounded-full border border-slate-200 px-3 py-1 font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Próxima
+            </button>
+          </div>
         </div>
       </section>
 
@@ -361,7 +432,7 @@ export default function LojasPage() {
                 className="rounded-full bg-slate-100 p-2 text-slate-600 transition hover:bg-slate-200"
                 aria-label="Fechar modal"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
 

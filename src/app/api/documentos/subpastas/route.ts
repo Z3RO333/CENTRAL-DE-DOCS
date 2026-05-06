@@ -11,6 +11,7 @@ import {
   getSessionUserFromRequest,
   hasDocumentosAccess,
 } from "@/lib/apiAuth";
+import { fixMojibakeText, normalizeDisplayData } from "@/lib/textEncoding";
 
 type FormularioRow = {
   created_at: string;
@@ -50,7 +51,10 @@ const TIPO_LABEL: Record<string, string> = {
 };
 
 const readTipoLaudo = (dados: FormularioRow["dados"]) => {
-  const parsed = safeParseDados(dados);
+  const parsed = normalizeDisplayData(safeParseDados(dados)) as Record<
+    string,
+    unknown
+  > | null;
   const value = typeof parsed?.tipo_laudo === "string" ? parsed.tipo_laudo.trim() : "";
   return value || "";
 };
@@ -114,7 +118,9 @@ function buildSubpastasFromAgg(rows: SubpastaAggRow[]): SubpastaNode[] {
       return;
     }
 
-    const tipoLaudoOriginal = row.tipo_laudo?.trim() ?? "";
+    const tipoLaudoOriginal = row.tipo_laudo
+      ? fixMojibakeText(row.tipo_laudo.trim())
+      : "";
     const resolved =
       tipoLaudoOriginal.length > 0
         ? resolveServicoOficial(tipoLaudoOriginal)

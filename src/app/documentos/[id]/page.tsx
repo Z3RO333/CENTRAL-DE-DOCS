@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { FileSignature } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
+import { fixMojibakeText, normalizeDisplayData } from "@/lib/textEncoding";
 
 type FormularioRecord = {
   id: string;
@@ -57,7 +58,7 @@ const getCampoTexto = (
   for (const campo of campos) {
     const valor = dados[campo];
     if (typeof valor === "string" && valor.trim()) {
-      return valor.trim();
+      return fixMojibakeText(valor.trim());
     }
   }
   return null;
@@ -81,6 +82,26 @@ async function getSignedFileUrl(
 
   return data.signedUrl;
 }
+
+const getFileNameFromPath = (path: string) => path.split("/").pop() ?? "documento.pdf";
+
+const downloadSignedUrlAsBlob = async (signedUrl: string, fileName: string) => {
+  const response = await fetch(signedUrl);
+  if (!response.ok) {
+    throw new Error("Nao foi possivel baixar o arquivo.");
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = fileName;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+};
 
 type SignatureFormat = "png" | "jpg";
 
@@ -138,6 +159,9 @@ export default function AssinaturaDocumentoPage() {
   const [signatureSource, setSignatureSource] = useState<"profile" | "upload" | null>(null);
   const [uploadedSignatureName, setUploadedSignatureName] = useState<string | null>(null);
   const [signProgress, setSignProgress] = useState(0);
+  const [pdfAction, setPdfAction] = useState<
+    "open" | "download" | "refresh" | "copy" | null
+  >(null);
   const signProgressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const getArquivoVisualizacaoPath = useCallback(() => {
     if (!registro) {
@@ -183,9 +207,14 @@ export default function AssinaturaDocumentoPage() {
   }, [getArquivoVisualizacaoPath]);
 
   const refreshPublicUrl = useCallback(async () => {
-    const signedUrl = await gerarLinkDoArquivoVisualizacao();
-    if (signedUrl) {
-      setPublicUrl(signedUrl);
+    try {
+      setPdfAction("refresh");
+      const signedUrl = await gerarLinkDoArquivoVisualizacao();
+      if (signedUrl) {
+        setPublicUrl(signedUrl);
+      }
+    } finally {
+      setPdfAction(null);
     }
   }, [gerarLinkDoArquivoVisualizacao]);
 
@@ -196,18 +225,24 @@ export default function AssinaturaDocumentoPage() {
       return;
     }
 
-    const signedUrl = await gerarLinkDoArquivoVisualizacao();
-    if (!signedUrl) {
-      return;
-    }
+    try {
+      setPdfAction("open");
+      setError(null);
+      const signedUrl = await gerarLinkDoArquivoVisualizacao();
+      if (!signedUrl) {
+        return;
+      }
 
-    const anchor = document.createElement("a");
-    anchor.href = signedUrl;
-    anchor.target = "_blank";
-    anchor.rel = "noopener noreferrer";
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
+      const anchor = document.createElement("a");
+      anchor.href = signedUrl;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+    } finally {
+      setPdfAction(null);
+    }
   }, [gerarLinkDoArquivoVisualizacao, getArquivoVisualizacaoPath]);
 
   const baixarArquivoAtual = useCallback(async () => {
@@ -216,17 +251,39 @@ export default function AssinaturaDocumentoPage() {
       setError("Arquivo indisponível para download.");
       return;
     }
-    const signedUrl = await getSignedFileUrl(path);
-    if (!signedUrl) {
+    try {
+      setPdfAction("download");
+      setError(null);
+      const signedUrl = await getSignedFileUrl(path);
+      await downloadSignedUrlAsBlob(signedUrl, getFileNameFromPath(path));
+    } catch (err) {
+      console.error("Erro ao baixar arquivo:", err);
+      setError("Não foi possível baixar o PDF. Verifique se o arquivo existe e tente novamente.");
+    } finally {
+      setPdfAction(null);
+    }
+  }, [getArquivoDownloadPath]);
+
+  const copiarLinkTemporario = useCallback(async () => {
+    const path = getArquivoVisualizacaoPath();
+    if (!path) {
+      setError("Arquivo indisponível no momento.");
       return;
     }
-    const link = document.createElement("a");
-    link.href = signedUrl;
-    link.download = "documento.pdf";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }, [getArquivoDownloadPath]);
+
+    try {
+      setPdfAction("copy");
+      setError(null);
+      const signedUrl = await getSignedFileUrl(path);
+      await navigator.clipboard.writeText(signedUrl);
+      setSuccess("Link temporário copiado. Ele expira em alguns minutos.");
+    } catch (err) {
+      console.error("Erro ao copiar link temporário:", err);
+      setError("Não foi possível copiar o link temporário.");
+    } finally {
+      setPdfAction(null);
+    }
+  }, [getArquivoVisualizacaoPath]);
 
   const loteParam = searchParams.get("lote");
   const loteQueue = useMemo(() => {
@@ -379,7 +436,9 @@ export default function AssinaturaDocumentoPage() {
           arquivo_assinado_path: data.arquivo_assinado_path as string | null,
           created_at: data.created_at as string,
           assinado_por: data.assinado_por as string | null,
-          dados: (data.dados as Record<string, unknown> | null) ?? null,
+          dados: normalizeDisplayData(
+            (data.dados as Record<string, unknown> | null) ?? null,
+          ) as Record<string, unknown> | null,
         };
 
         if (!active) {
@@ -388,7 +447,10 @@ export default function AssinaturaDocumentoPage() {
 
         setRegistro(record);
 
-        const path = record.arquivo_assinado_path ?? record.arquivo_path;
+        const path =
+          resolveSignedPdfPath(record.arquivo_assinado_path) ??
+          record.arquivo_assinado_path ??
+          record.arquivo_path;
         if (path) {
           try {
             const signedUrl = await getSignedFileUrl(path);
@@ -948,27 +1010,38 @@ export default function AssinaturaDocumentoPage() {
                 src={publicUrl}
                 className="h-80 w-full rounded-lg border border-slate-200 bg-slate-50"
               />
-              <div className="mt-3 flex gap-2 text-[11px]">
+              <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
                 <button
                   type="button"
                   onClick={() => void abrirEmNovaAba()}
+                  disabled={pdfAction !== null}
                   className="rounded-full border border-slate-300 px-3 py-1 text-slate-700 transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700"
                 >
-                  Abrir em nova aba
+                  {pdfAction === "open" ? "Abrindo..." : "Ver PDF"}
                 </button>
                 <button
                   type="button"
                   onClick={() => void baixarArquivoAtual()}
+                  disabled={pdfAction !== null}
                   className="rounded-full border border-slate-300 px-3 py-1 text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
                 >
-                  Baixar
+                  {pdfAction === "download" ? "Baixando..." : "Baixar PDF"}
                 </button>
                 <button
                   type="button"
                   onClick={() => void refreshPublicUrl()}
+                  disabled={pdfAction !== null}
                   className="rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
                 >
-                  Atualizar visualização
+                  {pdfAction === "refresh" ? "Atualizando..." : "Atualizar visualização"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void copiarLinkTemporario()}
+                  disabled={pdfAction !== null}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  {pdfAction === "copy" ? "Copiando..." : "Copiar link temporário"}
                 </button>
               </div>
             </>

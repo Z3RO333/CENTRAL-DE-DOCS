@@ -13,6 +13,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
+import { fixMojibakeText } from "@/lib/textEncoding";
 
 type Registro = {
   id: string;
@@ -20,6 +21,7 @@ type Registro = {
   status: string;
   created_at: string;
   dados: Record<string, unknown> | null;
+  prestador_id: string | null;
 };
 
 type DocumentoApiRecord = {
@@ -28,6 +30,7 @@ type DocumentoApiRecord = {
   status: string;
   created_at: string;
   dados?: Record<string, unknown> | null;
+  prestador_id?: string | null;
 };
 
 const tipoLabel: Record<string, string> = {
@@ -91,6 +94,8 @@ export default function DashboardAnalisesPage() {
   const [servicoFilter, setServicoFilter] = useState<string>("todos");
   const [anoFilter, setAnoFilter] = useState<string>("todos");
   const [mesFilter, setMesFilter] = useState<string>("todos");
+  const [prestadorFilter, setPrestadorFilter] = useState<string>("todos");
+  const [lojaFilter, setLojaFilter] = useState<string>("todos");
   const showServicoFilter = tipoFilter === "registro_laudos";
   const mesSelecionadoLabel =
     MESES.find((mes) => mes.value === mesFilter)?.label ?? "Todos os meses";
@@ -162,6 +167,7 @@ export default function DashboardAnalisesPage() {
             status: item.status as string,
             created_at: item.created_at as string,
             dados: (item.dados as Record<string, unknown> | null) ?? null,
+            prestador_id: (item.prestador_id as string | null) ?? null,
           })) ?? [];
 
         setRegistros(parsed);
@@ -224,6 +230,45 @@ export default function DashboardAnalisesPage() {
     ).sort((a, b) => Number(b) - Number(a));
   }, [registros]);
 
+  const prestadoresDisponiveis = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const registro of registros) {
+      const id = registro.prestador_id;
+      const nome =
+        typeof registro.dados?.prestador === "string"
+          ? fixMojibakeText(registro.dados.prestador.trim())
+          : "";
+      if (!id) continue;
+      if (!map.has(id) || (nome && map.get(id) === id)) {
+        map.set(id, nome || id);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [registros]);
+
+  const lojasDisponiveis = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const registro of registros) {
+      const id =
+        typeof registro.dados?.loja_id === "string"
+          ? registro.dados.loja_id.trim()
+          : "";
+      const nome =
+        typeof registro.dados?.loja_nome === "string"
+          ? fixMojibakeText(registro.dados.loja_nome.trim())
+          : "";
+      if (!id) continue;
+      if (!map.has(id) || (nome && map.get(id) === id)) {
+        map.set(id, nome || id);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [registros]);
+
   const registrosFiltrados = useMemo(
     () =>
       registros.filter((registro) => {
@@ -236,9 +281,23 @@ export default function DashboardAnalisesPage() {
         if (showServicoFilter && servicoFilter !== "todos") {
           const valorServico =
             typeof registro.dados?.tipo_laudo === "string"
-              ? registro.dados.tipo_laudo.trim()
+              ? fixMojibakeText(registro.dados.tipo_laudo.trim())
               : "";
           if (valorServico !== servicoFilter) {
+            return false;
+          }
+        }
+
+        if (prestadorFilter !== "todos" && registro.prestador_id !== prestadorFilter) {
+          return false;
+        }
+
+        if (lojaFilter !== "todos") {
+          const lojaIdRegistro =
+            typeof registro.dados?.loja_id === "string"
+              ? registro.dados.loja_id.trim()
+              : "";
+          if (lojaIdRegistro !== lojaFilter) {
             return false;
           }
         }
@@ -271,6 +330,8 @@ export default function DashboardAnalisesPage() {
       mesFilter,
       showServicoFilter,
       servicoFilter,
+      prestadorFilter,
+      lojaFilter,
     ],
   );
 
@@ -365,6 +426,8 @@ export default function DashboardAnalisesPage() {
     setServicoFilter("todos");
     setAnoFilter("todos");
     setMesFilter("todos");
+    setPrestadorFilter("todos");
+    setLojaFilter("todos");
   };
 
   if (authLoading || accessLoading || loading) {
@@ -574,7 +637,7 @@ export default function DashboardAnalisesPage() {
             Limpar filtros
           </button>
         </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <div className="mt-4 grid gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           <label className="text-xs font-semibold text-slate-600">
             Tipo de documento
             <select
@@ -647,6 +710,36 @@ export default function DashboardAnalisesPage() {
               {MESES.map((mes) => (
                 <option key={mes.value} value={mes.value}>
                   {mes.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Fornecedor
+            <select
+              value={prestadorFilter}
+              onChange={(event) => setPrestadorFilter(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+            >
+              <option value="todos">Todos os fornecedores</option>
+              {prestadoresDisponiveis.map((prestador) => (
+                <option key={prestador.id} value={prestador.id}>
+                  {prestador.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Loja
+            <select
+              value={lojaFilter}
+              onChange={(event) => setLojaFilter(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+            >
+              <option value="todos">Todas as lojas</option>
+              {lojasDisponiveis.map((loja) => (
+                <option key={loja.id} value={loja.id}>
+                  {loja.nome}
                 </option>
               ))}
             </select>

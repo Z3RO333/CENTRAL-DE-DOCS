@@ -10,6 +10,7 @@ import {
   getSessionUserFromRequest,
   hasDocumentosAccess,
 } from "@/lib/apiAuth";
+import { fixMojibakeText, normalizeDisplayData } from "@/lib/textEncoding";
 
 type FormularioRow = {
   created_at: string;
@@ -38,6 +39,22 @@ type FilterOptionsAggRow = {
 };
 
 const parseDados = (raw: FormularioRow["dados"]) => safeParseDados(raw);
+
+const normalizeLojaOption = (loja: LojaOption): LojaOption => ({
+  ...loja,
+  nome: fixMojibakeText(loja.nome),
+  codigo: loja.codigo ? fixMojibakeText(loja.codigo) : loja.codigo,
+});
+
+const normalizePrestadorOption = (
+  prestador: PrestadorOption,
+): PrestadorOption => ({
+  ...prestador,
+  nome: fixMojibakeText(prestador.nome),
+  tipo_servico: prestador.tipo_servico
+    ? fixMojibakeText(prestador.tipo_servico)
+    : prestador.tipo_servico,
+});
 
 export async function GET(request: Request) {
   try {
@@ -110,9 +127,11 @@ export async function GET(request: Request) {
       return NextResponse.json({
         anos: (aggregate.anos ?? []).map(String),
         status: aggregate.status ?? [],
-        tipoLaudo: aggregate.tipo_laudo ?? [],
-        lojas: (lojasAll as LojaOption[]) ?? [],
-        prestadores: (prestadoresAll as PrestadorOption[]) ?? [],
+        tipoLaudo: (aggregate.tipo_laudo ?? []).map(fixMojibakeText),
+        lojas: ((lojasAll as LojaOption[]) ?? []).map(normalizeLojaOption),
+        prestadores: ((prestadoresAll as PrestadorOption[]) ?? []).map(
+          normalizePrestadorOption,
+        ),
       });
     }
 
@@ -171,7 +190,10 @@ export async function GET(request: Request) {
       if (row.status) {
         statusSet.add(row.status);
       }
-      const dados = parseDados(row.dados);
+      const dados = normalizeDisplayData(parseDados(row.dados)) as Record<
+        string,
+        unknown
+      > | null;
       const tipoLaudo = dados?.tipo_laudo;
       if (typeof tipoLaudo === "string" && tipoLaudo.trim()) {
         tipoLaudoSet.add(tipoLaudo.trim());
@@ -201,7 +223,9 @@ export async function GET(request: Request) {
         if (lojasError) {
           throw lojasError;
         }
-        lojasDisponiveis = (lojasData as LojaOption[]) ?? [];
+        lojasDisponiveis = ((lojasData as LojaOption[]) ?? []).map(
+          normalizeLojaOption,
+        );
       }
 
       const prestadorIds = new Set<string>();
@@ -220,7 +244,9 @@ export async function GET(request: Request) {
         if (prestadoresError) {
           throw prestadoresError;
         }
-        prestadoresDisponiveis = (prestadoresData as PrestadorOption[]) ?? [];
+        prestadoresDisponiveis = (
+          (prestadoresData as PrestadorOption[]) ?? []
+        ).map(normalizePrestadorOption);
       }
     }
 

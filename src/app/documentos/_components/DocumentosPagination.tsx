@@ -1,6 +1,7 @@
 type DocumentosPaginationProps = {
   totalResultados: number;
   page: number;
+  pageSize: number;
   totalPages: number;
   canPrevPage: boolean;
   canNextPage: boolean;
@@ -11,6 +12,7 @@ type DocumentosPaginationProps = {
 export function DocumentosPagination({
   totalResultados,
   page,
+  pageSize,
   totalPages,
   canPrevPage,
   canNextPage,
@@ -21,10 +23,14 @@ export function DocumentosPagination({
     return null;
   }
 
+  const from = (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, totalResultados);
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-white p-3 text-xs text-slate-500 shadow-sm shadow-slate-200">
       <span>
-        {totalResultados} resultado(s) · Página {page} de {totalPages}
+        Mostrando {from}-{to} de {totalResultados} registros · Página {page} de{" "}
+        {totalPages}
       </span>
       <div className="flex gap-2">
         <button
