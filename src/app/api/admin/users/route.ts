@@ -11,10 +11,9 @@ type SafeUser = {
   phone: string | null;
 };
 
-const supabaseAdmin = createSupabaseAdminClient();
-
 export async function GET(request: Request) {
   try {
+    const supabaseAdmin = createSupabaseAdminClient();
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
