@@ -899,6 +899,8 @@ export default function DocumentosPage() {
           } else {
             params.set("userId", userId);
           }
+        } else if (prestadorFilter !== "todos") {
+          params.append("prestadorId", prestadorFilter);
         }
         if (canManageDocuments && userFilter !== "todos") {
           params.set("userId", userFilter);
