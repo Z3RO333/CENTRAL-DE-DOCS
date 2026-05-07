@@ -141,36 +141,48 @@ export default function DashboardAnalisesPage() {
       setError(null);
       try {
         const token = await getAccessToken();
-        const response = await fetch("/api/documentos", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        const payload = (await response.json()) as {
-          registros?: DocumentoApiRecord[];
-          error?: string;
-        };
-        if (!response.ok) {
-          throw new Error(
-            payload.error ?? "Não foi possível carregar os dados analíticos.",
+        const PAGE_LIMIT = 1000;
+        const acumulado: Registro[] = [];
+        let offset = 0;
+        let total = 0;
+        do {
+          const response = await fetch(
+            `/api/documentos?limit=${PAGE_LIMIT}&offset=${offset}`,
+            { headers: { Authorization: `Bearer ${token}` } },
           );
+          const payload = (await response.json()) as {
+            registros?: DocumentoApiRecord[];
+            total?: number;
+            error?: string;
+          };
+          if (!response.ok) {
+            throw new Error(
+              payload.error ?? "Não foi possível carregar os dados analíticos.",
+            );
+          }
+          if (!active) {
+            return;
+          }
+          const lote =
+            payload.registros?.map((item) => ({
+              id: item.id as string,
+              tipo: item.tipo as string,
+              status: item.status as string,
+              created_at: item.created_at as string,
+              dados: (item.dados as Record<string, unknown> | null) ?? null,
+              prestador_id: (item.prestador_id as string | null) ?? null,
+            })) ?? [];
+          acumulado.push(...lote);
+          total = payload.total ?? acumulado.length;
+          offset += PAGE_LIMIT;
+          if (lote.length < PAGE_LIMIT) {
+            break;
+          }
+        } while (offset < total);
+
+        if (active) {
+          setRegistros(acumulado);
         }
-
-        if (!active) {
-          return;
-        }
-
-        const parsed =
-          payload.registros?.map((item) => ({
-            id: item.id as string,
-            tipo: item.tipo as string,
-            status: item.status as string,
-            created_at: item.created_at as string,
-            dados: (item.dados as Record<string, unknown> | null) ?? null,
-            prestador_id: (item.prestador_id as string | null) ?? null,
-          })) ?? [];
-
-        setRegistros(parsed);
       } catch (err) {
         console.error("Erro ao carregar dados analíticos:", err);
         if (active) {
@@ -210,7 +222,8 @@ export default function DashboardAnalisesPage() {
 
   useEffect(() => {
     if (anoFilter === "todos" && mesFilter !== "todos") {
-      setMesFilter("todos");
+      const anoAtual = new Date().getFullYear().toString();
+      setAnoFilter(anoAtual);
     }
   }, [anoFilter, mesFilter]);
 
@@ -430,6 +443,30 @@ export default function DashboardAnalisesPage() {
     setLojaFilter("todos");
   };
 
+  const buildDocumentosUrl = useCallback(() => {
+    const params = new URLSearchParams();
+    if (tipoFilter !== "todos") params.set("tipo", tipoFilter);
+    if (statusFilter !== "todos") params.set("status", statusFilter);
+    if (showServicoFilter && servicoFilter !== "todos") {
+      params.set("tipoLaudo", servicoFilter);
+    }
+    if (anoFilter !== "todos") params.set("ano", anoFilter);
+    if (mesFilter !== "todos") params.set("mes", mesFilter);
+    if (prestadorFilter !== "todos") params.set("prestadorId", prestadorFilter);
+    if (lojaFilter !== "todos") params.set("lojaId", lojaFilter);
+    const qs = params.toString();
+    return qs ? `/documentos?${qs}` : "/documentos";
+  }, [
+    tipoFilter,
+    statusFilter,
+    servicoFilter,
+    showServicoFilter,
+    anoFilter,
+    mesFilter,
+    prestadorFilter,
+    lojaFilter,
+  ]);
+
   if (authLoading || accessLoading || loading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
@@ -505,7 +542,7 @@ export default function DashboardAnalisesPage() {
         </div>
         <button
           type="button"
-          onClick={() => router.push("/documentos")}
+          onClick={() => router.push(buildDocumentosUrl())}
           className="inline-flex items-center rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
         >
           Ver lista completa
@@ -670,21 +707,6 @@ export default function DashboardAnalisesPage() {
               </select>
             </label>
           )}
-          <label className="text-xs font-semibold text-slate-600">
-            Status
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            >
-              <option value="todos">Todos os status</option>
-              {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
           <label className="text-xs font-semibold text-slate-600">
             Ano
             <select

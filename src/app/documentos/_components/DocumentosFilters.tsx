@@ -32,7 +32,6 @@ type DocumentosFiltersProps = {
   identificacaoFilter: string;
   tipoFilter: string;
   tipoLaudoFilter: string;
-  statusFilter: string;
   userFilter: string;
   lojaFilter: string;
   prestadorFilter: string;
@@ -42,7 +41,6 @@ type DocumentosFiltersProps = {
   somenteDisponiveisLote: boolean;
   tipoOptions: FilterOption[];
   tipoLaudoOptions: string[];
-  statusOptions: string[];
   colaboradorOptions: FilterOption[];
   lojaOptions: FilterOption[];
   prestadorOptions: FilterOption[];
@@ -55,7 +53,6 @@ type DocumentosFiltersProps = {
   onIdentificacaoFilterChange: (value: string) => void;
   onTipoFilterChange: (value: string) => void;
   onTipoLaudoFilterChange: (value: string) => void;
-  onStatusFilterChange: (value: string) => void;
   onUserFilterChange: (value: string) => void;
   onLojaFilterChange: (value: string) => void;
   onPrestadorFilterChange: (value: string) => void;
@@ -63,7 +60,6 @@ type DocumentosFiltersProps = {
   onMesFilterChange: (value: string) => void;
   onSomenteAssinadosChange: (value: boolean) => void;
   onSomenteDisponiveisLoteChange: (value: boolean) => void;
-  formatStatusLabel: (status: string) => string;
 };
 
 const inputClassName =
@@ -77,7 +73,6 @@ export function DocumentosFilters({
   identificacaoFilter,
   tipoFilter,
   tipoLaudoFilter,
-  statusFilter,
   userFilter,
   lojaFilter,
   prestadorFilter,
@@ -87,7 +82,6 @@ export function DocumentosFilters({
   somenteDisponiveisLote,
   tipoOptions,
   tipoLaudoOptions,
-  statusOptions,
   colaboradorOptions,
   lojaOptions,
   prestadorOptions,
@@ -100,7 +94,6 @@ export function DocumentosFilters({
   onIdentificacaoFilterChange,
   onTipoFilterChange,
   onTipoLaudoFilterChange,
-  onStatusFilterChange,
   onUserFilterChange,
   onLojaFilterChange,
   onPrestadorFilterChange,
@@ -108,7 +101,6 @@ export function DocumentosFilters({
   onMesFilterChange,
   onSomenteAssinadosChange,
   onSomenteDisponiveisLoteChange,
-  formatStatusLabel,
 }: DocumentosFiltersProps) {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
@@ -293,26 +285,6 @@ export function DocumentosFilters({
                     {tipoLaudoOptions.map((tipoLaudo) => (
                       <option key={tipoLaudo} value={tipoLaudo}>
                         {tipoLaudo === "todos" ? "Todos os tipos" : tipoLaudo}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="text-xs font-semibold text-slate-600">
-                  Status
-                  <select
-                    value={statusFilter}
-                    onChange={(event) =>
-                      onStatusFilterChange(event.target.value)
-                    }
-                    disabled={filterOptionsLoading}
-                    className={inputClassName}
-                  >
-                    {statusOptions.map((statusOption) => (
-                      <option key={statusOption} value={statusOption}>
-                        {statusOption === "todos"
-                          ? "Todos os status"
-                          : formatStatusLabel(statusOption)}
                       </option>
                     ))}
                   </select>

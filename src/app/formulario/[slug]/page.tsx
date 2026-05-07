@@ -225,7 +225,7 @@ export default function FormularioPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading: authLoading } = useAuth();
-  const { modules, loading: accessLoading } = useDocumentsAccess();
+  const { isAdmin, modules, loading: accessLoading } = useDocumentsAccess();
   const canAccessFormularios = modules.documentos;
 
   const config = useMemo(
@@ -239,7 +239,7 @@ export default function FormularioPage() {
     prestadores: prestadoresDisponiveis,
     loading: prestadoresLoading,
   } = usePrestadores({
-    assignedOnly: true,
+    assignedOnly: !isAdmin,
     enabled: true,
   });
   const { lojas, loading: lojasLoading } = useLojas({ enabled: true });
@@ -315,7 +315,10 @@ export default function FormularioPage() {
         throw new Error("Sessão expirada. Faça login novamente.");
       }
       const params = new URLSearchParams();
-      if (prestadoresDisponiveis.length > 0) {
+      if (isAdmin) {
+        // Admin: histórico próprio (uploads feitos por ele).
+        params.set("userId", user.id);
+      } else if (prestadoresDisponiveis.length > 0) {
         prestadoresDisponiveis.forEach((prestador) => {
           params.append("prestadorId", prestador.id);
         });
@@ -349,7 +352,7 @@ export default function FormularioPage() {
     } finally {
       setHistoricoLoading(false);
     }
-  }, [prestadoresDisponiveis, user]);
+  }, [prestadoresDisponiveis, user, isAdmin]);
 
   useEffect(() => {
     if (user && !prestadoresLoading) {

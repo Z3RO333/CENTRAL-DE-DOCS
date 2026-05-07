@@ -2111,7 +2111,6 @@ export default function DocumentosPage() {
             identificacaoFilter={identificacaoFilter}
             tipoFilter={tipoFilter}
             tipoLaudoFilter={tipoLaudoFilter}
-            statusFilter={statusFilter}
             userFilter={userFilter}
             lojaFilter={lojaFilter}
             prestadorFilter={prestadorFilter}
@@ -2121,7 +2120,6 @@ export default function DocumentosPage() {
             somenteDisponiveisLote={somenteDisponiveisLote}
             tipoOptions={tipoOptions}
             tipoLaudoOptions={tipoLaudoOptions}
-            statusOptions={statusOptions}
             colaboradorOptions={colaboradorOptions}
             lojaOptions={lojaOptions}
             prestadorOptions={prestadorOptions}
@@ -2134,7 +2132,6 @@ export default function DocumentosPage() {
             onIdentificacaoFilterChange={setIdentificacaoFilter}
             onTipoFilterChange={setTipoFilter}
             onTipoLaudoFilterChange={setTipoLaudoFilter}
-            onStatusFilterChange={setStatusFilter}
             onUserFilterChange={setUserFilter}
             onLojaFilterChange={setLojaFilter}
             onPrestadorFilterChange={setPrestadorFilter}
@@ -2142,7 +2139,6 @@ export default function DocumentosPage() {
             onMesFilterChange={setMesFilter}
             onSomenteAssinadosChange={setSomenteAssinados}
             onSomenteDisponiveisLoteChange={setSomenteDisponiveisLote}
-            formatStatusLabel={formatStatusLabel}
           />
         </div>
 

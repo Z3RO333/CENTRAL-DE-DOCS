@@ -1,57 +1,48 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/AuthProvider";
 import {
+  ArrowRight,
   BriefcaseBusiness,
-  Building2,
-  CalendarDays,
+  Bot,
   CheckCircle2,
+  ClipboardList,
   Clock,
   Eye,
   FileBadge,
+  FilePlus2,
+  FileSearch,
   FileText,
+  Layers,
   ReceiptText,
+  Send,
   Signature,
+  Sparkles,
   Store,
   TriangleAlert,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { usePrestadores } from "@/hooks/usePrestadores";
+import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { supabase } from "@/lib/supabaseClient";
-import { isInPeriodo, type PrestadorRegra } from "@/lib/prestadorRegras";
 import { fixMojibakeText } from "@/lib/textEncoding";
-
-type DashboardCard = {
-  slug: string;
-  tipo: string;
-  title: string;
-  description: string;
-  href: string;
-  icon: LucideIcon;
-  accent: string;
-  border: string;
-};
+import { formatPersonName } from "@/lib/displayName";
 
 type DocumentosKpis = {
-  totalDocumentos: number;
   pendentes: number;
-  emAnalise: number;
-  assinados: number;
-  semLoja: number;
-  semPrestador: number;
+  aguardandoAssinatura: number;
   enviadosHoje: number;
   enviadosNoMes: number;
-  aguardandoAssinatura: number;
 };
 
-const STATUS_LABEL_MAP: Record<string, string> = {
-  pendente: "Pendente",
-  em_analise: "Em análise",
-  assinado: "Assinado",
+type AtividadeRecente = {
+  id: string;
+  tipo: string;
+  status: string;
+  created_at: string;
+  dados: Record<string, unknown> | null;
 };
 
 const TIPO_LABEL: Record<string, string> = {
@@ -60,63 +51,117 @@ const TIPO_LABEL: Record<string, string> = {
   notas_fiscais: "Notas Fiscais",
 };
 
-const STORAGE_BUCKET = "formularios";
-const SIGNED_URL_EXPIRES_IN = 60 * 30;
-const HISTORICO_PAGE_SIZE = 200;
+const STATUS_LABEL: Record<string, string> = {
+  pendente: "Pendente",
+  em_analise: "Em análise",
+  assinado: "Assinado",
+};
 
-const BASE_CARDS: DashboardCard[] = [
+const STATUS_BADGE: Record<string, string> = {
+  pendente: "bg-amber-50 text-amber-700",
+  em_analise: "bg-sky-50 text-sky-700",
+  assinado: "bg-emerald-50 text-emerald-700",
+};
+
+type ModuleCard = {
+  title: string;
+  description: string;
+  href: string;
+  icon: LucideIcon;
+  accent: string;
+  cta: string;
+};
+
+const MODULES: ModuleCard[] = [
   {
-    slug: "retencao-trabalhista",
-    tipo: "retencao_trabalhista",
-    title: "Retenção Trabalhista",
-    description:
-      "Envio de documentos relacionados à retenção de tributos trabalhistas.",
-    href: "/formulario/retencao-trabalhista",
-    icon: BriefcaseBusiness,
-    accent: "from-sky-100 via-sky-50 to-transparent",
-    border: "border-sky-200",
-  },
-  {
-    slug: "registro-laudos",
-    tipo: "registro_laudos",
-    title: "Registro e Laudos",
-    description: "Formulários para registros técnicos e laudos emitidos.",
-    href: "/formulario/registro-laudos",
-    icon: FileBadge,
-    accent: "from-sky-100 via-sky-50 to-transparent",
-    border: "border-sky-200",
-  },
-  {
-    slug: "notas-fiscais",
-    tipo: "notas_fiscais",
     title: "Notas Fiscais",
-    description: "Upload e controle de notas fiscais emitidas.",
+    description: "Cadastre e armazene notas fiscais com pedido, valor e descrição.",
     href: "/formulario/notas-fiscais",
     icon: ReceiptText,
-    accent: "from-sky-100 via-sky-50 to-transparent",
-    border: "border-sky-200",
+    accent: "bg-sky-50 text-sky-700 border-sky-200",
+    cta: "Enviar nota",
+  },
+  {
+    title: "Registro e Laudos",
+    description: "Envie laudos técnicos (PMOC, PPRA, LTCAT) e registros para revisão.",
+    href: "/formulario/registro-laudos",
+    icon: FileBadge,
+    accent: "bg-violet-50 text-violet-700 border-violet-200",
+    cta: "Enviar laudo",
+  },
+  {
+    title: "Retenção Trabalhista",
+    description: "Controle de retenções trabalhistas por competência e prestador.",
+    href: "/formulario/retencao-trabalhista",
+    icon: BriefcaseBusiness,
+    accent: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    cta: "Enviar retenção",
+  },
+  {
+    title: "Documentos por Loja",
+    description: "Navegue pelas pastas digitais de cada unidade.",
+    href: "/documentos/por-loja",
+    icon: Store,
+    accent: "bg-amber-50 text-amber-700 border-amber-200",
+    cta: "Abrir pastas",
+  },
+  {
+    title: "Pendências",
+    description: "Documentos que precisam de revisão, assinatura ou complementação.",
+    href: "/documentos/pendencias",
+    icon: TriangleAlert,
+    accent: "bg-rose-50 text-rose-700 border-rose-200",
+    cta: "Ver pendências",
+  },
+  {
+    title: "Copiloto",
+    description: "Tire dúvidas sobre regras, prazos e prestadores com a IA.",
+    href: "/copilot",
+    icon: Bot,
+    accent: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    cta: "Abrir copiloto",
   },
 ];
 
-const formatData = (value: string) => {
+const FLUXO_STEPS: { title: string; description: string; icon: LucideIcon }[] = [
+  {
+    title: "Envio",
+    description: "Prestador ou colaborador envia o arquivo pelo formulário.",
+    icon: Send,
+  },
+  {
+    title: "Classificação",
+    description: "Tipo de documento, loja e prestador são vinculados ao envio.",
+    icon: Layers,
+  },
+  {
+    title: "Análise",
+    description: "Equipe revisa as informações e o conteúdo do arquivo.",
+    icon: FileSearch,
+  },
+  {
+    title: "Assinatura/Revisão",
+    description: "Documentos elegíveis são assinados ou marcados como revisados.",
+    icon: Signature,
+  },
+  {
+    title: "Consulta",
+    description: "Tudo fica disponível em Documentos, organizado por loja e tipo.",
+    icon: FileText,
+  },
+];
+
+const formatDataCurta = (value: string) => {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "--";
-  }
-  return date.toLocaleString("pt-BR");
+  if (Number.isNaN(date.getTime())) return "--";
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  });
 };
 
-const formatStatus = (status: string) =>
-  STATUS_LABEL_MAP[status] ?? status.replace(/_/g, " ");
-
-const formatTipo = (tipo: string) => TIPO_LABEL[tipo] ?? tipo;
-
-const getDocumentoNome = (registro: {
-  id: string;
-  dados: Record<string, unknown> | null;
-  arquivo_assinado_path?: string | null;
-  arquivo_path?: string | null;
-}) => {
+const getDocumentoNome = (registro: AtividadeRecente) => {
   const anexos = registro.dados?.anexos;
   if (Array.isArray(anexos) && anexos.length > 0) {
     const primeiro = anexos[0] as { nome?: unknown } | null;
@@ -124,1136 +169,410 @@ const getDocumentoNome = (registro: {
       return fixMojibakeText(primeiro.nome.trim());
     }
   }
-  const path = registro.arquivo_assinado_path ?? registro.arquivo_path;
-  if (path) {
-    return fixMojibakeText(path.split("/").pop() ?? path);
-  }
-  return registro.id;
-};
-
-const getLocalDateKey = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const getLocalDateLabel = (date: Date) => {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${day}/${month}`;
+  return registro.id.slice(0, 8);
 };
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, isLoading, error: authError } = useAuth();
-  const { isAdmin, modules, loading: accessLoading } = useDocumentsAccess();
+  const { user, isLoading: authLoading, error: authError } = useAuth();
+  const { modules, loading: accessLoading } = useDocumentsAccess();
   const canAccessFormularios = modules.documentos;
-  const canViewAllDocuments = isAdmin;
-  const {
-    prestadores: prestadoresDoUsuario,
-    loading: prestadoresLoading,
-  } = usePrestadores({
-    assignedOnly: true,
-    enabled: Boolean(user) && !canViewAllDocuments,
-  });
-  const [historico, setHistorico] = useState<
-    {
-      id: string;
-      tipo: string;
-      status: string;
-      arquivo_path?: string | null;
-      arquivo_assinado_path?: string | null;
-      created_at: string;
-      dados: Record<string, unknown> | null;
-      prestador_id?: string | null;
-    }[]
-  >([]);
-  const [historicoLoading, setHistoricoLoading] = useState(true);
-  const [historicoLoadingMore, setHistoricoLoadingMore] = useState(false);
-  const [historicoErro, setHistoricoErro] = useState<string | null>(null);
-  const [historicoTotal, setHistoricoTotal] = useState<number | null>(null);
-  const [historicoHasMore, setHistoricoHasMore] = useState(true);
-  const [historicoTipoFilter, setHistoricoTipoFilter] = useState("todos");
-  const [historicoStatusFilter, setHistoricoStatusFilter] = useState("todos");
-  const [historicoPeriodoFilter, setHistoricoPeriodoFilter] =
-    useState("ultimos_30_dias");
-  const [regras, setRegras] = useState<PrestadorRegra[]>([]);
-  const [regrasLoading, setRegrasLoading] = useState(true);
-  const [regrasErro, setRegrasErro] = useState<string | null>(null);
-  const [dashboardTab, setDashboardTab] = useState<"formularios" | "monitoramento">(
-    "formularios",
-  );
-  const [documentosKpis, setDocumentosKpis] = useState<DocumentosKpis | null>(
-    null,
-  );
-  const [documentosKpisLoading, setDocumentosKpisLoading] = useState(true);
-  const [documentosKpisErro, setDocumentosKpisErro] = useState<string | null>(
-    null,
-  );
+
+  const [kpis, setKpis] = useState<DocumentosKpis | null>(null);
+  const [kpisLoading, setKpisLoading] = useState(true);
+  const [atividades, setAtividades] = useState<AtividadeRecente[]>([]);
+  const [atividadesLoading, setAtividadesLoading] = useState(true);
 
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (!authLoading && !user) {
       router.replace("/login");
       return;
     }
-    if (!isLoading && user && !accessLoading && !canAccessFormularios) {
+    if (!authLoading && user && !accessLoading && !canAccessFormularios) {
       router.replace("/documentos");
     }
-  }, [isLoading, user, router, accessLoading, canAccessFormularios]);
-  const isBlocked = isLoading || !user;
-  const baseCards = BASE_CARDS;
+  }, [authLoading, user, accessLoading, canAccessFormularios, router]);
 
-  const resolveSignedPdfPath = (path?: string | null) => {
-    if (!path) {
-      return null;
-    }
-    if (path.endsWith("-view.html")) {
-      return path.replace(/-view\.html$/, ".pdf");
-    }
-    if (path.endsWith(".html")) {
-      return path.replace(/\.html$/, ".pdf");
-    }
-    return path;
-  };
-
-  const getSignedFileUrl = async (path: string) => {
-    const { data, error } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .createSignedUrl(path, SIGNED_URL_EXPIRES_IN);
-
-    if (error || !data?.signedUrl) {
-      throw error ?? new Error("Não foi possível gerar o link do arquivo.");
-    }
-    return data.signedUrl;
-  };
-
-  const abrirDocumento = async (registro: {
-    arquivo_path?: string | null;
-    arquivo_assinado_path?: string | null;
-  }) => {
-    const path =
-      resolveSignedPdfPath(registro.arquivo_assinado_path) ??
-      registro.arquivo_assinado_path ??
-      registro.arquivo_path;
-
-    if (!path) {
-      setHistoricoErro("Arquivo indisponível no momento.");
-      return;
-    }
-
+  const carregarDados = useCallback(async (signal: AbortSignal) => {
+    setKpisLoading(true);
+    setAtividadesLoading(true);
     try {
-      const signedUrl = await getSignedFileUrl(path);
-      const anchor = document.createElement("a");
-      anchor.href = signedUrl;
-      anchor.target = "_blank";
-      anchor.rel = "noopener noreferrer";
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-    } catch (err) {
-      console.error("Erro ao abrir documento:", err);
-      setHistoricoErro("Não foi possível abrir o documento. Tente novamente.");
-    }
-  };
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Sessão expirada.");
 
-  const carregarHistorico = useCallback(
-    async ({
-      signal,
-      append = false,
-      offset = 0,
-    }: {
-      signal?: AbortSignal;
-      append?: boolean;
-      offset?: number;
-    } = {}) => {
-      if (!user) {
-        return;
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const [kpisRes, atividadesRes] = await Promise.all([
+        fetch("/api/documentos/kpis", { headers, signal }),
+        fetch("/api/documentos?limit=5&offset=0", { headers, signal }),
+      ]);
+
+      if (signal.aborted) return;
+
+      if (kpisRes.ok) {
+        const payload = (await kpisRes.json()) as { kpis?: DocumentosKpis };
+        if (payload.kpis) {
+          setKpis({
+            pendentes: payload.kpis.pendentes ?? 0,
+            aguardandoAssinatura: payload.kpis.aguardandoAssinatura ?? 0,
+            enviadosHoje: payload.kpis.enviadosHoje ?? 0,
+            enviadosNoMes: payload.kpis.enviadosNoMes ?? 0,
+          });
+        }
       }
-      if (append) {
-        setHistoricoLoadingMore(true);
-      } else {
-        setHistoricoLoading(true);
-        setHistorico([]);
-        setHistoricoTotal(null);
-        setHistoricoHasMore(true);
-      }
-      setHistoricoErro(null);
-      try {
-        const { data, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) {
-          throw sessionError;
-        }
-        const token = data.session?.access_token;
-        if (!token) {
-          throw new Error("Sessão expirada. Faça login novamente.");
-        }
-        const params = new URLSearchParams();
-        if (!canViewAllDocuments) {
-          if (prestadoresDoUsuario.length > 0) {
-            prestadoresDoUsuario.forEach((prestador) =>
-              params.append("prestadorId", prestador.id),
-            );
-          } else {
-            params.set("userId", user.id);
-          }
-        }
-        params.set("limit", HISTORICO_PAGE_SIZE.toString());
-        params.set("offset", offset.toString());
-        const url =
-          params.size > 0
-            ? `/api/documentos?${params.toString()}`
-            : "/api/documentos";
-        const response = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          signal,
-        });
-        const payload = (await response.json()) as {
-          registros?: {
-            id: string;
-            tipo: string;
-            status: string;
-            arquivo_path?: string | null;
-            arquivo_assinado_path?: string | null;
-            created_at: string;
-            dados: Record<string, unknown> | null;
-            prestador_id?: string | null;
-          }[];
-          total?: number;
-          error?: string;
+
+      if (atividadesRes.ok) {
+        const payload = (await atividadesRes.json()) as {
+          registros?: AtividadeRecente[];
         };
-        if (!response.ok) {
-          throw new Error(
-            payload.error ?? "Não foi possível carregar o histórico.",
-          );
-        }
-        if (signal?.aborted) {
-          return;
-        }
-        const registros = payload.registros ?? [];
-        setHistorico((prev) => (append ? [...prev, ...registros] : registros));
-        if (typeof payload.total === "number") {
-          setHistoricoTotal(payload.total);
-          const loaded = (append ? offset : 0) + registros.length;
-          setHistoricoHasMore(loaded < payload.total);
-        } else {
-          setHistoricoHasMore(registros.length === HISTORICO_PAGE_SIZE);
-        }
-      } catch (err) {
-        if (signal?.aborted) {
-          return;
-        }
-        console.error("Erro ao carregar histórico:", err);
-        setHistoricoErro(
-          err instanceof Error
-            ? err.message
-            : "Não foi possível carregar o histórico.",
-        );
-      } finally {
-        if (!signal?.aborted) {
-          if (append) {
-            setHistoricoLoadingMore(false);
-          } else {
-            setHistoricoLoading(false);
-          }
-        }
-      }
-    },
-    [user, prestadoresDoUsuario, canViewAllDocuments],
-  );
-
-  const carregarDocumentosKpis = useCallback(async (signal?: AbortSignal) => {
-    if (!user) {
-      return;
-    }
-    setDocumentosKpisLoading(true);
-    setDocumentosKpisErro(null);
-    try {
-      const { data, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        throw sessionError;
-      }
-      const token = data.session?.access_token;
-      if (!token) {
-        throw new Error("Sessão expirada. Faça login novamente.");
-      }
-      const response = await fetch("/api/documentos/kpis", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        signal,
-      });
-      const payload = (await response.json()) as {
-        kpis?: DocumentosKpis;
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Não foi possível carregar KPIs.");
-      }
-      if (!signal?.aborted) {
-        setDocumentosKpis(payload.kpis ?? null);
+        setAtividades(payload.registros ?? []);
       }
     } catch (err) {
-      if (signal?.aborted) {
-        return;
+      if (!signal.aborted) {
+        console.error("Erro ao carregar dashboard:", err);
       }
-      console.error("Erro ao carregar KPIs de documentos:", err);
-      setDocumentosKpisErro(
-        err instanceof Error ? err.message : "Não foi possível carregar KPIs.",
-      );
-      setDocumentosKpis(null);
     } finally {
-      if (!signal?.aborted) {
-        setDocumentosKpisLoading(false);
+      if (!signal.aborted) {
+        setKpisLoading(false);
+        setAtividadesLoading(false);
       }
     }
-  }, [user]);
-
-  const carregarRegras = useCallback(async (signal?: AbortSignal) => {
-    if (!user) {
-      return;
-    }
-    if (prestadoresDoUsuario.length === 0) {
-      setRegras([]);
-      setRegrasLoading(false);
-      setRegrasErro(null);
-      return;
-    }
-    setRegrasLoading(true);
-    setRegrasErro(null);
-    try {
-      const { data, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        throw sessionError;
-      }
-      const token = data.session?.access_token;
-      if (!token) {
-        throw new Error("Sessão expirada. Faça login novamente.");
-      }
-      const params = new URLSearchParams();
-      prestadoresDoUsuario.forEach((prestador) =>
-        params.append("prestadorId", prestador.id),
-      );
-      const url =
-        params.size > 0
-          ? `/api/prestador-regras?${params.toString()}`
-          : "/api/prestador-regras";
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        signal,
-      });
-      const payload = (await response.json()) as {
-        regras?: PrestadorRegra[];
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Não foi possível carregar as regras.");
-      }
-      if (signal?.aborted) {
-        return;
-      }
-      setRegras(payload.regras ?? []);
-    } catch (err) {
-      if (signal?.aborted) {
-        return;
-      }
-      console.error("Erro ao carregar regras:", err);
-      setRegrasErro(
-        err instanceof Error ? err.message : "Não foi possível carregar as regras.",
-      );
-    } finally {
-      if (!signal?.aborted) {
-        setRegrasLoading(false);
-      }
-    }
-  }, [prestadoresDoUsuario, user]);
+  }, []);
 
   useEffect(() => {
-    if (user && !accessLoading && (canViewAllDocuments || !prestadoresLoading)) {
-      const controller = new AbortController();
-      void carregarHistorico({ signal: controller.signal });
-      return () => controller.abort();
-    }
-    return undefined;
-  }, [
-    user,
-    accessLoading,
-    canViewAllDocuments,
-    prestadoresLoading,
-    carregarHistorico,
-  ]);
+    if (!user) return;
+    const controller = new AbortController();
+    void carregarDados(controller.signal);
+    return () => controller.abort();
+  }, [user, carregarDados]);
 
-  useEffect(() => {
-    if (user && !accessLoading && canAccessFormularios) {
-      const controller = new AbortController();
-      void carregarDocumentosKpis(controller.signal);
-      return () => controller.abort();
-    }
-    return undefined;
-  }, [
-    accessLoading,
-    canAccessFormularios,
-    carregarDocumentosKpis,
-    user,
-  ]);
-
-  useEffect(() => {
-    if (user && !accessLoading && !canViewAllDocuments && !prestadoresLoading) {
-      const controller = new AbortController();
-      void carregarRegras(controller.signal);
-      return () => controller.abort();
-    }
-    return undefined;
-  }, [
-    user,
-    accessLoading,
-    canViewAllDocuments,
-    prestadoresLoading,
-    carregarRegras,
-  ]);
-
-  const historicoTipoOptions = useMemo(() => {
-    const extras = Array.from(new Set(historico.map((item) => item.tipo)))
-      .filter((tipo) => !(tipo in TIPO_LABEL))
-      .sort();
-    return [
-      { value: "todos", label: "Todos os tipos" },
-      ...Object.entries(TIPO_LABEL).map(([value, label]) => ({
-        value,
-        label,
-      })),
-      ...extras.map((tipo) => ({
-        value: tipo,
-        label: tipo.replace(/_/g, " "),
-      })),
-    ];
-  }, [historico]);
-
-  const historicoStatusOptions = useMemo(() => {
-    const base = ["pendente", "assinado", "em_analise"];
-    const unique = Array.from(new Set(historico.map((item) => item.status)));
-    const extras = unique.filter((status) => !base.includes(status)).sort();
-    const ordered = [
-      "todos",
-      ...base.filter((status) => unique.includes(status)),
-      ...extras,
-    ];
-    const seen = new Set<string>();
-    return ordered.filter((status) => {
-      if (seen.has(status)) {
-        return false;
-      }
-      seen.add(status);
-      return true;
-    });
-  }, [historico]);
-
-  const isDentroPeriodoGlobal = useCallback(
-    (dateValue: string) => {
-      if (historicoPeriodoFilter === "todos") {
-        return true;
-      }
-      const date = new Date(dateValue);
-      if (Number.isNaN(date.getTime())) {
-        return false;
-      }
-      const now = new Date();
-      if (historicoPeriodoFilter === "mes_atual") {
-        return (
-          date.getFullYear() === now.getFullYear() &&
-          date.getMonth() === now.getMonth()
-        );
-      }
-      if (historicoPeriodoFilter === "ano_atual") {
-        return date.getFullYear() === now.getFullYear();
-      }
-      const dias =
-        historicoPeriodoFilter === "ultimos_90_dias" ? 90 : 30;
-      const start = new Date(now);
-      start.setHours(0, 0, 0, 0);
-      start.setDate(start.getDate() - dias);
-      const end = new Date(now);
-      end.setHours(23, 59, 59, 999);
-      return date >= start && date <= end;
-    },
-    [historicoPeriodoFilter],
-  );
-
-  const historicoFiltrado = useMemo(() => {
-    return historico.filter((item) => {
-      if (historicoTipoFilter !== "todos" && item.tipo !== historicoTipoFilter) {
-        return false;
-      }
-      if (
-        historicoStatusFilter !== "todos" &&
-        item.status !== historicoStatusFilter
-      ) {
-        return false;
-      }
-      return isDentroPeriodoGlobal(item.created_at);
-    });
-  }, [
-    historico,
-    historicoTipoFilter,
-    historicoStatusFilter,
-    isDentroPeriodoGlobal,
-  ]);
-  const handleLoadMoreHistorico = useCallback(() => {
-    if (historicoLoading || historicoLoadingMore || !historicoHasMore) {
-      return;
-    }
-    void carregarHistorico({ append: true, offset: historico.length });
-  }, [
-    carregarHistorico,
-    historico.length,
-    historicoHasMore,
-    historicoLoading,
-    historicoLoadingMore,
-  ]);
-
-  const resumoPorTipo = useMemo(() => {
-    return historicoFiltrado.reduce<
-      Record<
-        string,
-        {
-          total: number;
-          ultimo: {
-            status: string;
-            created_at: string;
-            dados: Record<string, unknown> | null;
-          } | null;
-        }
-      >
-    >((acc, item) => {
-      if (!acc[item.tipo]) {
-        acc[item.tipo] = { total: 0, ultimo: null };
-      }
-      acc[item.tipo].total += 1;
-      if (
-        !acc[item.tipo].ultimo ||
-        new Date(item.created_at) >
-          new Date(acc[item.tipo].ultimo?.created_at ?? 0)
-      ) {
-        acc[item.tipo].ultimo = {
-          status: item.status,
-          created_at: item.created_at,
-          dados: item.dados,
-        };
-      }
-      return acc;
-    }, {});
-  }, [historicoFiltrado]);
-
-  const statusResumo = useMemo(() => {
-    return historicoFiltrado.reduce<Record<string, number>>((acc, item) => {
-      acc[item.status] = (acc[item.status] ?? 0) + 1;
-      return acc;
-    }, {});
-  }, [historicoFiltrado]);
-
-  const tipoResumo = useMemo(() => {
-    return historicoFiltrado.reduce<Record<string, number>>((acc, item) => {
-      acc[item.tipo] = (acc[item.tipo] ?? 0) + 1;
-      return acc;
-    }, {});
-  }, [historicoFiltrado]);
-
-  const prestadorResumo = useMemo(() => {
-    const base = prestadoresDoUsuario.reduce<Record<string, number>>(
-      (acc, prestador) => {
-        acc[prestador.id] = 0;
-        return acc;
-      },
-      {},
+  if (authLoading || (user && accessLoading)) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
+        Carregando...
+      </div>
     );
-    return historicoFiltrado.reduce<Record<string, number>>((acc, item) => {
-      if (!item.prestador_id) {
-        return acc;
-      }
-      acc[item.prestador_id] = (acc[item.prestador_id] ?? 0) + 1;
-      return acc;
-    }, base);
-  }, [historicoFiltrado, prestadoresDoUsuario]);
+  }
 
-  const enviosUltimos30Dias = useMemo(() => {
-    const today = new Date();
-    const days: { key: string; label: string; count: number }[] = [];
-    for (let offset = 29; offset >= 0; offset -= 1) {
-      const day = new Date(today);
-      day.setDate(today.getDate() - offset);
-      days.push({
-        key: getLocalDateKey(day),
-        label: getLocalDateLabel(day),
-        count: 0,
-      });
-    }
-
-    const indexByKey = days.reduce<Record<string, number>>((acc, item, index) => {
-      acc[item.key] = index;
-      return acc;
-    }, {});
-
-    historicoFiltrado.forEach((item) => {
-      const date = new Date(item.created_at);
-      if (Number.isNaN(date.getTime())) {
-        return;
-      }
-      const key = getLocalDateKey(date);
-      const index = indexByKey[key];
-      if (index === undefined) {
-        return;
-      }
-      days[index].count += 1;
-    });
-
-    return days;
-  }, [historicoFiltrado]);
-
-  const maxEnviosDia = Math.max(
-    1,
-    ...enviosUltimos30Dias.map((item) => item.count),
-  );
-  const maxPrestadorEnvios = Math.max(
-    1,
-    ...Object.values(prestadorResumo),
-  );
-  const maxTipoEnvios = Math.max(1, ...Object.values(tipoResumo));
-  const maxStatusEnvios = Math.max(1, ...Object.values(statusResumo));
-
-  const statusOrdenado = useMemo(
-    () =>
-      Object.entries(statusResumo).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0)),
-    [statusResumo],
-  );
-
-  const tipoOrdenado = useMemo(
-    () =>
-      Object.entries(tipoResumo).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0)),
-    [tipoResumo],
-  );
-
-  const prestadorOrdenado = useMemo(() => {
-    return prestadoresDoUsuario
-      .map((prestador) => ({
-        id: prestador.id,
-        nome: prestador.nome,
-        tipo: prestador.tipo_servico,
-        total: prestadorResumo[prestador.id] ?? 0,
-      }))
-      .sort((a, b) => b.total - a.total);
-  }, [prestadoresDoUsuario, prestadorResumo]);
-
-  const regrasPorPrestador = useMemo(() => {
-    return regras.reduce<Record<string, PrestadorRegra[]>>((acc, regra) => {
-      if (!acc[regra.prestador_id]) {
-        acc[regra.prestador_id] = [];
-      }
-      acc[regra.prestador_id].push(regra);
-      return acc;
-    }, {});
-  }, [regras]);
-
-  const prestadoresProgresso = useMemo(() => {
-    const now = new Date();
-    return prestadoresDoUsuario.map((prestador) => {
-      const regrasDoPrestador = regrasPorPrestador[prestador.id] ?? [];
-      const progresso = regrasDoPrestador.map((regra) => {
-        const enviados = historicoFiltrado.filter((item) => {
-          if (item.prestador_id !== prestador.id) {
-            return false;
-          }
-          if (!isInPeriodo(item.created_at, regra.periodo, now)) {
-            return false;
-          }
-          return true;
-        }).length;
-        const percentual =
-          regra.quantidade > 0
-            ? Math.min((enviados / regra.quantidade) * 100, 100)
-            : 0;
-        return {
-          regra,
-          enviados,
-          percentual,
-        };
-      });
-      return {
-        prestador,
-        progresso,
-      };
-    });
-  }, [historicoFiltrado, prestadoresDoUsuario, regrasPorPrestador]);
-
-  const kpiCards = useMemo(
-    () => [
-      {
-        label: "Total de documentos",
-        value: documentosKpis?.totalDocumentos ?? 0,
-        icon: FileText,
-      },
-      { label: "Pendentes", value: documentosKpis?.pendentes ?? 0, icon: Clock },
-      {
-        label: "Em análise",
-        value: documentosKpis?.emAnalise ?? 0,
-        icon: TriangleAlert,
-      },
-      {
-        label: "Assinados",
-        value: documentosKpis?.assinados ?? 0,
-        icon: CheckCircle2,
-      },
-      { label: "Sem loja", value: documentosKpis?.semLoja ?? 0, icon: Store },
-      {
-        label: "Sem prestador",
-        value: documentosKpis?.semPrestador ?? 0,
-        icon: Building2,
-      },
-      {
-        label: "Enviados hoje",
-        value: documentosKpis?.enviadosHoje ?? 0,
-        icon: CalendarDays,
-      },
-      {
-        label: "Enviados no mês",
-        value: documentosKpis?.enviadosNoMes ?? 0,
-        icon: CalendarDays,
-      },
-      {
-        label: "Aguardando assinatura",
-        value: documentosKpis?.aguardandoAssinatura ?? 0,
-        icon: Signature,
-      },
-    ],
-    [documentosKpis],
-  );
-  return isBlocked ? (
-    <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
-      {authError ?? "Carregando formularios..."}
-    </div>
-  ) : (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-            {"Formul\u00e1rios"}
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {"Escolha um tipo de formul\u00e1rio para iniciar o envio de documentos."}
-          </p>
-        </div>
-        <Link
-          href="/documentos"
-          className="inline-flex items-center rounded-full border border-sky-500/70 bg-sky-50 px-4 py-1.5 text-xs font-medium text-sky-700 shadow-sm shadow-sky-200/80 transition hover:bg-sky-100"
-        >
-          Ver documentos enviados
-        </Link>
+  if (authError) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
+        {authError}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 text-xs font-semibold text-slate-500">
-          <button
-            type="button"
-            onClick={() => setDashboardTab("formularios")}
-            className={`rounded-full px-3 py-1.5 transition ${
-              dashboardTab === "formularios"
-                ? "bg-white text-slate-700 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            Formulários
-          </button>
-          <button
-            type="button"
-            onClick={() => setDashboardTab("monitoramento")}
-            className={`rounded-full px-3 py-1.5 transition ${
-              dashboardTab === "monitoramento"
-                ? "bg-white text-slate-700 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            Monitoramento
-          </button>
-        </div>
-      </div>
-      <div className="rounded-2xl bg-white/80 p-4 text-xs text-slate-600 shadow-sm shadow-slate-100/80">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Filtros globais
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  const kpiCards = [
+    {
+      label: "Pendências abertas",
+      value: kpis?.pendentes ?? 0,
+      icon: Clock,
+      accent: "bg-amber-50 text-amber-700",
+      href: "/documentos/pendencias",
+    },
+    {
+      label: "Aguardando assinatura",
+      value: kpis?.aguardandoAssinatura ?? 0,
+      icon: Signature,
+      accent: "bg-sky-50 text-sky-700",
+      href: "/documentos?tipo=registro_laudos&somenteDisponiveisLote=true",
+    },
+    {
+      label: "Enviados hoje",
+      value: kpis?.enviadosHoje ?? 0,
+      icon: FilePlus2,
+      accent: "bg-emerald-50 text-emerald-700",
+      href: "/documentos",
+    },
+    {
+      label: "Enviados no mês",
+      value: kpis?.enviadosNoMes ?? 0,
+      icon: ClipboardList,
+      accent: "bg-violet-50 text-violet-700",
+      href: "/dashboard/analises",
+    },
+  ];
+
+  const nomeCompleto = formatPersonName({
+    name: (user.user_metadata?.name as string | undefined) ?? null,
+    fullName: (user.user_metadata?.full_name as string | undefined) ?? null,
+    email: user.email ?? null,
+  });
+
+  return (
+    <div className="flex flex-1 flex-col gap-10 py-4">
+      {/* HERO */}
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-600 via-sky-500 to-emerald-500 p-6 text-white shadow-lg shadow-sky-200/60 sm:p-10">
+        <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute -bottom-20 -left-10 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+        <div className="relative flex flex-col gap-6">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-white/80">
+            <Sparkles className="h-3.5 w-3.5" />
+            Central de Documentos
+          </div>
+          <div className="max-w-2xl space-y-3">
+            <p className="text-sm font-medium uppercase tracking-widest text-white/85">
+              {nomeCompleto ? `Olá, ${nomeCompleto}` : "Bem-vindo"}
             </p>
-            <span className="text-[11px] text-slate-500">
-              Ajuste os filtros para todas as visualizações dos documentos.
-            </span>
+            <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-4xl">
+              Tudo o que você precisa em um só lugar.
+            </h1>
+            <p className="text-sm text-white/85 sm:text-base">
+              Plataforma para envio, acompanhamento, revisão, assinatura e consulta
+              de documentos operacionais. Use os atalhos abaixo para ir direto ao
+              que importa.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href="#modulos"
+              className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-sky-700 shadow-md shadow-sky-900/20 transition hover:bg-slate-50"
+            >
+              <FilePlus2 className="h-4 w-4" />
+              Enviar documento
+            </a>
+            <Link
+              href="/documentos"
+              className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20"
+            >
+              <FileSearch className="h-4 w-4" />
+              Consultar documentos
+            </Link>
+            <Link
+              href="/documentos/pendencias"
+              className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20"
+            >
+              <TriangleAlert className="h-4 w-4" />
+              Ver pendências
+            </Link>
           </div>
         </div>
-        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <label className="text-xs font-semibold text-slate-600">
-            {"Per\u00edodo"}
-            <select
-              value={historicoPeriodoFilter}
-              onChange={(event) => setHistoricoPeriodoFilter(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+      </section>
+
+      {/* KPIs leves */}
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {kpiCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <Link
+              key={card.label}
+              href={card.href}
+              className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
             >
-              <option value="ultimos_30_dias">Últimos 30 dias</option>
-              <option value="ultimos_90_dias">Últimos 90 dias</option>
-              <option value="mes_atual">Mês atual</option>
-              <option value="ano_atual">Ano atual</option>
-              <option value="todos">Todos os períodos</option>
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-slate-600">
-            Tipo
-            <select
-              value={historicoTipoFilter}
-              onChange={(event) => setHistoricoTipoFilter(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            >
-              {historicoTipoOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-slate-600">
-            Status
-            <select
-              value={historicoStatusFilter}
-              onChange={(event) => setHistoricoStatusFilter(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            >
-              {historicoStatusOptions.map((statusOption) => (
-                <option key={statusOption} value={statusOption}>
-                  {statusOption === "todos"
-                    ? "Todos os status"
-                    : formatStatus(statusOption)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </div>
-      <section className="rounded-2xl bg-white/80 p-4 shadow-sm shadow-slate-100/80">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              KPIs de documentos
-            </p>
-            <span className="text-[11px] text-slate-500">
-              Indicadores operacionais respeitando seu escopo de acesso.
-            </span>
-          </div>
-          {documentosKpisLoading ? (
-            <span className="text-[11px] font-semibold text-slate-400">
-              Atualizando...
-            </span>
-          ) : null}
-        </div>
-        {documentosKpisErro ? (
-          <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">
-            {documentosKpisErro}
-          </p>
-        ) : null}
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {kpiCards.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div
-                key={item.label}
-                className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    {item.label}
-                  </p>
-                  <Icon className="h-4 w-4 text-slate-400" />
-                </div>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">
-                  {documentosKpisLoading ? "--" : item.value}
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {card.label}
                 </p>
+                <span
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${card.accent}`}
+                >
+                  <Icon className="h-4 w-4" />
+                </span>
               </div>
+              <p className="mt-3 text-2xl font-semibold text-slate-900">
+                {kpisLoading ? "—" : card.value}
+              </p>
+              <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 group-hover:text-sky-600">
+                Abrir <ArrowRight className="h-3 w-3" />
+              </p>
+            </Link>
+          );
+        })}
+      </section>
+
+      {/* Módulos */}
+      <section id="modulos" className="space-y-4">
+        <header className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+              Módulos
+            </p>
+            <h2 className="text-lg font-semibold text-slate-900">
+              O que você quer fazer agora?
+            </h2>
+          </div>
+          <Link
+            href="/dashboard/analises"
+            className="hidden text-xs font-semibold text-sky-600 hover:text-sky-700 sm:inline-flex sm:items-center sm:gap-1"
+          >
+            Painel analítico <ArrowRight className="h-3 w-3" />
+          </Link>
+        </header>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {MODULES.map((module) => {
+            const Icon = module.icon;
+            return (
+              <Link
+                key={module.title}
+                href={module.href}
+                className="group flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-100 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+              >
+                <span
+                  className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border ${module.accent}`}
+                >
+                  <Icon className="h-5 w-5" />
+                </span>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    {module.title}
+                  </h3>
+                  <p className="text-xs leading-relaxed text-slate-500">
+                    {module.description}
+                  </p>
+                </div>
+                <span className="mt-auto inline-flex items-center gap-1 text-xs font-semibold text-sky-600 group-hover:text-sky-700">
+                  {module.cta} <ArrowRight className="h-3.5 w-3.5" />
+                </span>
+              </Link>
             );
           })}
         </div>
       </section>
-      {dashboardTab === "formularios" ? (
-        <>
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        {baseCards.map((card) => {
-          const resumo = resumoPorTipo[card.tipo];
-          const ultimoStatus = resumo?.ultimo?.status ?? null;
-          const ultimoNumeroPedido =
-            resumo?.ultimo?.dados &&
-            typeof resumo.ultimo.dados.numero_pedido === "string"
-              ? resumo.ultimo.dados.numero_pedido
-              : null;
 
-          return (
-            <Link
-              key={card.href}
-              href={card.href}
-              className="group relative overflow-hidden rounded-3xl bg-white p-6 shadow-md shadow-slate-200 transition hover:-translate-y-1 hover:shadow-lg"
-            >
-              <div
-                className={`pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br ${card.accent} opacity-80 blur-2xl`}
-              />
-              <div className="relative flex h-full flex-col gap-3">
-                <div className="flex items-center gap-2">
-                  <card.icon className="h-6 w-6 text-slate-700" />
-                  <h2 className="text-base font-semibold text-slate-900">
-                    {card.title}
-                  </h2>
-                </div>
-                <p className="text-sm text-slate-500">{card.description}</p>
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                  <span className="rounded-full bg-slate-100 px-2 py-1">
-                    {resumo?.total ? `${resumo.total} envio(s)` : "Nenhum envio"}
-                  </span>
-                  {resumo?.ultimo && (
-                    <span className="rounded-full bg-slate-100 px-2 py-1">
-                      Último envio: {formatData(resumo.ultimo.created_at)}
+      {/* Como funciona */}
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-100 sm:p-8">
+        <header className="mb-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+            Como funciona
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-900">
+            Do envio à consulta em 5 etapas
+          </h2>
+        </header>
+        <ol className="grid gap-3 lg:grid-cols-5">
+          {FLUXO_STEPS.map((step, index) => {
+            const Icon = step.icon;
+            const isLast = index === FLUXO_STEPS.length - 1;
+            return (
+              <li key={step.title} className="relative">
+                <div className="flex h-full flex-col gap-2 rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-sky-600 shadow-sm">
+                      <Icon className="h-4 w-4" />
                     </span>
-                  )}
-                </div>
-                {ultimoStatus && (
-                  <div className="text-[11px] text-slate-500">
-                    Status recente:{" "}
-                    <span className="font-semibold text-slate-700">
-                      {formatStatus(ultimoStatus)}
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      Etapa {index + 1}
                     </span>
                   </div>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    {step.title}
+                  </h3>
+                  <p className="text-xs leading-relaxed text-slate-500">
+                    {step.description}
+                  </p>
+                </div>
+                {!isLast && (
+                  <ArrowRight className="absolute right-[-14px] top-1/2 hidden h-4 w-4 -translate-y-1/2 text-slate-300 lg:block" />
                 )}
-                {ultimoNumeroPedido && (
-                  <div className="text-[11px] text-slate-500">
-                    Pedido recente:{" "}
-                    <span className="font-semibold text-slate-700">
-                      {ultimoNumeroPedido}
-                    </span>
-                  </div>
-                )}
-                <span className="mt-1 inline-flex items-center text-sm font-semibold text-emerald-700">
-                  Abrir formulário
-                  <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-700">
-                    &gt;
-                  </span>
-                </span>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
 
-      <section className="rounded-3xl bg-white/80 p-6 shadow-sm shadow-slate-100/80">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+      {/* Atividade recente */}
+      <section className="space-y-4">
+        <header className="flex items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Histórico de envios
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+              Atividade recente
             </p>
-            <span className="text-[11px] text-slate-500">
-              Consulte rapidamente os formulários enviados pelo seu grupo.
-            </span>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Últimos envios da plataforma
+            </h2>
           </div>
-          <span className="text-[11px] text-slate-400">
-            {historicoTotal !== null
-              ? `Carregados ${historico.length} de ${historicoTotal}`
-              : `Carregados ${historico.length}`}{" "}
-            · Mostrando {historicoFiltrado.length} após filtros
-          </span>
-        </div>
-
-        {historicoLoading ? (
-          <p className="mt-4 text-xs text-slate-500">
-            Carregando histórico de envios...
-          </p>
-        ) : historicoErro ? (
-          <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
-            {historicoErro}
-          </p>
-        ) : historicoFiltrado.length === 0 ? (
-          <p className="mt-4 text-xs text-slate-500">
-            Ainda não há envios registrados para o seu acesso.
-          </p>
-        ) : (
-          <>
-            <ul className="mt-4 space-y-3 text-xs text-slate-600">
-              {historicoFiltrado.map((registro) => {
-                const pathParaVisualizar =
-                  resolveSignedPdfPath(registro.arquivo_assinado_path) ??
-                  registro.arquivo_assinado_path ??
-                  registro.arquivo_path;
-                const podeVisualizar = Boolean(pathParaVisualizar);
-
+          <Link
+            href="/documentos"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-sky-600 hover:text-sky-700"
+          >
+            Ver todos em Documentos <ArrowRight className="h-3 w-3" />
+          </Link>
+        </header>
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-100">
+          {atividadesLoading ? (
+            <p className="px-4 py-6 text-center text-xs text-slate-500">
+              Carregando atividade recente...
+            </p>
+          ) : atividades.length === 0 ? (
+            <p className="px-4 py-6 text-center text-xs text-slate-500">
+              Nenhum envio registrado ainda. Comece pelos módulos acima.
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {atividades.slice(0, 5).map((registro) => {
+                const status = registro.status;
+                const dadosLojaNome =
+                  typeof registro.dados?.loja_nome === "string"
+                    ? fixMojibakeText(registro.dados.loja_nome)
+                    : null;
+                const prestadorNome =
+                  typeof registro.dados?.prestador === "string"
+                    ? fixMojibakeText(registro.dados.prestador)
+                    : null;
                 return (
                   <li
                     key={registro.id}
-                    className="rounded-2xl bg-slate-50/80 px-4 py-3"
+                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">
-                          {getDocumentoNome(registro)}
-                        </p>
-                        <p className="text-[11px] text-slate-500">
-                          {formatTipo(registro.tipo)}
-                        </p>
-                        <p className="text-[11px] text-slate-500">
-                          Enviado em {formatData(registro.created_at)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void abrirDocumento(registro)}
-                          disabled={!podeVisualizar}
-                          className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          title="Visualizar documento"
-                          aria-label="Visualizar documento"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        <span
-                          className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                            registro.status === "assinado"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : registro.status === "em_analise"
-                                ? "bg-amber-50 text-amber-700"
-                                : "bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          {formatStatus(registro.status)}
-                        </span>
-                      </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {getDocumentoNome(registro)}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-500">
+                        {TIPO_LABEL[registro.tipo] ?? registro.tipo}
+                        {dadosLojaNome ? ` • ${dadosLojaNome}` : ""}
+                        {prestadorNome ? ` • ${prestadorNome}` : ""}
+                      </p>
                     </div>
-                    {registro.dados &&
-                      typeof registro.dados.numero_pedido === "string" && (
-                        <p className="mt-1 text-[11px] text-slate-500">
-                          Pedido: {registro.dados.numero_pedido}
-                        </p>
-                      )}
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                          STATUS_BADGE[status] ?? "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {STATUS_LABEL[status] ?? status}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        {formatDataCurta(registro.created_at)}
+                      </span>
+                      <Link
+                        href={`/documentos/${registro.id}`}
+                        className="inline-flex items-center justify-center rounded-full border border-slate-200 p-1.5 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+                        aria-label="Abrir documento"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
                   </li>
                 );
               })}
             </ul>
-            {historicoHasMore && (
-              <div className="mt-4 flex justify-center">
-                <button
-                  type="button"
-                  onClick={handleLoadMoreHistorico}
-                  disabled={historicoLoadingMore}
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {historicoLoadingMore ? "Carregando..." : "Carregar mais"}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </section>
-        </>
-      ) : (
-      <section className="rounded-3xl bg-white/80 p-6 shadow-sm shadow-slate-100/80">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Progresso por prestador
-            </p>
-            <span className="text-[11px] text-slate-500">
-              {
-                "Monitoramento de envios no per\u00edodo da regra (mensal/anual)."
-              }
-            </span>
-          </div>
-          <span className="text-[11px] text-slate-400">
-            {prestadoresProgresso.length} prestador(es) monitorados
-          </span>
+          )}
         </div>
-
-        {regrasLoading ? (
-          <p className="mt-4 text-xs text-slate-500">
-            Carregando regras de progresso...
-          </p>
-        ) : regrasErro ? (
-          <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
-            {regrasErro}
-          </p>
-        ) : prestadoresProgresso.length === 0 ? (
-          <p className="mt-4 text-xs text-slate-500">
-            Nenhum prestador vinculado ao seu usuário.
-          </p>
-        ) : (
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {prestadoresProgresso.map((item) => (
-              <div
-                key={item.prestador.id}
-                className="rounded-2xl bg-slate-50/70 px-4 py-3 text-xs text-slate-600"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">
-                      {item.prestador.nome}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      {item.prestador.tipo_servico}
-                    </p>
-                  </div>
-                  <span className="text-[11px] text-slate-500">
-                    {item.progresso.length} regra(s)
-                  </span>
-                </div>
-
-                {item.progresso.length === 0 ? (
-                  <p className="mt-3 text-[11px] text-slate-500">
-                    Nenhuma regra cadastrada.
-                  </p>
-                ) : (
-                  <div className="mt-3 space-y-3">
-                    {item.progresso.map(({ regra, enviados, percentual }) => {
-                      const label =
-                        regra.label?.trim() ||
-                        (regra.tipo_regra === "formulario"
-                          ? TIPO_LABEL[regra.alvo] ?? regra.alvo
-                          : regra.alvo);
-                      const faltam = Math.max(regra.quantidade - enviados, 0);
-
-                      return (
-                        <div key={regra.id} className="space-y-1">
-                          <div className="flex items-center justify-between text-[11px] text-slate-500">
-                            <span className="font-semibold text-slate-700">
-                              {label}
-                            </span>
-                            <span>
-                              Enviados: {enviados} / Meta: {regra.quantidade}
-                            </span>
-                          </div>
-                          <div className="h-2 w-full rounded-full bg-white">
-                            <div
-                              className="h-2 rounded-full bg-gradient-to-r from-emerald-400 via-sky-400 to-sky-300 transition-all"
-                              style={{ width: `${percentual}%` }}
-                            />
-                          </div>
-                          <p className="text-[11px] text-slate-500">
-                            Faltam {faltam} envio(s)
-                          </p>
-                          <p className="text-[11px] text-slate-500">
-                            {Math.round(percentual)}% no {regra.periodo === "mensal" ? "mês" : "ano"} atual
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
       </section>
-      )}
+
+      {/* Rodapé sutil */}
+      <section className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-5 text-xs text-slate-500">
+        <p className="flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+          Está procurando KPIs detalhados, gráficos de volume e distribuição? Vá
+          para{" "}
+          <Link
+            href="/dashboard/analises"
+            className="font-semibold text-sky-600 hover:text-sky-700"
+          >
+            Painel analítico
+          </Link>
+          .
+        </p>
+      </section>
     </div>
   );
 }
-
-
-
