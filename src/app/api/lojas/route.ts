@@ -7,13 +7,25 @@ import {
 } from "@/lib/apiAuth";
 import { fixMojibakeText } from "@/lib/textEncoding";
 
+type LojaCategoria = "LOJA" | "CD" | "FARMA" | "REVISAR";
+
 type LojaRow = {
   id: string;
   nome: string;
   codigo?: string | null;
   usuarios?: string[] | null;
+  categoria?: string | null;
   created_at: string;
 };
+
+const VALID_CATEGORIAS: LojaCategoria[] = ["LOJA", "CD", "FARMA", "REVISAR"];
+
+function normalizeCategoria(value: string | null | undefined): LojaCategoria {
+  if (value && (VALID_CATEGORIAS as string[]).includes(value)) {
+    return value as LojaCategoria;
+  }
+  return "REVISAR";
+}
 
 function normalizeEmails(values: string[]) {
   return values
@@ -27,8 +39,29 @@ function normalizeLoja(item: LojaRow) {
     nome: fixMojibakeText(item.nome),
     codigo: item.codigo ? fixMojibakeText(item.codigo) : null,
     usuarios: item.usuarios ?? [],
+    categoria: normalizeCategoria(item.categoria),
     created_at: item.created_at,
   };
+}
+
+function compareCodigo(a: string | null, b: string | null) {
+  if (a === b) {
+    return 0;
+  }
+  if (a === null) {
+    return 1;
+  }
+  if (b === null) {
+    return -1;
+  }
+  const numA = Number(a);
+  const numB = Number(b);
+  const aNumeric = Number.isFinite(numA);
+  const bNumeric = Number.isFinite(numB);
+  if (aNumeric && bNumeric) {
+    return numA - numB;
+  }
+  return a.localeCompare(b);
 }
 
 export async function GET(request: Request) {
@@ -38,23 +71,24 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabaseAdmin
       .from("lojas")
-      .select("id,nome,codigo,usuarios,created_at")
-      .order("nome", { ascending: true });
+      .select("id,nome,codigo,usuarios,categoria,created_at");
 
     if (error) {
       throw error;
     }
 
-    const lojas =
-      data?.map((item) =>
+    const lojas = (data ?? [])
+      .map((item) =>
         normalizeLoja({
           id: item.id as string,
           nome: item.nome as string,
           codigo: (item.codigo as string | null) ?? null,
           usuarios: (item.usuarios as string[] | null) ?? [],
+          categoria: (item.categoria as string | null) ?? null,
           created_at: item.created_at as string,
         }),
-      ) ?? [];
+      )
+      .sort((a, b) => compareCodigo(a.codigo, b.codigo));
 
     return NextResponse.json({ lojas });
   } catch (err) {
@@ -100,7 +134,7 @@ export async function POST(request: Request) {
         codigo,
         usuarios,
       })
-      .select("id,nome,codigo,usuarios,created_at")
+      .select("id,nome,codigo,usuarios,categoria,created_at")
       .single();
 
     if (error || !data) {
@@ -113,6 +147,7 @@ export async function POST(request: Request) {
         nome: data.nome as string,
         codigo: (data.codigo as string | null) ?? null,
         usuarios: (data.usuarios as string[] | null) ?? [],
+        categoria: (data.categoria as string | null) ?? null,
         created_at: data.created_at as string,
       }),
     });
@@ -168,7 +203,7 @@ export async function PATCH(request: Request) {
       .from("lojas")
       .update(updates)
       .eq("id", body.id)
-      .select("id,nome,codigo,usuarios,created_at")
+      .select("id,nome,codigo,usuarios,categoria,created_at")
       .single();
 
     if (error || !data) {
@@ -181,6 +216,7 @@ export async function PATCH(request: Request) {
         nome: data.nome as string,
         codigo: (data.codigo as string | null) ?? null,
         usuarios: (data.usuarios as string[] | null) ?? [],
+        categoria: (data.categoria as string | null) ?? null,
         created_at: data.created_at as string,
       }),
     });

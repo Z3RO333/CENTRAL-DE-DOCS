@@ -5,9 +5,35 @@ import { useRouter } from "next/navigation";
 import { Pencil, Search, Trash2, X } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
-import { useLojas, type Loja } from "@/hooks/useLojas";
+import { useLojas, type Loja, type LojaCategoria } from "@/hooks/useLojas";
 
 const PAGE_SIZES = [10, 20, 50];
+
+type CategoriaFilter = "todas" | LojaCategoria;
+
+const CATEGORIA_LABEL: Record<LojaCategoria, string> = {
+  LOJA: "Loja",
+  CD: "CD",
+  FARMA: "Farma",
+  REVISAR: "Revisar",
+};
+
+const CATEGORIA_BADGE: Record<LojaCategoria, string> = {
+  LOJA: "bg-sky-50 text-sky-700",
+  CD: "bg-violet-50 text-violet-700",
+  FARMA: "bg-emerald-50 text-emerald-700",
+  REVISAR: "bg-amber-100 text-amber-700",
+};
+
+const compareCodigo = (a: string | null, b: string | null) => {
+  if (a === b) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  const numA = Number(a);
+  const numB = Number(b);
+  if (Number.isFinite(numA) && Number.isFinite(numB)) return numA - numB;
+  return a.localeCompare(b);
+};
 
 type FeedbackState = {
   kind: "success" | "error";
@@ -34,6 +60,7 @@ export default function LojasPage() {
   } = useLojas({ enabled: isAdmin });
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [categoriaFilter, setCategoriaFilter] = useState<CategoriaFilter>("todas");
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
   const [currentPage, setCurrentPage] = useState(1);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
@@ -58,19 +85,25 @@ export default function LojasPage() {
   }, [authLoading, accessLoading, user, isAdmin, router]);
 
   const filteredLojas = useMemo(() => {
-    if (!searchTerm.trim()) {
-      return lojas;
-    }
+    const base =
+      categoriaFilter === "todas"
+        ? lojas
+        : lojas.filter((loja) => loja.categoria === categoriaFilter);
     const query = searchTerm.trim().toLowerCase();
-    return lojas.filter((loja) => {
-      const nome = loja.nome.toLowerCase();
-      const codigo = loja.codigo?.toLowerCase() ?? "";
-      const emails = loja.usuarios.join(" ").toLowerCase();
-      return (
-        nome.includes(query) || codigo.includes(query) || emails.includes(query)
-      );
-    });
-  }, [lojas, searchTerm]);
+    const filtered = !query
+      ? base
+      : base.filter((loja) => {
+          const nome = loja.nome.toLowerCase();
+          const codigo = loja.codigo?.toLowerCase() ?? "";
+          const emails = loja.usuarios.join(" ").toLowerCase();
+          return (
+            nome.includes(query) ||
+            codigo.includes(query) ||
+            emails.includes(query)
+          );
+        });
+    return [...filtered].sort((a, b) => compareCodigo(a.codigo, b.codigo));
+  }, [lojas, searchTerm, categoriaFilter]);
 
   const visibleLojas = useMemo(
     () =>
@@ -83,7 +116,20 @@ export default function LojasPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, pageSize]);
+  }, [searchTerm, pageSize, categoriaFilter]);
+
+  const categoriaCount = useMemo(() => {
+    const counts: Record<LojaCategoria, number> = {
+      LOJA: 0,
+      CD: 0,
+      FARMA: 0,
+      REVISAR: 0,
+    };
+    for (const loja of lojas) {
+      counts[loja.categoria] = (counts[loja.categoria] ?? 0) + 1;
+    }
+    return counts;
+  }, [lojas]);
 
   const totalPages = Math.max(1, Math.ceil(filteredLojas.length / pageSize));
 
@@ -269,6 +315,37 @@ export default function LojasPage() {
             </select>
           </label>
         </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {(["todas", "LOJA", "CD", "FARMA", "REVISAR"] as CategoriaFilter[]).map(
+            (option) => {
+              const active = categoriaFilter === option;
+              const count =
+                option === "todas"
+                  ? lojas.length
+                  : categoriaCount[option as LojaCategoria];
+              const label =
+                option === "todas"
+                  ? "Todas"
+                  : CATEGORIA_LABEL[option as LojaCategoria];
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setCategoriaFilter(option)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                    active
+                      ? option === "REVISAR"
+                        ? "border-amber-300 bg-amber-100 text-amber-800"
+                        : "border-sky-300 bg-sky-100 text-sky-800"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  {label} ({count})
+                </button>
+              );
+            },
+          )}
+        </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
           <span>
             Mostrando {showingFrom}-{showingTo} de {filteredLojas.length} registros
@@ -315,9 +392,20 @@ export default function LojasPage() {
                 key={loja.id}
                 className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700"
               >
-                <p className="font-semibold text-slate-900">{loja.nome}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-semibold text-slate-900">
+                    <span className="font-mono text-xs text-slate-500">
+                      {loja.codigo ?? "—"}
+                    </span>{" "}
+                    - {loja.nome}
+                  </p>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${CATEGORIA_BADGE[loja.categoria]}`}
+                  >
+                    {CATEGORIA_LABEL[loja.categoria]}
+                  </span>
+                </div>
                 <div className="mt-2 space-y-1 text-xs text-slate-500">
-                  <p>Codigo: {loja.codigo ?? "-"}</p>
                   <p>{loja.usuarios.length} e-mail(s) vinculado(s)</p>
                 </div>
                 <div className="mt-3 flex items-center justify-end gap-2">
@@ -344,37 +432,47 @@ export default function LojasPage() {
         </div>
 
         <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[560px] text-sm">
+          <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-5 py-3 text-left">Loja</th>
-                <th className="px-5 py-3 text-left">Código</th>
-                <th className="px-5 py-3 text-left">Emails vinculados</th>
-                <th className="px-5 py-3 text-right"></th>
+                <th className="px-5 py-3 text-left">Centro</th>
+                <th className="px-5 py-3 text-left">Unidade</th>
+                <th className="px-5 py-3 text-left">Categoria</th>
+                <th className="px-5 py-3 text-left">Emails</th>
+                <th className="px-5 py-3 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {lojasLoading ? (
                 <tr>
-                  <td className="px-5 py-6 text-center text-slate-500" colSpan={4}>
+                  <td className="px-5 py-6 text-center text-slate-500" colSpan={5}>
                     Carregando lojas...
                   </td>
                 </tr>
               ) : visibleLojas.length === 0 ? (
                 <tr>
-                  <td className="px-5 py-6 text-center text-slate-500" colSpan={4}>
+                  <td className="px-5 py-6 text-center text-slate-500" colSpan={5}>
                     Nenhuma loja encontrada.
                   </td>
                 </tr>
               ) : (
                 visibleLojas.map((loja) => (
                   <tr key={loja.id} className="text-slate-700">
+                    <td className="px-5 py-4 font-mono text-xs text-slate-500">
+                      {loja.codigo ?? "—"}
+                    </td>
                     <td className="px-5 py-4">
                       <div className="font-semibold text-slate-900">
                         {loja.nome}
                       </div>
                     </td>
-                    <td className="px-5 py-4">{loja.codigo ?? "-"}</td>
+                    <td className="px-5 py-4">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${CATEGORIA_BADGE[loja.categoria]}`}
+                      >
+                        {CATEGORIA_LABEL[loja.categoria]}
+                      </span>
+                    </td>
                     <td className="px-5 py-4">
                       {loja.usuarios.length} e-mail(s)
                     </td>

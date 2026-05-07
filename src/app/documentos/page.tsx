@@ -1665,11 +1665,13 @@ export default function DocumentosPage() {
   );
 
   const lojaOptions = useMemo(() => {
+    const formatLojaLabel = (codigo: string | null, nome: string) =>
+      codigo ? `${codigo} - ${nome}` : nome;
     const base = [
       { value: "todos", label: "Todas as lojas" },
       ...lojas.map((loja) => ({
         value: loja.id,
-        label: loja.codigo ? `${loja.nome} - ${loja.codigo}` : loja.nome,
+        label: formatLojaLabel(loja.codigo, loja.nome),
       })),
     ];
     if (filterOptions.lojas.length === 0) {
@@ -1677,7 +1679,7 @@ export default function DocumentosPage() {
     }
     const extras = filterOptions.lojas.map((loja) => ({
       value: loja.id,
-      label: loja.codigo ? `${loja.nome} - ${loja.codigo}` : loja.nome,
+      label: formatLojaLabel(loja.codigo, loja.nome),
     }));
     const unique = new Map<string, { value: string; label: string }>();
     [...base, ...extras].forEach((item) => unique.set(item.value, item));

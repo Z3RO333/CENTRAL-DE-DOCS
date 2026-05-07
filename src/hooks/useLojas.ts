@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
+export type LojaCategoria = "LOJA" | "CD" | "FARMA" | "REVISAR";
+
 export type Loja = {
   id: string;
   nome: string;
   codigo: string | null;
   usuarios: string[];
+  categoria: LojaCategoria;
   created_at: string;
 };
 

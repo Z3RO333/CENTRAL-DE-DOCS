@@ -138,6 +138,12 @@ export async function GET(request: Request) {
       query = query.or(accessOr.join(","));
     }
 
+    if (filterPrestadores.length === 1) {
+      query = query.eq("prestador_id", filterPrestadores[0]);
+    } else if (filterPrestadores.length > 1) {
+      query = query.in("prestador_id", filterPrestadores);
+    }
+
     if (tipoFilter && tipoFilter !== "todos") {
       query = query.eq("tipo", tipoFilter);
     }

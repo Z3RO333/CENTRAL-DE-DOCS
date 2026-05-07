@@ -9,6 +9,7 @@ import {
   Table as TableIcon,
   X,
 } from "lucide-react";
+import { SearchableSelect } from "@/components/SearchableSelect";
 
 type FilterOption = {
   value: string;
@@ -338,38 +339,32 @@ export function DocumentosFilters({
                 {(canManageDocuments || lojaOptions.length > 1) && (
                   <label className="text-xs font-semibold text-slate-600">
                     Loja
-                    <select
-                      value={lojaFilter}
-                      onChange={(event) => onLojaFilterChange(event.target.value)}
-                      disabled={filterOptionsLoading}
-                      className={inputClassName}
-                    >
-                      {lojaOptions.map((loja) => (
-                        <option key={loja.value} value={loja.value}>
-                          {loja.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="mt-1">
+                      <SearchableSelect
+                        options={lojaOptions}
+                        value={lojaFilter}
+                        onChange={onLojaFilterChange}
+                        disabled={filterOptionsLoading}
+                        searchPlaceholder="Buscar por centro ou nome..."
+                        ariaLabel="Loja"
+                      />
+                    </div>
                   </label>
                 )}
 
                 {prestadorOptions.length > 1 && (
                   <label className="text-xs font-semibold text-slate-600">
                     Prestador
-                    <select
-                      value={prestadorFilter}
-                      onChange={(event) =>
-                        onPrestadorFilterChange(event.target.value)
-                      }
-                      disabled={filterOptionsLoading}
-                      className={inputClassName}
-                    >
-                      {prestadorOptions.map((prestador) => (
-                        <option key={prestador.value} value={prestador.value}>
-                          {prestador.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="mt-1">
+                      <SearchableSelect
+                        options={prestadorOptions}
+                        value={prestadorFilter}
+                        onChange={onPrestadorFilterChange}
+                        disabled={filterOptionsLoading}
+                        searchPlaceholder="Buscar prestador..."
+                        ariaLabel="Prestador"
+                      />
+                    </div>
                   </label>
                 )}
 

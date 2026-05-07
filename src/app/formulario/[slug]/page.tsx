@@ -17,6 +17,7 @@ import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { useLojas } from "@/hooks/useLojas";
 import { resolveServicoOficial } from "@/lib/servicosVocab";
+import LojaCombobox from "./_components/LojaCombobox";
 
 type FormField = {
   name: string;
@@ -771,27 +772,14 @@ export default function FormularioPage() {
                   ))}
                 </select>
               ) : field.type === "select" && field.name === "loja_id" ? (
-                <select
+                <LojaCombobox
                   id={field.name}
                   required
+                  lojas={lojas}
+                  loading={lojasLoading}
                   value={values[field.name] ?? ""}
-                  onChange={(e) => handleLojaSelection(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-sky-500/40 placeholder:text-slate-400 focus:border-sky-500 focus:ring"
-                  disabled={lojasLoading || lojas.length === 0}
-                >
-                  <option value="">
-                    {lojasLoading
-                      ? "Carregando lojas..."
-                      : lojas.length === 0
-                        ? "Nenhuma loja cadastrada"
-                        : "Selecione uma loja"}
-                  </option>
-                  {lojas.map((loja) => (
-                    <option key={loja.id} value={loja.id}>
-                      {loja.codigo ? `${loja.nome} - ${loja.codigo}` : loja.nome}
-                    </option>
-                  ))}
-                </select>
+                  onChange={handleLojaSelection}
+                />
               ) : field.type === "textarea" ? (
                 <textarea
                   id={field.name}
@@ -839,7 +827,7 @@ export default function FormularioPage() {
                     ? "Carregando lojas disponíveis..."
                     : lojas.length === 0
                       ? "Cadastre uma loja antes de enviar documentos."
-                      : "Selecione a loja para vincular o envio."}
+                      : "Busque por centro (ex.: 101) ou nome (ex.: matriz, farma, shopping)."}
                 </p>
               )}
               {field.name === "competencia" && (

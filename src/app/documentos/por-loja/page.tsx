@@ -1010,7 +1010,7 @@ export default function DocumentosPorLojaPage() {
                           </option>
                           {lojasCadastradas.map((loja) => (
                             <option key={loja.id} value={loja.id}>
-                              {loja.codigo ? `${loja.nome} - ${loja.codigo}` : loja.nome}
+                              {loja.codigo ? `${loja.codigo} - ${loja.nome}` : loja.nome}
                             </option>
                           ))}
                         </select>
