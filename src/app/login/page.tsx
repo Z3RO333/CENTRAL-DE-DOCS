@@ -6,15 +6,21 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
 
+type AuthMode = "login" | "signup" | "recovery";
+
 export default function LoginPage() {
   const router = useRouter();
   const { user, isLoading: loadingSession } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoginMode, setIsLoginMode] = useState(true);
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  const isLoginMode = authMode === "login";
+  const isSignupMode = authMode === "signup";
+  const isRecoveryMode = authMode === "recovery";
 
   useEffect(() => {
     if (!loadingSession && user) {
@@ -29,6 +35,24 @@ export default function LoginPage() {
     setFeedback(null);
 
     try {
+      if (isRecoveryMode) {
+        const redirectTo = `${window.location.origin}/redefinir-senha`;
+        const { error: recoveryError } =
+          await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo,
+          });
+
+        if (recoveryError) {
+          setError(recoveryError.message);
+          return;
+        }
+
+        setFeedback(
+          "Enviamos um link para redefinir sua senha. Verifique a caixa de entrada e o spam.",
+        );
+        return;
+      }
+
       if (isLoginMode) {
         const { error: signInError } =
           await supabase.auth.signInWithPassword({
@@ -52,7 +76,7 @@ export default function LoginPage() {
         setFeedback(
           "Cadastro realizado! Confirme o seu e-mail para liberar o acesso e, em seguida, fa\u00e7a o login.",
         );
-        setIsLoginMode(true);
+        setAuthMode("login");
         return;
       }
 
@@ -108,7 +132,11 @@ export default function LoginPage() {
           <div className="relative rounded-[22px] border border-slate-200 bg-white/95 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.12)] backdrop-blur sm:p-8">
             <div className="mb-5 flex items-center justify-between text-xs text-slate-500">
               <span className="uppercase tracking-[0.2em]">
-                {isLoginMode ? "Acesso" : "Cadastro"}
+                {isRecoveryMode
+                  ? "Recuperar"
+                  : isSignupMode
+                    ? "Cadastro"
+                    : "Acesso"}
               </span>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold text-slate-600">
                 Portal interno
@@ -116,7 +144,11 @@ export default function LoginPage() {
             </div>
 
             <h2 className="mb-4 text-base font-semibold text-slate-900">
-              {isLoginMode ? "Entrar na sua conta" : "Criar uma nova conta"}
+              {isRecoveryMode
+                ? "Redefinir senha"
+                : isSignupMode
+                  ? "Criar uma nova conta"
+                  : "Entrar na sua conta"}
             </h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -135,22 +167,24 @@ export default function LoginPage() {
                   disabled={isProcessing}
                 />
               </div>
-              <div className="space-y-2 text-sm">
-                <label htmlFor="password" className="block text-slate-700">
-                  Senha
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  required
-                  minLength={6}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-sky-400/40 placeholder:text-slate-400 focus:border-sky-400 focus:ring"
-                  placeholder="Mínimo 6 caracteres"
-                  disabled={isProcessing}
-                />
-              </div>
+              {!isRecoveryMode && (
+                <div className="space-y-2 text-sm">
+                  <label htmlFor="password" className="block text-slate-700">
+                    Senha
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-sky-400/40 placeholder:text-slate-400 focus:border-sky-400 focus:ring"
+                    placeholder="Mínimo 6 caracteres"
+                    disabled={isProcessing}
+                  />
+                </div>
+              )}
 
               {error && (
                 <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -170,21 +204,50 @@ export default function LoginPage() {
               >
                 {isProcessing
                   ? "Enviando..."
-                  : isLoginMode
+                  : isRecoveryMode
+                    ? "Enviar link de redefinição"
+                    : isLoginMode
                     ? "Entrar"
                     : "Criar conta"}
               </button>
             </form>
 
+            {isLoginMode && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode("recovery");
+                  setPassword("");
+                  setError(null);
+                  setFeedback(null);
+                }}
+                disabled={isProcessing}
+                className="mt-4 w-full text-center text-xs font-medium text-sky-600 hover:text-sky-500 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Esqueci minha senha
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={() => setIsLoginMode((prev) => !prev)}
+              onClick={() => {
+                setAuthMode((prev) => {
+                  if (prev === "signup" || prev === "recovery") {
+                    return "login";
+                  }
+                  return "signup";
+                });
+                setError(null);
+                setFeedback(null);
+              }}
               disabled={isProcessing}
               className="mt-4 w-full text-center text-xs text-slate-500 hover:text-sky-500 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {isLoginMode
-                ? "Ainda n\u00e3o tem conta? Criar conta"
-                : "J\u00e1 tem conta? Fazer login"}
+              {isRecoveryMode
+                ? "Voltar para login"
+                : isSignupMode
+                ? "J\u00e1 tem conta? Fazer login"
+                : "Ainda n\u00e3o tem conta? Criar conta"}
             </button>
 
           </div>

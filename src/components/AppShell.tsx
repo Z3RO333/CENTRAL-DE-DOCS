@@ -36,7 +36,8 @@ export default function AppShell({
   const { user, isLoading, error: authError, refresh } = useAuth();
   const { isAdmin, modules: modulesAccess, loading: documentsAccessLoading } =
     useDocumentsAccess();
-  const showNav = pathname !== "/login";
+  const publicRoutes = new Set(["/login", "/redefinir-senha"]);
+  const showNav = !publicRoutes.has(pathname ?? "");
   const isDocumentsRoute = pathname?.startsWith("/documentos");
   const isCopilotRoute = pathname?.startsWith("/copilot");
 
