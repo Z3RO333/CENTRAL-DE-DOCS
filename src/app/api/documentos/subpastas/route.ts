@@ -42,6 +42,8 @@ const TIPO_LABEL: Record<string, string> = {
   retencao_trabalhista: "Retencao Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
+  contratos: "Contratos",
+  orcamentos: "Orcamentos",
 };
 
 const MESES: Record<string, string> = {
@@ -158,7 +160,7 @@ function buildExplorerFromRows(rows: FormularioRow[]): SubpastaNode[] {
     touchStats(monthMap.get(monthKey)!, row.created_at);
   });
 
-  const orderedTipos = ["retencao_trabalhista", "registro_laudos", "notas_fiscais"];
+  const orderedTipos = ["retencao_trabalhista", "registro_laudos", "notas_fiscais", "contratos", "orcamentos"];
   return Array.from(tipoMap.values())
     .map((node) => ({
       ...node,

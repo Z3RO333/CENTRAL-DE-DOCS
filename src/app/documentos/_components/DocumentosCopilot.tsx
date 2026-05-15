@@ -43,6 +43,8 @@ const tipoLabels: Record<string, string> = {
   retencao_trabalhista: "Retenção Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
+  contratos: "Contratos",
+  orcamentos: "Orçamentos",
 };
 
 const statusLabels: Record<string, string> = {

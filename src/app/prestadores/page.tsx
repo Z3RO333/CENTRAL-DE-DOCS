@@ -135,6 +135,8 @@ export default function PrestadoresPage() {
     { value: "registro_laudos", label: "Registro e Laudos" },
     { value: "retencao_trabalhista", label: "Retenção Trabalhista" },
     { value: "notas_fiscais", label: "Notas Fiscais" },
+    { value: "contratos", label: "Contratos" },
+    { value: "orcamentos", label: "Orçamentos" },
   ];
   const alvoSugestoes = useMemo(() => {
     if (regraForm.tipo_regra === "formulario") {

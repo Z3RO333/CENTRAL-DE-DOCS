@@ -36,7 +36,10 @@ export default function LoginPage() {
 
     try {
       if (isRecoveryMode) {
-        const redirectTo = `${window.location.origin}/redefinir-senha`;
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
+        const redirectTo = `${
+          siteUrl || window.location.origin
+        }/redefinir-senha`;
         const { error: recoveryError } =
           await supabase.auth.resetPasswordForEmail(email, {
             redirectTo,

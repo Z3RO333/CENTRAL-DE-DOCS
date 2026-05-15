@@ -8,6 +8,10 @@ for (const line of readFileSync(".env", "utf8").split(/\r?\n/)) {
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const siteUrl = (
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "https://formscentral-frbnd8hxhkhjh5hn.brazilsouth-01.azurewebsites.net"
+).replace(/\/$/, "");
 const email = process.argv[2];
 
 if (!email) {
@@ -20,8 +24,7 @@ const admin = createClient(url, serviceKey, {
 });
 
 const redirectTo =
-  process.argv[3] ||
-  "https://formscentral-frbnd8hxhkhjh5hn.brazilsouth-01.azurewebsites.net/";
+  process.argv[3] || `${siteUrl}/redefinir-senha`;
 
 const { data, error } = await admin.auth.admin.generateLink({
   type: "recovery",

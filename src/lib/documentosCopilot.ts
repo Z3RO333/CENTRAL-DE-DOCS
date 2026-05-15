@@ -23,6 +23,8 @@ export const DOCUMENTO_COPILOT_TYPES = {
   retencao_trabalhista: "Retenção Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
+  contratos: "Contratos",
+  orcamentos: "Orçamentos",
 } as const;
 
 export const DOCUMENTO_COPILOT_STATUS = [
@@ -172,6 +174,9 @@ const normalizeTipoValue = (value: string) => {
     "registro laudos": "registro_laudos",
     notas_fiscais: "notas_fiscais",
     "notas fiscais": "notas_fiscais",
+    contratos: "contratos",
+    orcamentos: "orcamentos",
+    "orçamentos": "orcamentos",
   };
   return map[normalized] ?? null;
 };
@@ -240,6 +245,10 @@ const getIdentificacao = (registro: {
       return getCampoTexto(registro.dados, ["prestador", "responsavel"]);
     case "notas_fiscais":
       return getCampoTexto(registro.dados, ["numero_pedido", "numero_nf"]);
+    case "contratos":
+      return getCampoTexto(registro.dados, ["numero_contrato", "prestador"]);
+    case "orcamentos":
+      return getCampoTexto(registro.dados, ["numero_orcamento", "prestador"]);
     default:
       return getCampoTexto(registro.dados, ["empresa", "prestador"]);
   }
@@ -256,6 +265,10 @@ const getComplemento = (registro: {
       return getCampoTexto(registro.dados, ["responsavel"]);
     case "notas_fiscais":
       return getCampoTexto(registro.dados, ["cnpj_emitente"]);
+    case "contratos":
+      return getCampoTexto(registro.dados, ["data_inicio"]);
+    case "orcamentos":
+      return getCampoTexto(registro.dados, ["data_validade"]);
     default:
       return getCampoTexto(registro.dados, ["observacoes", "cnpj"]);
   }
@@ -298,6 +311,8 @@ const TIPO_LABELS: Record<string, string> = {
   retencao_trabalhista: "Retenção Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
+  contratos: "Contratos",
+  orcamentos: "Orçamentos",
 };
 
 const MONTH_LABELS: Record<string, string> = {
@@ -809,7 +824,7 @@ const buildPrompt = (input: {
         "Regras: nunca invente documentos, nunca mencione dados fora do conjunto retornado, e nunca peça acesso admin.",
         "Se faltarem dados para filtrar com confiança, peça uma única pergunta de clarificação curta.",
         "Retorne sempre JSON válido com as chaves reply, filters e intent.",
-        "Valores válidos de tipo: retencao_trabalhista, registro_laudos, notas_fiscais.",
+        "Valores válidos de tipo: retencao_trabalhista, registro_laudos, notas_fiscais, contratos, orcamentos.",
         "Valores válidos de status: pendente, em_analise, revisado, assinado.",
         "Se o usuário mencionar um tipo de laudo, preencha tipoLaudo.",
       ].join(" "),

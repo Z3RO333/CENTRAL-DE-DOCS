@@ -22,6 +22,8 @@ const tipoLabel: Record<string, string> = {
   retencao_trabalhista: "Retenção Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
+  contratos: "Contratos",
+  orcamentos: "Orçamentos",
 };
 export const TIPO_LABEL = tipoLabel;
 
@@ -44,6 +46,23 @@ const EDIT_FIELDS_BY_TIPO: Record<string, EditField[]> = {
     { name: "numero_nf", label: "Número da nota" },
     { name: "valor", label: "Valor", type: "number" },
     { name: "descricao", label: "Descrição / Histórico", type: "textarea" },
+  ],
+  contratos: [
+    { name: "prestador", label: "Prestador" },
+    { name: "numero_contrato", label: "Número do contrato" },
+    { name: "objeto", label: "Objeto do contrato", type: "textarea" },
+    { name: "data_inicio", label: "Data de início", type: "date" },
+    { name: "data_fim", label: "Data de término", type: "date" },
+    { name: "valor", label: "Valor", type: "number" },
+    { name: "observacoes", label: "Observações", type: "textarea" },
+  ],
+  orcamentos: [
+    { name: "prestador", label: "Prestador" },
+    { name: "numero_orcamento", label: "Número do orçamento" },
+    { name: "descricao", label: "Descrição dos serviços", type: "textarea" },
+    { name: "valor", label: "Valor", type: "number" },
+    { name: "data_validade", label: "Validade do orçamento", type: "date" },
+    { name: "observacoes", label: "Observações", type: "textarea" },
   ],
 };
 
@@ -139,6 +158,14 @@ const identificacaoFieldMap: Record<
     label: "Número do pedido",
     campos: ["numero_pedido"],
   },
+  contratos: {
+    label: "Número do contrato",
+    campos: ["numero_contrato", "prestador"],
+  },
+  orcamentos: {
+    label: "Número do orçamento",
+    campos: ["numero_orcamento", "prestador"],
+  },
 };
 
 const defaultIdentificacaoConfig = {
@@ -191,6 +218,10 @@ export const getIdentificacaoComplemento = (registro: FormularioRecord) => {
       return getCampoTexto(registro.dados, ["responsavel"]);
     case "notas_fiscais":
       return getCampoTexto(registro.dados, ["cnpj_emitente"]);
+    case "contratos":
+      return getCampoTexto(registro.dados, ["data_inicio"]);
+    case "orcamentos":
+      return getCampoTexto(registro.dados, ["data_validade"]);
     default:
       return getCampoTexto(registro.dados, ["cnpj_emitente", "cnpj"]);
   }

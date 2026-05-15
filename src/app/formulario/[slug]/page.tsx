@@ -160,6 +160,39 @@ const FORM_CONFIGS: FormConfig[] = [
       },
     ],
   },
+  {
+    slug: "contratos",
+    tipo: "contratos",
+    title: "Contratos",
+    description: "Cadastre e armazene contratos firmados com prestadores.",
+    defaultStatus: "em_analise",
+    fields: [
+      { name: "loja_id", label: "Loja", type: "select" },
+      { name: "prestador", label: "Prestador", type: "text", placeholder: "Nome do prestador" },
+      { name: "numero_contrato", label: "Número do contrato", type: "text", placeholder: "Ex.: CTR-2026-001" },
+      { name: "objeto", label: "Objeto do contrato", type: "textarea", placeholder: "Descreva o objeto do contrato" },
+      { name: "data_inicio", label: "Data de início", type: "date" },
+      { name: "data_fim", label: "Data de término", type: "date" },
+      { name: "valor", label: "Valor", type: "number", placeholder: "0,00" },
+      { name: "observacoes", label: "Observações", type: "textarea", placeholder: "Informações adicionais" },
+    ],
+  },
+  {
+    slug: "orcamentos",
+    tipo: "orcamentos",
+    title: "Orçamentos",
+    description: "Registre orçamentos recebidos de prestadores para controle e aprovação.",
+    defaultStatus: "em_analise",
+    fields: [
+      { name: "loja_id", label: "Loja", type: "select" },
+      { name: "prestador", label: "Prestador", type: "text", placeholder: "Nome do prestador" },
+      { name: "numero_orcamento", label: "Número do orçamento", type: "text", placeholder: "Ex.: ORC-2026-001" },
+      { name: "descricao", label: "Descrição dos serviços", type: "textarea", placeholder: "Descreva os serviços orçados" },
+      { name: "valor", label: "Valor", type: "number", placeholder: "0,00" },
+      { name: "data_validade", label: "Validade do orçamento", type: "date" },
+      { name: "observacoes", label: "Observações", type: "textarea", placeholder: "Informações adicionais" },
+    ],
+  },
 ];
 
 const FORM_TIPO_ASSINAVEL = "registro_laudos";
@@ -170,6 +203,8 @@ const tipoLabel: Record<string, string> = {
   retencao_trabalhista: "Retenção Trabalhista",
   registro_laudos: "Registro e Laudos",
   notas_fiscais: "Notas Fiscais",
+  contratos: "Contratos",
+  orcamentos: "Orçamentos",
 };
 
 const formatTipo = (tipo: string) => tipoLabel[tipo] ?? tipo;
