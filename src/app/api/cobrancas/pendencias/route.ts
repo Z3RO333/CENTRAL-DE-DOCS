@@ -7,6 +7,15 @@ import {
 } from "@/lib/apiAuth";
 import { levantarPendencias } from "@/lib/cobrancasService";
 
+function mascararEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!domain || local.length <= 2) return `${local[0]}***@${domain ?? ""}`;
+  const visivel = local.slice(0, 2);
+  const fim = local.slice(-1);
+  const asteriscos = "*".repeat(Math.max(local.length - 3, 3));
+  return `${visivel}${asteriscos}${fim}@${domain}`;
+}
+
 export async function GET(request: Request) {
   try {
     const user = await getSessionUserFromRequest(request);
@@ -32,6 +41,7 @@ export async function GET(request: Request) {
       {
         prestador_id: string;
         prestador_nome: string;
+        emails_contato: string[];
         ano_referencia: number;
         lojas: {
           loja_id: string;
@@ -50,6 +60,7 @@ export async function GET(request: Request) {
         porPrestador[p.prestador_id] = {
           prestador_id: p.prestador_id,
           prestador_nome: p.prestador_nome,
+          emails_contato: p.prestador_emails.map(mascararEmail),
           ano_referencia: p.ano_referencia,
           lojas: [],
         };
