@@ -50,6 +50,7 @@ AS $$
     WHERE f.prestador_id IS NOT NULL
       AND f.dados->>'loja_id' IS NOT NULL
       AND f.dados->>'loja_id' <> ''
+      AND f.tipo <> 'contratos'
     GROUP BY f.prestador_id, f.dados->>'loja_id'
   ),
   -- Passo 2: documentos do ano de referência, com mês extraído
@@ -61,6 +62,7 @@ AS $$
     FROM formularios f
     WHERE f.prestador_id IS NOT NULL
       AND f.dados->>'loja_id' IS NOT NULL
+      AND f.tipo <> 'contratos'
       AND f.created_at >= make_date(p_ano, 1, 1)::timestamptz
       AND f.created_at <  make_date(p_ano + 1, 1, 1)::timestamptz
   ),

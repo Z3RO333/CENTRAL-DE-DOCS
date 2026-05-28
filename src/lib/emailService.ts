@@ -1,4 +1,6 @@
 import sgMail from "@sendgrid/mail";
+import fs from "fs";
+import path from "path";
 
 const MESES_PT = [
   "JANEIRO",
@@ -26,6 +28,15 @@ export type PendenciaLoja = {
   total_faltante: number;
 };
 
+function carregarLogoBase64(): string | null {
+  try {
+    const logoPath = path.join(process.cwd(), "public", "logo-manutencao.png");
+    return fs.readFileSync(logoPath).toString("base64");
+  } catch {
+    return null;
+  }
+}
+
 export async function enviarEmailCobranca(params: {
   prestador_nome: string;
   destinatarios: string[];
@@ -46,69 +57,152 @@ export async function enviarEmailCobranca(params: {
   const { prestador_nome, destinatarios, ano_referencia, pendencias_por_loja } =
     params;
 
+  const logoBase64 = carregarLogoBase64();
+  const logoHtml = logoBase64
+    ? `<img src="cid:logo_manutencao" alt="Manutenção Bemol" style="height:52px;display:block;" />`
+    : `<span style="font-size:18px;font-weight:bold;color:#ffffff;">Manutenção Bemol</span>`;
+
   const detalhesHtml = pendencias_por_loja
     .map(
       (p) => `
-    <tr>
-      <td style="padding:8px 12px;border:1px solid #e0e0e0;">${p.loja_nome}</td>
-      <td style="padding:8px 12px;border:1px solid #e0e0e0;">${formatarMeses(p.meses_pendentes)}</td>
-      <td style="padding:8px 12px;border:1px solid #e0e0e0;text-align:center;">12</td>
-      <td style="padding:8px 12px;border:1px solid #e0e0e0;text-align:center;">${p.total_recebido}</td>
-      <td style="padding:8px 12px;border:1px solid #e0e0e0;text-align:center;color:#c0392b;font-weight:bold;">${p.total_faltante}</td>
-    </tr>`,
+      <tr>
+        <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#333;">${p.loja_nome}</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#e67e22;">${formatarMeses(p.meses_pendentes)}</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#555;">12</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#27ae60;font-weight:600;">${p.total_recebido}</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#c0392b;font-weight:700;">${p.total_faltante}</td>
+      </tr>`,
     )
     .join("");
 
-  const detalhesTxt = pendencias_por_loja
-    .map(
-      (p) =>
-        `Loja/Unidade: ${p.loja_nome}\n` +
-        `Meses pendentes: ${formatarMeses(p.meses_pendentes)}\n` +
-        `Documentos esperados: 12\n` +
-        `Documentos recebidos: ${p.total_recebido}\n` +
-        `Documentos faltantes: ${p.total_faltante}`,
-    )
-    .join("\n\n");
+  const totalFaltante = pendencias_por_loja.reduce(
+    (acc, p) => acc + p.total_faltante,
+    0,
+  );
+  const totalLojas = pendencias_por_loja.length;
 
-  const html = `
-<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="pt-BR">
-<head><meta charset="UTF-8"/></head>
-<body style="font-family:Arial,sans-serif;color:#333;max-width:700px;margin:0 auto;padding:24px;">
-  <p>Prezados,</p>
-  <p>
-    Identificamos pendências na documentação mensal obrigatória referente aos
-    geradores das lojas/unidades atendidas por este fornecedor.
-  </p>
-  <p>Segue abaixo o detalhamento:</p>
-  <p>
-    <strong>Fornecedor:</strong> ${prestador_nome}<br/>
-    <strong>Ano de referência:</strong> ${ano_referencia}
-  </p>
-  <h3 style="margin-top:24px;">Pendências identificadas:</h3>
-  <table style="border-collapse:collapse;width:100%;font-size:14px;">
-    <thead>
-      <tr style="background:#f5f5f5;">
-        <th style="padding:8px 12px;border:1px solid #e0e0e0;text-align:left;">Loja/Unidade</th>
-        <th style="padding:8px 12px;border:1px solid #e0e0e0;text-align:left;">Meses pendentes</th>
-        <th style="padding:8px 12px;border:1px solid #e0e0e0;">Esperados</th>
-        <th style="padding:8px 12px;border:1px solid #e0e0e0;">Recebidos</th>
-        <th style="padding:8px 12px;border:1px solid #e0e0e0;">Faltantes</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${detalhesHtml}
-    </tbody>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+</head>
+<body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;">
+
+          <!-- HEADER -->
+          <tr>
+            <td style="background:#1a2b4a;border-radius:8px 8px 0 0;padding:24px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>${logoHtml}</td>
+                  <td align="right" style="font-size:12px;color:#8fa3c0;vertical-align:bottom;">
+                    Ano de referência: <strong style="color:#ffffff;">${ano_referencia}</strong>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- TÍTULO -->
+          <tr>
+            <td style="background:#c0392b;padding:16px 32px;">
+              <p style="margin:0;font-size:15px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">
+                ⚠️ Pendência de Documentação Mensal — Geradores
+              </p>
+            </td>
+          </tr>
+
+          <!-- CORPO -->
+          <tr>
+            <td style="background:#ffffff;padding:32px;">
+
+              <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.6;">Prezados,</p>
+              <p style="margin:0 0 24px;font-size:15px;color:#333;line-height:1.6;">
+                Identificamos pendências na documentação mensal obrigatória referente aos
+                <strong>geradores das lojas/unidades</strong> atendidas por este fornecedor.
+              </p>
+
+              <!-- RESUMO -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+                <tr>
+                  <td style="background:#f8f9fa;border-radius:6px;padding:16px 20px;">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="font-size:13px;color:#666;">Fornecedor</td>
+                        <td style="font-size:13px;color:#666;text-align:right;">Lojas com pendência</td>
+                      </tr>
+                      <tr>
+                        <td style="font-size:16px;font-weight:700;color:#1a2b4a;padding-top:4px;">${prestador_nome}</td>
+                        <td style="font-size:16px;font-weight:700;color:#c0392b;text-align:right;padding-top:4px;">${totalLojas} loja${totalLojas > 1 ? "s" : ""} · ${totalFaltante} doc${totalFaltante > 1 ? "s" : ""} faltando</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- TABELA -->
+              <p style="margin:0 0 12px;font-size:14px;font-weight:700;color:#1a2b4a;text-transform:uppercase;letter-spacing:0.5px;">
+                Pendências identificadas
+              </p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:6px;overflow:hidden;">
+                <thead>
+                  <tr style="background:#f0f4f8;">
+                    <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:left;text-transform:uppercase;letter-spacing:0.4px;">Loja / Unidade</th>
+                    <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:left;text-transform:uppercase;letter-spacing:0.4px;">Meses pendentes</th>
+                    <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:center;text-transform:uppercase;letter-spacing:0.4px;">Esperados</th>
+                    <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:center;text-transform:uppercase;letter-spacing:0.4px;">Recebidos</th>
+                    <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:center;text-transform:uppercase;letter-spacing:0.4px;">Faltantes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${detalhesHtml}
+                </tbody>
+              </table>
+
+              <p style="margin:28px 0 16px;font-size:15px;color:#333;line-height:1.6;">
+                Solicitamos a <strong>regularização imediata</strong> das pendências acima.
+              </p>
+
+              <!-- ALERTA -->
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="background:#fff8e1;border-left:4px solid #f39c12;border-radius:0 6px 6px 0;padding:14px 18px;">
+                    <p style="margin:0;font-size:14px;color:#7d5a00;line-height:1.6;">
+                      <strong>Atenção:</strong> A ausência da documentação obrigatória poderá
+                      impactar diretamente o <strong>processo de pagamento</strong> do fornecedor
+                      até que todos os documentos exigidos sejam enviados e validados.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:28px 0 0;font-size:14px;color:#555;line-height:1.6;">
+                Atenciosamente,<br/>
+                <strong style="color:#1a2b4a;">Equipe de Manutenção</strong>
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background:#e8ecf0;border-radius:0 0 8px 8px;padding:16px 32px;text-align:center;">
+              <p style="margin:0;font-size:11px;color:#888;">
+                Este é um e-mail automático. Por favor, não responda diretamente a esta mensagem.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
   </table>
-  <p style="margin-top:24px;">
-    Solicitamos a regularização dessas pendências com urgência.
-  </p>
-  <p style="background:#fff3cd;border-left:4px solid #f0a500;padding:12px 16px;border-radius:4px;">
-    <strong>Atenção:</strong> A ausência da documentação obrigatória poderá impactar
-    diretamente o processo de pagamento do fornecedor até que todos os documentos
-    exigidos sejam enviados e validados.
-  </p>
-  <p>Atenciosamente,<br/><strong>Equipe de Manutenção</strong></p>
+
 </body>
 </html>`;
 
@@ -118,17 +212,41 @@ export async function enviarEmailCobranca(params: {
     `Fornecedor: ${prestador_nome}\n` +
     `Ano de referência: ${ano_referencia}\n\n` +
     `Pendências identificadas:\n\n` +
-    `${detalhesTxt}\n\n` +
-    `Solicitamos a regularização dessas pendências com urgência.\n\n` +
+    pendencias_por_loja
+      .map(
+        (p) =>
+          `Loja/Unidade: ${p.loja_nome}\n` +
+          `Meses pendentes: ${formatarMeses(p.meses_pendentes)}\n` +
+          `Documentos esperados: 12\n` +
+          `Documentos recebidos: ${p.total_recebido}\n` +
+          `Documentos faltantes: ${p.total_faltante}`,
+      )
+      .join("\n\n") +
+    `\n\nSolicitamos a regularização imediata das pendências acima.\n\n` +
     `Ressaltamos que a ausência da documentação obrigatória poderá impactar diretamente o processo de pagamento do fornecedor até que todos os documentos exigidos sejam enviados e validados.\n\n` +
     `Atenciosamente,\nEquipe de Manutenção`;
+
+  const ccList = destinatarios.includes(fromEmail) ? undefined : fromEmail;
+
+  const attachments = logoBase64
+    ? [
+        {
+          content: logoBase64,
+          filename: "logo-manutencao.png",
+          type: "image/png",
+          disposition: "inline" as const,
+          content_id: "logo_manutencao",
+        },
+      ]
+    : undefined;
 
   await sgMail.send({
     from: fromEmail,
     to: destinatarios,
-    cc: fromEmail,   // cópia para a caixa remetente confirmar o envio
+    ...(ccList ? { cc: ccList } : {}),
     subject: `Pendência de Documentação Mensal — Geradores (${ano_referencia})`,
     text,
     html,
+    ...(attachments ? { attachments } : {}),
   });
 }
