@@ -10,6 +10,17 @@ function nomeExcluido(nome: string): boolean {
   return PRESTADORES_EXCLUIDOS.has(fixMojibakeText(nome).trim().toUpperCase());
 }
 
+// Domínio interno: e-mails @bemol.com.br não são cobrados como fornecedor
+// (a manutenção ainda recebe cópia via CC do próprio remetente).
+const DOMINIO_INTERNO = "@bemol.com.br";
+
+function emailsExternos(usuarios: string[] | null): string[] {
+  return (usuarios ?? [])
+    .map((e) => e.trim())
+    .filter(Boolean)
+    .filter((e) => !e.toLowerCase().endsWith(DOMINIO_INTERNO));
+}
+
 export type PendenciaCobranca = {
   prestador_id: string;
   prestador_nome: string;
@@ -116,7 +127,7 @@ export async function levantarPendencias(
       return {
         prestador_id: row.prestador_id,
         prestador_nome: fixMojibakeText(prest.nome),
-        prestador_emails: (prest.usuarios ?? []).filter(Boolean),
+        prestador_emails: emailsExternos(prest.usuarios),
         loja_id: row.loja_id,
         loja_nome: fixMojibakeText(row.loja_nome ?? row.loja_id),
         ano_referencia: anoRef,
