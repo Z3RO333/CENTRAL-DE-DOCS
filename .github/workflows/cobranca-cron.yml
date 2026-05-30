@@ -1,0 +1,57 @@
+name: Cobrança de Documentação (agendada)
+
+# Roda diariamente, mas só dispara a cobrança no DIA 1 e no ÚLTIMO DIA do mês
+# (verificação feita no fuso America/Manaus). Também permite execução manual.
+on:
+  schedule:
+    - cron: "0 12 * * *" # 12:00 UTC = 09:00 Manaus (UTC-4). GitHub pode atrasar alguns min.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Simular sem enviar e-mails?"
+        type: boolean
+        default: true
+
+jobs:
+  disparar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar cobrança
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          ENDPOINT: "https://formscentral-frbnd8hxhkhjh5hn.brazilsouth-01.azurewebsites.net/api/cobrancas/disparar"
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Secret CRON_SECRET não configurado no repositório. Cobrança não enviada."
+            exit 1
+          fi
+
+          TODAY=$(TZ=America/Manaus date +%d)
+          TOMORROW=$(TZ=America/Manaus date -d '+1 day' +%d)
+
+          # Execução manual pela interface do GitHub
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            URL="$ENDPOINT"
+            if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+              URL="$ENDPOINT?dryRun=true"
+              echo "Execução MANUAL em modo dry-run (nenhum e-mail será enviado)."
+            else
+              echo "Execução MANUAL REAL (e-mails serão enviados)."
+            fi
+            code=$(curl -s -o /tmp/resp.json -w '%{http_code}' -X POST -H "Authorization: Bearer $CRON_SECRET" "$URL")
+            echo "HTTP $code"; cat /tmp/resp.json; echo
+            test "$code" = "200"
+            exit 0
+          fi
+
+          # Execução agendada: só nos dias de cobrança (dia 1 ou último dia do mês)
+          if [ "$TODAY" = "01" ] || [ "$TOMORROW" = "01" ]; then
+            echo "Hoje (dia $TODAY, Manaus) é dia de cobrança. Disparando..."
+            code=$(curl -s -o /tmp/resp.json -w '%{http_code}' -X POST -H "Authorization: Bearer $CRON_SECRET" "$ENDPOINT")
+            echo "HTTP $code"; cat /tmp/resp.json; echo
+            test "$code" = "200"
+          else
+            echo "Hoje (dia $TODAY, Manaus) não é dia 1 nem último dia do mês. Nada a fazer."
+          fi
