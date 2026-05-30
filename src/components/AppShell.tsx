@@ -18,6 +18,7 @@ import {
   HelpCircle,
   Menu,
   CircleAlert,
+  MailWarning,
   ChevronLeft,
   ChevronRight,
   X,
@@ -34,8 +35,12 @@ export default function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const { user, isLoading, error: authError, refresh } = useAuth();
-  const { isAdmin, modules: modulesAccess, loading: documentsAccessLoading } =
-    useDocumentsAccess();
+  const {
+    isAdmin,
+    role,
+    modules: modulesAccess,
+    loading: documentsAccessLoading,
+  } = useDocumentsAccess();
   const publicRoutes = new Set(["/login", "/redefinir-senha"]);
   const showNav = !publicRoutes.has(pathname ?? "");
   const isDocumentsRoute = pathname?.startsWith("/documentos");
@@ -44,6 +49,8 @@ export default function AppShell({
   const isAuthenticated = !!user;
   const canAccessDocuments =
     modulesAccess.documentos && !documentsAccessLoading;
+  const canAccessCobrancas =
+    (isAdmin || role === "gerente_loja") && !documentsAccessLoading;
   const canAccessDashboards = isAdmin && !documentsAccessLoading;
   const canAccessPerfil = isAdmin && !documentsAccessLoading;
   const resolvedWithoutUser = !isLoading && !isAuthenticated;
@@ -83,7 +90,8 @@ export default function AppShell({
           isActive:
             pathname?.startsWith("/documentos") &&
             !pathname?.startsWith("/documentos/por-loja") &&
-            !pathname?.startsWith("/documentos/pendencias"),
+            !pathname?.startsWith("/documentos/pendencias") &&
+            !pathname?.startsWith("/documentos/cobrancas"),
           isVisible: canAccessDocuments,
         },
         {
@@ -99,6 +107,13 @@ export default function AppShell({
           icon: CircleAlert,
           isActive: pathname?.startsWith("/documentos/pendencias"),
           isVisible: canAccessDocuments,
+        },
+        {
+          href: "/documentos/cobrancas",
+          label: "Cobranças",
+          icon: MailWarning,
+          isActive: pathname?.startsWith("/documentos/cobrancas"),
+          isVisible: canAccessCobrancas,
         },
         {
           href: "/copilot",
