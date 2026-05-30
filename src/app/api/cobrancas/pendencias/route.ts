@@ -2,14 +2,21 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 import {
   getSessionUserFromRequest,
+  getAuthorizedPrestadorIds,
+  getGerenteAccessEntries,
   hasDocumentosAccess,
   ApiHttpError as HttpError,
 } from "@/lib/apiAuth";
 import { levantarPendencias } from "@/lib/cobrancasService";
+import { filtrarPendenciasPorAcesso } from "@/lib/cobrancasAccess";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function mascararEmail(email: string): string {
   const [local, domain] = email.split("@");
-  if (!domain || local.length <= 2) return `${local[0]}***@${domain ?? ""}`;
+  if (!local) return email;
+  if (!domain || local.length <= 2) return `${local[0] ?? "*"}***@${domain ?? ""}`;
   const visivel = local.slice(0, 2);
   const fim = local.slice(-1);
   const asteriscos = "*".repeat(Math.max(local.length - 3, 3));
@@ -22,38 +29,63 @@ export async function GET(request: Request) {
     const email = user.email?.toLowerCase().trim() ?? null;
     const supabase = createSupabaseAdminClient();
 
-    const canAccess = await hasDocumentosAccess(user.id, email, supabase);
-    if (!canAccess) {
-      throw new HttpError(403, "Acesso restrito a administradores.");
+    const isAdmin = await hasDocumentosAccess(user.id, email, supabase);
+
+    // Gerente/fornecedor: precisa ter algum escopo concedido
+    const allowedPrestadores = isAdmin
+      ? []
+      : await getAuthorizedPrestadorIds(email, supabase);
+    const gerenteEntries = isAdmin
+      ? []
+      : await getGerenteAccessEntries(user.id, email, supabase);
+
+    if (
+      !isAdmin &&
+      allowedPrestadores.length === 0 &&
+      gerenteEntries.length === 0
+    ) {
+      throw new HttpError(
+        403,
+        "Você não possui permissão para consultar pendências.",
+      );
     }
 
     const { searchParams } = new URL(request.url);
     const anoParam = searchParams.get("ano");
-    const ano = anoParam ? Number(anoParam) : undefined;
+    const anoNum = anoParam ? Number(anoParam) : NaN;
+    const ano = Number.isFinite(anoNum) ? anoNum : undefined;
 
-    const pendencias = await levantarPendencias(
-      Number.isFinite(ano) ? ano : undefined,
-    );
+    let pendencias = await levantarPendencias(ano, supabase);
+
+    // Restringe ao escopo de gerente/fornecedor (admin vê tudo)
+    if (!isAdmin) {
+      pendencias = filtrarPendenciasPorAcesso(pendencias, {
+        allowedPrestadores,
+        gerenteEntries,
+      });
+    }
 
     // Agrupa por prestador para facilitar a exibição no painel
-    const porPrestador: Record<
-      string,
-      {
-        prestador_id: string;
-        prestador_nome: string;
-        emails_contato: string[];
-        ano_referencia: number;
-        lojas: {
-          loja_id: string;
-          loja_nome: string;
-          meses_com_documentos: number[];
-          meses_pendentes: number[];
-          total_esperado: number;
-          total_recebido: number;
-          total_faltante: number;
-        }[];
-      }
-    > = {};
+    type LojaResumo = {
+      loja_id: string;
+      loja_nome: string;
+      meses_com_documentos: number[];
+      meses_pendentes: number[];
+      total_esperado: number;
+      total_recebido: number;
+      total_faltante: number;
+    };
+    type FornecedorResumo = {
+      prestador_id: string;
+      prestador_nome: string;
+      emails_contato: string[];
+      ano_referencia: number;
+      total_lojas: number;
+      total_documentos_faltantes: number;
+      lojas: LojaResumo[];
+    };
+
+    const porPrestador: Record<string, FornecedorResumo> = {};
 
     for (const p of pendencias) {
       if (!porPrestador[p.prestador_id]) {
@@ -62,10 +94,13 @@ export async function GET(request: Request) {
           prestador_nome: p.prestador_nome,
           emails_contato: p.prestador_emails.map(mascararEmail),
           ano_referencia: p.ano_referencia,
+          total_lojas: 0,
+          total_documentos_faltantes: 0,
           lojas: [],
         };
       }
-      porPrestador[p.prestador_id].lojas.push({
+      const fornecedor = porPrestador[p.prestador_id];
+      fornecedor.lojas.push({
         loja_id: p.loja_id,
         loja_nome: p.loja_nome,
         meses_com_documentos: p.meses_com_documentos,
@@ -74,12 +109,20 @@ export async function GET(request: Request) {
         total_recebido: p.total_recebido,
         total_faltante: p.total_faltante,
       });
+      fornecedor.total_lojas += 1;
+      fornecedor.total_documentos_faltantes += p.total_faltante;
     }
+
+    const fornecedores = Object.values(porPrestador).sort(
+      (a, b) => b.total_documentos_faltantes - a.total_documentos_faltantes,
+    );
 
     return NextResponse.json({
       ano: ano ?? new Date().getFullYear(),
+      perfil: isAdmin ? "admin" : "gerente",
+      total_fornecedores: fornecedores.length,
       total_pendencias: pendencias.length,
-      fornecedores: Object.values(porPrestador),
+      fornecedores,
     });
   } catch (err) {
     console.error("[cobrancas/pendencias] Erro:", err);

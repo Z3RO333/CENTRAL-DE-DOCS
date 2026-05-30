@@ -1,5 +1,14 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 import { enviarEmailCobranca, type PendenciaLoja } from "@/lib/emailService";
+import { fixMojibakeText } from "@/lib/textEncoding";
+
+// Fornecedores que nunca devem ser cobrados (comparação por nome normalizado, maiúsculo)
+const PRESTADORES_EXCLUIDOS = new Set(["TESTE"]);
+
+function nomeExcluido(nome: string): boolean {
+  return PRESTADORES_EXCLUIDOS.has(fixMojibakeText(nome).trim().toUpperCase());
+}
 
 export type PendenciaCobranca = {
   prestador_id: string;
@@ -17,10 +26,19 @@ export type PendenciaCobranca = {
 
 export type ResultadoDisparo = {
   ano: number;
+  dry_run: boolean;
   total_pendencias: number;
   emails_enviados: number;
   emails_ignorados_duplicata: number;
+  fornecedores_sem_email: number;
   erros: { prestador: string; loja: string; erro: string }[];
+  // No dry-run, lista quem SERIA cobrado (sem enviar nada)
+  previa: {
+    prestador: string;
+    emails: string[];
+    lojas: number;
+    documentos_faltantes: number;
+  }[];
 };
 
 type RpcRow = {
@@ -37,26 +55,43 @@ type PrestadorRow = {
   usuarios: string[] | null;
 };
 
-// Retorna as pendências sem enviar e-mails – usado no relatório admin
+// Retorna a data "hoje" no fuso de Manaus (UTC-4) no formato YYYY-MM-DD
+export function diaManaus(date = new Date()): string {
+  return date.toLocaleDateString("en-CA", { timeZone: "America/Manaus" });
+}
+
+// Quantos meses do ano já devem ter documentação:
+//  - ano corrente: até o mês anterior ao atual (mês ainda em curso não é cobrado)
+//  - anos fechados: os 12 meses
+//  - anos futuros: nenhum
+export function calcularMesLimite(anoRef: number, hoje = new Date()): number {
+  const anoAtual = hoje.getFullYear();
+  if (anoRef > anoAtual) return 0;
+  if (anoRef < anoAtual) return 12;
+  return hoje.getMonth(); // mês atual (1-12) menos 1 == getMonth() (0-11)
+}
+
+// Retorna as pendências sem enviar e-mails – usado no relatório (admin/gerente)
 export async function levantarPendencias(
   ano?: number,
+  supabase: SupabaseClient = createSupabaseAdminClient(),
 ): Promise<PendenciaCobranca[]> {
-  const supabase = createSupabaseAdminClient();
   const anoRef = ano ?? new Date().getFullYear();
-  const mesAtual = new Date().getMonth() + 1;
-  const mesLimite = mesAtual - 1;
+  const mesLimite = calcularMesLimite(anoRef);
 
   if (mesLimite < 1) return [];
 
-  const { data: rows, error } = await supabase.rpc(
-    "cobrancas_pendencias_ano",
-    { p_ano: anoRef, p_mes_limite: mesLimite },
-  );
+  const { data: rows, error } = await supabase.rpc("cobrancas_pendencias_ano", {
+    p_ano: anoRef,
+    p_mes_limite: mesLimite,
+  });
 
   if (error) throw error;
   if (!rows || rows.length === 0) return [];
 
-  const prestadorIds = [...new Set((rows as RpcRow[]).map((r) => r.prestador_id))];
+  const prestadorIds = [
+    ...new Set((rows as RpcRow[]).map((r) => r.prestador_id)),
+  ];
   const { data: prestadores, error: prestadoresError } = await supabase
     .from("prestadores")
     .select("id, nome, usuarios")
@@ -72,20 +107,23 @@ export async function levantarPendencias(
     .map((row) => {
       const prest = prestMap.get(row.prestador_id);
       if (!prest) return null;
+      // Pula fornecedores na lista de exclusão (ex.: cadastros de teste)
+      if (nomeExcluido(prest.nome)) return null;
 
       const mesesCom = row.meses_com_documentos ?? [];
       const mesesPend = row.meses_pendentes ?? [];
 
       return {
         prestador_id: row.prestador_id,
-        prestador_nome: prest.nome,
+        prestador_nome: fixMojibakeText(prest.nome),
         prestador_emails: (prest.usuarios ?? []).filter(Boolean),
         loja_id: row.loja_id,
-        loja_nome: row.loja_nome ?? row.loja_id,
+        loja_nome: fixMojibakeText(row.loja_nome ?? row.loja_id),
         ano_referencia: anoRef,
         meses_com_documentos: mesesCom,
         meses_pendentes: mesesPend,
-        total_esperado: 12,
+        // esperado = meses já decorridos (consistente com recebido + faltante)
+        total_esperado: mesLimite,
         total_recebido: mesesCom.length,
         total_faltante: mesesPend.length,
       } satisfies PendenciaCobranca;
@@ -93,61 +131,49 @@ export async function levantarPendencias(
     .filter((p): p is PendenciaCobranca => p !== null);
 }
 
-// Verifica se já houve cobrança hoje para um par prestador+loja+ano
-async function jaCobradoHoje(
-  prestadorId: string,
-  lojaId: string,
-  ano: number,
-): Promise<boolean> {
-  const supabase = createSupabaseAdminClient();
-  const hoje = new Date();
-  const inicioDia = new Date(
-    hoje.getFullYear(),
-    hoje.getMonth(),
-    hoje.getDate(),
-  ).toISOString();
-
-  const { count } = await supabase
+// Busca, em UMA query, todos os pares prestador+loja já cobrados hoje (evita N+1)
+async function carregarCobrancasDeHoje(
+  supabase: SupabaseClient,
+  anoRef: number,
+): Promise<Set<string>> {
+  const { data, error } = await supabase
     .from("cobrancas_documentacao_historico")
-    .select("id", { count: "exact", head: true })
-    .eq("prestador_id", prestadorId)
-    .eq("loja_id", lojaId)
-    .eq("ano_referencia", ano)
-    .gte("enviado_em", inicioDia);
+    .select("prestador_id, loja_id")
+    .eq("ano_referencia", anoRef)
+    .eq("dia_cobranca", diaManaus());
 
-  return (count ?? 0) > 0;
+  if (error) throw error;
+
+  return new Set(
+    (data ?? []).map((r) => `${r.prestador_id}:${r.loja_id}`),
+  );
 }
 
-async function registrarCobranca(
-  pendencia: PendenciaCobranca,
-  emails: string[],
-): Promise<void> {
-  const supabase = createSupabaseAdminClient();
-  await supabase.from("cobrancas_documentacao_historico").insert({
-    prestador_id: pendencia.prestador_id,
-    loja_id: pendencia.loja_id,
-    ano_referencia: pendencia.ano_referencia,
-    meses_pendentes: pendencia.meses_pendentes,
-    emails_destinatarios: emails,
-  });
-}
-
-// Orquestrador principal: levanta pendências, agrupa por fornecedor e envia e-mails
+// Orquestrador principal: levanta pendências, agrupa por fornecedor e envia e-mails.
+// dryRun = true apenas simula (não envia e-mail nem grava histórico).
 export async function processarCobrancas(
   ano?: number,
+  opts: { dryRun?: boolean } = {},
 ): Promise<ResultadoDisparo> {
-  const pendencias = await levantarPendencias(ano);
+  const dryRun = opts.dryRun ?? false;
+  const supabase = createSupabaseAdminClient();
   const anoRef = ano ?? new Date().getFullYear();
+  const pendencias = await levantarPendencias(anoRef, supabase);
 
   const resultado: ResultadoDisparo = {
     ano: anoRef,
+    dry_run: dryRun,
     total_pendencias: pendencias.length,
     emails_enviados: 0,
     emails_ignorados_duplicata: 0,
+    fornecedores_sem_email: 0,
     erros: [],
+    previa: [],
   };
 
   if (pendencias.length === 0) return resultado;
+
+  const jaCobradas = await carregarCobrancasDeHoje(supabase, anoRef);
 
   // Agrupa por prestador para enviar um único e-mail por fornecedor
   const porPrestador = new Map<string, PendenciaCobranca[]>();
@@ -160,28 +186,38 @@ export async function processarCobrancas(
     const first = lojasPendentes[0];
     const emails = first.prestador_emails;
 
-    if (emails.length === 0) continue;
-
-    // Filtra lojas que ainda não foram cobradas hoje
-    const novas: PendenciaCobranca[] = [];
-    for (const pend of lojasPendentes) {
-      const duplicata = await jaCobradoHoje(
-        pend.prestador_id,
-        pend.loja_id,
-        anoRef,
-      );
-      if (duplicata) {
-        resultado.emails_ignorados_duplicata++;
-      } else {
-        novas.push(pend);
-      }
+    if (emails.length === 0) {
+      resultado.fornecedores_sem_email++;
+      continue;
     }
 
+    // Filtra lojas que ainda não foram cobradas hoje (checagem em memória)
+    const novas = lojasPendentes.filter((p) => {
+      const chave = `${p.prestador_id}:${p.loja_id}`;
+      if (jaCobradas.has(chave)) {
+        resultado.emails_ignorados_duplicata++;
+        return false;
+      }
+      return true;
+    });
+
     if (novas.length === 0) continue;
+
+    // Dry-run: apenas registra a prévia, sem enviar nem gravar
+    if (dryRun) {
+      resultado.previa.push({
+        prestador: first.prestador_nome,
+        emails,
+        lojas: novas.length,
+        documentos_faltantes: novas.reduce((a, p) => a + p.total_faltante, 0),
+      });
+      continue;
+    }
 
     const pendenciasLoja: PendenciaLoja[] = novas.map((p) => ({
       loja_nome: p.loja_nome,
       meses_pendentes: p.meses_pendentes,
+      total_esperado: p.total_esperado,
       total_recebido: p.total_recebido,
       total_faltante: p.total_faltante,
     }));
@@ -194,14 +230,37 @@ export async function processarCobrancas(
         pendencias_por_loja: pendenciasLoja,
       });
 
-      for (const pend of novas) {
-        await registrarCobranca(pend, emails);
+      // Bulk insert do histórico; índice único protege contra corrida
+      const { error: insertError } = await supabase
+        .from("cobrancas_documentacao_historico")
+        .upsert(
+          novas.map((p) => ({
+            prestador_id: p.prestador_id,
+            loja_id: p.loja_id,
+            ano_referencia: p.ano_referencia,
+            meses_pendentes: p.meses_pendentes,
+            emails_destinatarios: emails,
+            dia_cobranca: diaManaus(),
+          })),
+          {
+            onConflict: "prestador_id,loja_id,ano_referencia,dia_cobranca",
+            ignoreDuplicates: true,
+          },
+        );
+
+      if (insertError) {
+        // Histórico falhou: registra como erro para reprocessar, mas e-mail já saiu
+        console.error("[cobrancas] Falha ao gravar histórico:", insertError);
+        resultado.erros.push({
+          prestador: first.prestador_nome,
+          loja: "(histórico)",
+          erro: insertError.message,
+        });
       }
 
       resultado.emails_enviados++;
     } catch (err) {
-      const mensagem =
-        err instanceof Error ? err.message : "Erro desconhecido";
+      const mensagem = err instanceof Error ? err.message : "Erro desconhecido";
       for (const pend of novas) {
         resultado.erros.push({
           prestador: pend.prestador_nome,

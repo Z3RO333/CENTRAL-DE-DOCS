@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { processarCobrancas } from "@/lib/cobrancasService";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 // Protegido por token secreto – configure CRON_SECRET nas variáveis de ambiente
 function autorizarRequisicao(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
@@ -19,10 +22,16 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json().catch(() => ({})) as { ano?: number };
+    const { searchParams } = new URL(request.url);
+    const body = (await request.json().catch(() => ({}))) as {
+      ano?: number;
+      dryRun?: boolean;
+    };
     const ano = typeof body.ano === "number" ? body.ano : undefined;
+    const dryRun =
+      body.dryRun === true || searchParams.get("dryRun") === "true";
 
-    const resultado = await processarCobrancas(ano);
+    const resultado = await processarCobrancas(ano, { dryRun });
 
     return NextResponse.json({ ok: true, resultado });
   } catch (err) {
@@ -33,7 +42,7 @@ export async function POST(request: Request) {
   }
 }
 
-// Permite GET para facilitar testes via browser/curl (com parâmetro ?secret=)
+// GET para validação manual (browser/curl). Use ?dryRun=true para simular sem enviar.
 export async function GET(request: Request) {
   if (!autorizarRequisicao(request)) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
@@ -42,9 +51,11 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const anoParam = searchParams.get("ano");
-    const ano = anoParam ? Number(anoParam) : undefined;
+    const anoNum = anoParam ? Number(anoParam) : NaN;
+    const ano = Number.isFinite(anoNum) ? anoNum : undefined;
+    const dryRun = searchParams.get("dryRun") === "true";
 
-    const resultado = await processarCobrancas(Number.isFinite(ano) ? ano : undefined);
+    const resultado = await processarCobrancas(ano, { dryRun });
 
     return NextResponse.json({ ok: true, resultado });
   } catch (err) {

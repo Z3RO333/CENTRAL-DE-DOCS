@@ -24,17 +24,29 @@ export function formatarMeses(meses: number[]): string {
 export type PendenciaLoja = {
   loja_nome: string;
   meses_pendentes: number[];
+  total_esperado: number;
   total_recebido: number;
   total_faltante: number;
 };
 
+// Documentos mensais obrigatórios cobrados por loja
+const DOCUMENTOS_OBRIGATORIOS = [
+  "Registro de laudos",
+  "Notas fiscais",
+  "Retenção trabalhista",
+];
+
+// Cache da logo em escopo de módulo (lida do disco uma única vez)
+let logoCache: string | null | undefined;
 function carregarLogoBase64(): string | null {
+  if (logoCache !== undefined) return logoCache;
   try {
     const logoPath = path.join(process.cwd(), "public", "logo-manutencao.png");
-    return fs.readFileSync(logoPath).toString("base64");
+    logoCache = fs.readFileSync(logoPath).toString("base64");
   } catch {
-    return null;
+    logoCache = null;
   }
+  return logoCache;
 }
 
 export async function enviarEmailCobranca(params: {
@@ -68,7 +80,7 @@ export async function enviarEmailCobranca(params: {
       <tr>
         <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#333;">${p.loja_nome}</td>
         <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#e67e22;">${formatarMeses(p.meses_pendentes)}</td>
-        <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#555;">12</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#555;">${p.total_esperado}</td>
         <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#27ae60;font-weight:600;">${p.total_recebido}</td>
         <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#c0392b;font-weight:700;">${p.total_faltante}</td>
       </tr>`,
@@ -80,6 +92,22 @@ export async function enviarEmailCobranca(params: {
     0,
   );
   const totalLojas = pendencias_por_loja.length;
+
+  // Prazo de regularização: 7 dias a partir de hoje
+  const prazoData = new Date();
+  prazoData.setDate(prazoData.getDate() + 7);
+  const prazoFormatado = prazoData.toLocaleDateString("pt-BR", {
+    timeZone: "America/Manaus",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+  const portalUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  const docsHtml = DOCUMENTOS_OBRIGATORIOS.map(
+    (d) => `<li style="margin-bottom:4px;">${d}</li>`,
+  ).join("");
+  const docsTxt = DOCUMENTOS_OBRIGATORIOS.map((d) => `  - ${d}`).join("\n");
 
   const html = `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -112,7 +140,7 @@ export async function enviarEmailCobranca(params: {
           <tr>
             <td style="background:#c0392b;padding:16px 32px;">
               <p style="margin:0;font-size:15px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">
-                ⚠️ Pendência de Documentação Mensal — Geradores
+                ⚠️ Pendência de Documentação Mensal Obrigatória
               </p>
             </td>
           </tr>
@@ -123,8 +151,8 @@ export async function enviarEmailCobranca(params: {
 
               <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.6;">Prezados,</p>
               <p style="margin:0 0 24px;font-size:15px;color:#333;line-height:1.6;">
-                Identificamos pendências na documentação mensal obrigatória referente aos
-                <strong>geradores das lojas/unidades</strong> atendidas por este fornecedor.
+                Identificamos pendências na documentação mensal obrigatória referente às
+                <strong>lojas/unidades</strong> atendidas por este fornecedor.
               </p>
 
               <!-- RESUMO -->
@@ -168,6 +196,41 @@ export async function enviarEmailCobranca(params: {
                 Solicitamos a <strong>regularização imediata</strong> das pendências acima.
               </p>
 
+              <!-- DOCUMENTOS ESPERADOS -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+                <tr>
+                  <td style="background:#f0f4f8;border-radius:6px;padding:16px 20px;">
+                    <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1a2b4a;text-transform:uppercase;letter-spacing:0.4px;">
+                      Documentos obrigatórios por mês
+                    </p>
+                    <ul style="margin:0;padding-left:20px;font-size:14px;color:#444;line-height:1.5;">
+                      ${docsHtml}
+                    </ul>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- PRAZO -->
+              <p style="margin:0 0 20px;font-size:15px;color:#333;line-height:1.6;">
+                Prazo para regularização: <strong style="color:#c0392b;">${prazoFormatado}</strong>.
+              </p>
+
+              ${
+                portalUrl
+                  ? `<!-- CTA -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                <tr>
+                  <td align="center">
+                    <a href="${portalUrl}" target="_blank"
+                       style="display:inline-block;background:#1a2b4a;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:6px;">
+                      Enviar documentação
+                    </a>
+                  </td>
+                </tr>
+              </table>`
+                  : ""
+              }
+
               <!-- ALERTA -->
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
@@ -208,7 +271,7 @@ export async function enviarEmailCobranca(params: {
 
   const text =
     `Prezados,\n\n` +
-    `Identificamos pendências na documentação mensal obrigatória referente aos geradores das lojas/unidades atendidas por este fornecedor.\n\n` +
+    `Identificamos pendências na documentação mensal obrigatória referente às lojas/unidades atendidas por este fornecedor.\n\n` +
     `Fornecedor: ${prestador_nome}\n` +
     `Ano de referência: ${ano_referencia}\n\n` +
     `Pendências identificadas:\n\n` +
@@ -217,12 +280,15 @@ export async function enviarEmailCobranca(params: {
         (p) =>
           `Loja/Unidade: ${p.loja_nome}\n` +
           `Meses pendentes: ${formatarMeses(p.meses_pendentes)}\n` +
-          `Documentos esperados: 12\n` +
+          `Documentos esperados: ${p.total_esperado}\n` +
           `Documentos recebidos: ${p.total_recebido}\n` +
           `Documentos faltantes: ${p.total_faltante}`,
       )
       .join("\n\n") +
-    `\n\nSolicitamos a regularização imediata das pendências acima.\n\n` +
+    `\n\nDocumentos obrigatórios por mês:\n${docsTxt}\n\n` +
+    `Prazo para regularização: ${prazoFormatado}.\n` +
+    (portalUrl ? `Envie a documentação em: ${portalUrl}\n` : "") +
+    `\nSolicitamos a regularização imediata das pendências acima.\n\n` +
     `Ressaltamos que a ausência da documentação obrigatória poderá impactar diretamente o processo de pagamento do fornecedor até que todos os documentos exigidos sejam enviados e validados.\n\n` +
     `Atenciosamente,\nEquipe de Manutenção`;
 
@@ -244,7 +310,7 @@ export async function enviarEmailCobranca(params: {
     from: fromEmail,
     to: destinatarios,
     ...(ccList ? { cc: ccList } : {}),
-    subject: `Pendência de Documentação Mensal — Geradores (${ano_referencia})`,
+    subject: `Pendência de Documentação Mensal Obrigatória (${ano_referencia})`,
     text,
     html,
     ...(attachments ? { attachments } : {}),
