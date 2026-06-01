@@ -35,11 +35,17 @@ const MESES_NOMES = [
   "Jul", "Ago", "Set", "Out", "Nov", "Dez",
 ];
 
-// Documentos mensais obrigatórios cobrados por loja
-const DOCUMENTOS_OBRIGATORIOS = [
-  "Registro de laudos",
-  "Notas fiscais",
-  "Retenção trabalhista",
+const DOCS_CARDS = [
+  {
+    titulo: "Retenção Trabalhista",
+    icone: "📋",
+    descricao: "FGTS · INSS · FOPAG · SINETRAM · Vale-transporte · PERDCOMP",
+  },
+  {
+    titulo: "Registro de Laudos",
+    icone: "🔧",
+    descricao: "Laudos técnicos e registros de manutenção das unidades",
+  },
 ];
 
 // Cache da logo em escopo de módulo (lida do disco uma única vez)
@@ -118,10 +124,21 @@ export async function enviarEmailCobranca(params: {
   });
 
   const portalUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
-  const docsHtml = DOCUMENTOS_OBRIGATORIOS.map(
-    (d) => `<li style="margin-bottom:4px;">${d}</li>`,
+  const docsCardsHtml = DOCS_CARDS.map(
+    (d) => `
+    <td width="50%" style="padding:0 8px;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="background:#f3f6fb;border-left:4px solid #1a2b4a;border-radius:0 8px 8px 0;padding:16px 18px;">
+            <p style="margin:0 0 4px;font-size:18px;">${d.icone}</p>
+            <p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#1a2b4a;">${d.titulo}</p>
+            <p style="margin:0;font-size:12px;color:#666;line-height:1.5;">${d.descricao}</p>
+          </td>
+        </tr>
+      </table>
+    </td>`,
   ).join("");
-  const docsTxt = DOCUMENTOS_OBRIGATORIOS.map((d) => `  - ${d}`).join("\n");
+  const docsTxt = DOCS_CARDS.map((d) => `  - ${d.titulo}: ${d.descricao}`).join("\n");
 
   const html = `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -214,17 +231,13 @@ export async function enviarEmailCobranca(params: {
                 Solicitamos a <strong>regularização imediata</strong> das pendências acima.
               </p>
 
-              <!-- DOCUMENTOS ESPERADOS -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+              <!-- DOCUMENTOS OBRIGATÓRIOS - CARDS -->
+              <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#1a2b4a;text-transform:uppercase;letter-spacing:0.6px;">
+                Documentos obrigatórios por mês
+              </p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 -8px 28px -8px;">
                 <tr>
-                  <td style="background:#f3f6fb;border-radius:8px;padding:18px 24px;">
-                    <p style="margin:0 0 10px;font-size:12px;font-weight:700;color:#1a2b4a;text-transform:uppercase;letter-spacing:0.5px;">
-                      Documentos obrigatórios por mês
-                    </p>
-                    <ul style="margin:0;padding-left:20px;font-size:14px;color:#444;line-height:1.7;">
-                      ${docsHtml}
-                    </ul>
-                  </td>
+                  ${docsCardsHtml}
                 </tr>
               </table>
 

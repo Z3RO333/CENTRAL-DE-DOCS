@@ -6,7 +6,10 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const MESES_PT = ["JANEIRO","FEVEREIRO","MARÇO","ABRIL","MAIO","JUNHO","JULHO","AGOSTO","SETEMBRO","OUTUBRO","NOVEMBRO","DEZEMBRO"];
 const fmt = (m) => m.map((x) => MESES_PT[x - 1]).join(", ");
-const DOCS = ["Registro de laudos", "Notas fiscais", "Retenção trabalhista"];
+const DOCS_CARDS = [
+  { titulo: "Retenção Trabalhista", icone: "📋", descricao: "FGTS · INSS · FOPAG · SINETRAM · Vale-transporte · PERDCOMP" },
+  { titulo: "Registro de Laudos",   icone: "🔧", descricao: "Laudos técnicos e registros de manutenção das unidades" },
+];
 const MESES_NOMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 const ano = 2026;
 const mesLimite = new Date().getMonth(); // jan=0 → 0, jun=5 → 5 meses decorridos (jan-mai)
@@ -23,7 +26,6 @@ const portalUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
 const prazo = new Date();
 prazo.setDate(prazo.getDate() + 7);
 const prazoFmt = prazo.toLocaleDateString("pt-BR", { timeZone: "America/Manaus", day: "2-digit", month: "2-digit", year: "numeric" });
-const docsHtml = DOCS.map((d) => `<li style="margin-bottom:4px;">${d}</li>`).join("");
 const totalFalt = pend.reduce((a, p) => a + p.total_faltante, 0);
 const totalLojas = pend.length;
 
@@ -35,8 +37,19 @@ const rows = pend.map((p) => `<tr>
 </tr>`).join("");
 
 const cta = portalUrl
-  ? `<table width="100%" style="margin-bottom:24px;"><tr><td align="center"><a href="${portalUrl}" target="_blank" style="display:inline-block;background:#1a2b4a;color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:6px;">Enviar documentação</a></td></tr></table>`
+  ? `<table width="100%" style="margin-bottom:28px;"><tr><td align="center"><a href="${portalUrl}" target="_blank" style="display:inline-block;background:#1a2b4a;color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:16px 48px;border-radius:8px;letter-spacing:0.3px;">Enviar documentação</a></td></tr></table>`
   : "";
+
+const docsCardsHtml = DOCS_CARDS.map(d => `
+  <td width="50%" style="padding:0 8px;">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="background:#f3f6fb;border-left:4px solid #1a2b4a;border-radius:0 8px 8px 0;padding:16px 18px;">
+        <p style="margin:0 0 4px;font-size:18px;">${d.icone}</p>
+        <p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#1a2b4a;">${d.titulo}</p>
+        <p style="margin:0;font-size:12px;color:#666;line-height:1.5;">${d.descricao}</p>
+      </td>
+    </tr></table>
+  </td>`).join("");
 
 const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/></head>
 <body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;">
@@ -66,10 +79,8 @@ const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/></h
         <th style="padding:13px 18px;font-size:11px;font-weight:700;color:#555;text-align:center;text-transform:uppercase;letter-spacing:0.5px;">Faltantes</th>
       </tr></thead><tbody>${rows}</tbody></table>
     <p style="margin:28px 0 24px;font-size:15px;color:#333;line-height:1.7;">Solicitamos a <strong>regularização imediata</strong> das pendências acima.</p>
-    <table width="100%" style="margin-bottom:24px;"><tr><td style="background:#f3f6fb;border-radius:8px;padding:18px 24px;">
-      <p style="margin:0 0 10px;font-size:12px;font-weight:700;color:#1a2b4a;text-transform:uppercase;letter-spacing:0.5px;">Documentos obrigatórios por mês</p>
-      <ul style="margin:0;padding-left:20px;font-size:14px;color:#444;line-height:1.7;">${docsHtml}</ul>
-    </td></tr></table>
+    <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#1a2b4a;text-transform:uppercase;letter-spacing:0.6px;">Documentos obrigatórios por mês</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 -8px 28px -8px;"><tr>${docsCardsHtml}</tr></table>
     <p style="margin:0 0 24px;font-size:15px;color:#333;line-height:1.7;">Prazo para regularização: <strong style="color:#c0392b;">${prazoFmt}</strong>.</p>
     ${cta}
     <table width="100%" style="margin-bottom:28px;"><tr>
