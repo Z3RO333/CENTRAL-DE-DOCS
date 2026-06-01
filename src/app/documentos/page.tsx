@@ -1737,6 +1737,21 @@ export default function DocumentosPage() {
     ];
   }, [filterOptions.prestadores, prestadoresDoUsuario]);
 
+  const prestadorTipoServicoMap = useMemo(() => {
+    const source =
+      filterOptions.prestadores.length > 0
+        ? filterOptions.prestadores
+        : prestadoresDoUsuario.map((p) => ({
+            id: p.id,
+            tipo_servico: p.tipo_servico,
+          }));
+    return new Map(
+      source
+        .filter((p) => p.tipo_servico)
+        .map((p) => [p.id, p.tipo_servico as string]),
+    );
+  }, [filterOptions.prestadores, prestadoresDoUsuario]);
+
   const colaboradorLabelById = useMemo(() => {
     const map = new Map<string, string>();
     adminUsers.forEach((item) => {
@@ -2379,7 +2394,13 @@ export default function DocumentosPage() {
                               Loja: {lojaNome}
                             </span>
                           )}
-                          {registro.tipo === "retencao_trabalhista" && responsavel ? (
+                          {registro.tipo === "retencao_trabalhista" &&
+                          responsavel &&
+                          registro.prestador_id &&
+                          prestadorTipoServicoMap
+                            .get(registro.prestador_id)
+                            ?.toLowerCase()
+                            .includes("conserva") ? (
                             <span className="rounded-full bg-slate-100 px-2 py-0.5">
                               Responsável: {responsavel}
                             </span>
