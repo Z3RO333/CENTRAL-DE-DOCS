@@ -133,8 +133,8 @@ export async function levantarPendencias(
         ano_referencia: anoRef,
         meses_com_documentos: mesesCom,
         meses_pendentes: mesesPend,
-        // esperado = meses já decorridos (consistente com recebido + faltante)
-        total_esperado: mesLimite,
+        // esperado = recebidos + faltantes (cobrança começa no 1º envio da loja)
+        total_esperado: mesesCom.length + mesesPend.length,
         total_recebido: mesesCom.length,
         total_faltante: mesesPend.length,
       } satisfies PendenciaCobranca;
