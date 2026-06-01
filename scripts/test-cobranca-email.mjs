@@ -16,8 +16,27 @@ const mesLimite = new Date().getMonth(); // jan=0 → 0, jun=5 → 5 meses decor
 const periodoLabel = `Jan–${MESES_NOMES[mesLimite - 1]}/${ano}`;
 
 const pend = [
-  { loja_nome: "Loja 01 - Manaus", meses_pendentes: [1, 3], total_esperado: 4, total_recebido: 2, total_faltante: 2 },
-  { loja_nome: "Loja 05 - Manaus", meses_pendentes: [2],    total_esperado: 4, total_recebido: 3, total_faltante: 1 },
+  {
+    loja_nome: "Loja 01 - Manaus",
+    meses_pendentes: [1, 3],
+    meses_pendentes_laudos: [1, 3],
+    meses_pendentes_retencao: [3],
+    total_esperado: 4, total_recebido: 2, total_faltante: 3,
+  },
+  {
+    loja_nome: "Loja 05 - Manaus",
+    meses_pendentes: [2],
+    meses_pendentes_laudos: [],
+    meses_pendentes_retencao: [2],
+    total_esperado: 4, total_recebido: 3, total_faltante: 1,
+  },
+  {
+    loja_nome: "CD Tarumã",
+    meses_pendentes: [1, 2],
+    meses_pendentes_laudos: [1, 2],
+    meses_pendentes_retencao: [],
+    total_esperado: 4, total_recebido: 2, total_faltante: 2,
+  },
 ];
 const prestador = "Fornecedor Teste Ltda";
 const logo = fs.readFileSync(path.join(process.cwd(), "public", "logo-manutencao.png")).toString("base64");
@@ -29,12 +48,26 @@ const prazoFmt = prazo.toLocaleDateString("pt-BR", { timeZone: "America/Manaus",
 const totalFalt = pend.reduce((a, p) => a + p.total_faltante, 0);
 const totalLojas = pend.length;
 
-const rows = pend.map((p) => `<tr>
-  <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#333;">${p.loja_nome}</td>
-  <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#e67e22;">${fmt(p.meses_pendentes)}</td>
+const rows = pend.map((p) => {
+  const temTipos = p.meses_pendentes_laudos.length > 0 || p.meses_pendentes_retencao.length > 0;
+  let pendenciaCell = "";
+  if (temTipos) {
+    const linhas = [];
+    if (p.meses_pendentes_laudos.length > 0)
+      linhas.push(`<span style="display:block;margin-bottom:4px;">🔧 <strong>Laudos:</strong> ${fmt(p.meses_pendentes_laudos)}</span>`);
+    if (p.meses_pendentes_retencao.length > 0)
+      linhas.push(`<span style="display:block;">📋 <strong>Retenção:</strong> ${fmt(p.meses_pendentes_retencao)}</span>`);
+    pendenciaCell = linhas.join("");
+  } else {
+    pendenciaCell = fmt(p.meses_pendentes);
+  }
+  return `<tr>
+  <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#333;font-weight:600;">${p.loja_nome}</td>
+  <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#e67e22;">${pendenciaCell}</td>
   <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;font-weight:700;"><span style="color:#27ae60;">${p.total_recebido}</span><span style="color:#aaa;">/</span><span style="color:#555;">${mesLimite}</span></td>
   <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#c0392b;font-weight:700;">${p.total_faltante}</td>
-</tr>`).join("");
+</tr>`;
+}).join("");
 
 const cta = portalUrl
   ? `<table width="100%" style="margin-bottom:28px;"><tr><td align="center"><a href="${portalUrl}" target="_blank" style="display:inline-block;background:#1a2b4a;color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:16px 48px;border-radius:8px;letter-spacing:0.3px;">Enviar documentação</a></td></tr></table>`

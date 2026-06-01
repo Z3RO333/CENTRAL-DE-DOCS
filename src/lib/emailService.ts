@@ -24,6 +24,8 @@ export function formatarMeses(meses: number[]): string {
 export type PendenciaLoja = {
   loja_nome: string;
   meses_pendentes: number[];
+  meses_pendentes_laudos: number[];
+  meses_pendentes_retencao: number[];
   total_esperado: number;
   total_recebido: number;
   total_faltante: number;
@@ -94,17 +96,41 @@ export async function enviarEmailCobranca(params: {
     : `<span style="font-size:18px;font-weight:bold;color:#ffffff;">Manutenção Bemol</span>`;
 
   const detalhesHtml = pendencias_por_loja
-    .map(
-      (p) => `
+    .map((p) => {
+      // Monta as linhas de pendência por tipo (se disponível pela nova RPC)
+      const temTipos =
+        p.meses_pendentes_laudos.length > 0 ||
+        p.meses_pendentes_retencao.length > 0;
+
+      let pendenciaCell = "";
+      if (temTipos) {
+        const linhas: string[] = [];
+        if (p.meses_pendentes_laudos.length > 0) {
+          linhas.push(
+            `<span style="display:block;margin-bottom:4px;">🔧 <strong>Laudos:</strong> ${formatarMeses(p.meses_pendentes_laudos)}</span>`,
+          );
+        }
+        if (p.meses_pendentes_retencao.length > 0) {
+          linhas.push(
+            `<span style="display:block;">📋 <strong>Retenção:</strong> ${formatarMeses(p.meses_pendentes_retencao)}</span>`,
+          );
+        }
+        pendenciaCell = linhas.join("");
+      } else {
+        // fallback: RPC antiga sem separação por tipo
+        pendenciaCell = formatarMeses(p.meses_pendentes);
+      }
+
+      return `
       <tr>
-        <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#333;">${p.loja_nome}</td>
-        <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#e67e22;">${formatarMeses(p.meses_pendentes)}</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#333;font-weight:600;">${p.loja_nome}</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#e67e22;">${pendenciaCell}</td>
         <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;font-weight:700;">
           <span style="color:#27ae60;">${p.total_recebido}</span><span style="color:#aaa;">/</span><span style="color:#555;">${mes_limite}</span>
         </td>
         <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#c0392b;font-weight:700;">${p.total_faltante}</td>
-      </tr>`,
-    )
+      </tr>`;
+    })
     .join("");
 
   const totalFaltante = pendencias_por_loja.reduce(

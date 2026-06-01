@@ -30,6 +30,8 @@ export type PendenciaCobranca = {
   ano_referencia: number;
   meses_com_documentos: number[];
   meses_pendentes: number[];
+  meses_pendentes_laudos: number[];
+  meses_pendentes_retencao: number[];
   total_esperado: number;
   total_recebido: number;
   total_faltante: number;
@@ -58,6 +60,9 @@ type RpcRow = {
   loja_nome: string | null;
   meses_com_documentos: number[] | null;
   meses_pendentes: number[] | null;
+  // colunas adicionadas pela migração 202606011700 (podem ser null em ambientes antigos)
+  meses_pendentes_laudos: number[] | null;
+  meses_pendentes_retencao: number[] | null;
 };
 
 type PrestadorRow = {
@@ -123,6 +128,11 @@ export async function levantarPendencias(
 
       const mesesCom = row.meses_com_documentos ?? [];
       const mesesPend = row.meses_pendentes ?? [];
+      const laudosPend = row.meses_pendentes_laudos ?? [];
+      const retencaoPend = row.meses_pendentes_retencao ?? [];
+      // total_faltante = soma dos dois tipos (laudos + retenção), pode ser > meses únicos
+      const totalFaltante =
+        laudosPend.length + retencaoPend.length || mesesPend.length;
 
       return {
         prestador_id: row.prestador_id,
@@ -133,10 +143,11 @@ export async function levantarPendencias(
         ano_referencia: anoRef,
         meses_com_documentos: mesesCom,
         meses_pendentes: mesesPend,
-        // esperado = recebidos + faltantes (cobrança começa no 1º envio da loja)
+        meses_pendentes_laudos: laudosPend,
+        meses_pendentes_retencao: retencaoPend,
         total_esperado: mesesCom.length + mesesPend.length,
         total_recebido: mesesCom.length,
-        total_faltante: mesesPend.length,
+        total_faltante: totalFaltante,
       } satisfies PendenciaCobranca;
     })
     .filter((p): p is PendenciaCobranca => p !== null);
@@ -228,6 +239,8 @@ export async function processarCobrancas(
     const pendenciasLoja: PendenciaLoja[] = novas.map((p) => ({
       loja_nome: p.loja_nome,
       meses_pendentes: p.meses_pendentes,
+      meses_pendentes_laudos: p.meses_pendentes_laudos,
+      meses_pendentes_retencao: p.meses_pendentes_retencao,
       total_esperado: p.total_esperado,
       total_recebido: p.total_recebido,
       total_faltante: p.total_faltante,
