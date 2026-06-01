@@ -164,7 +164,7 @@ const identificacaoFieldMap: Record<
 > = {
   retencao_trabalhista: {
     label: "Empresa",
-    campos: ["empresa"],
+    campos: ["prestador"],
   },
   registro_laudos: {
     label: "Prestador",
@@ -347,6 +347,9 @@ const getLojaNome = (registro: FormularioRecord) =>
 
 const getPrestadorNome = (registro: FormularioRecord) =>
   getCampoTexto(registro.dados, ["prestador"]);
+
+const getResponsavel = (registro: FormularioRecord) =>
+  getCampoTexto(registro.dados, ["responsavel"]);
 
 export default function DocumentosPage() {
   const router = useRouter();
@@ -2306,6 +2309,7 @@ export default function DocumentosPage() {
                   const cnpjDocumento = getCnpjDocumento(registro);
                   const lojaNome = getLojaNome(registro);
                   const prestadorNome = getPrestadorNome(registro);
+                  const responsavel = getResponsavel(registro);
                   const enviadoPor = registro.user_id
                     ? colaboradorLabelById.get(registro.user_id) ?? registro.user_id
                     : null;
@@ -2375,11 +2379,15 @@ export default function DocumentosPage() {
                               Loja: {lojaNome}
                             </span>
                           )}
-                          {prestadorNome && (
+                          {registro.tipo === "retencao_trabalhista" && responsavel ? (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                              Responsável: {responsavel}
+                            </span>
+                          ) : prestadorNome ? (
                             <span className="rounded-full bg-slate-100 px-2 py-0.5">
                               Prestador: {prestadorNome}
                             </span>
-                          )}
+                          ) : null}
                           {numeroNf && (
                             <span className="rounded-full bg-slate-100 px-2 py-0.5">
                               NF: {numeroNf}
@@ -2537,6 +2545,7 @@ export default function DocumentosPage() {
             const cnpjDocumento = getCnpjDocumento(registro);
             const lojaNome = getLojaNome(registro);
             const prestadorNome = getPrestadorNome(registro);
+            const responsavel = getResponsavel(registro);
             const enviadoPor = registro.user_id
               ? colaboradorLabelById.get(registro.user_id) ?? registro.user_id
               : null;
@@ -2613,11 +2622,15 @@ export default function DocumentosPage() {
                           Loja: {lojaNome}
                         </span>
                       )}
-                      {prestadorNome && (
+                      {registro.tipo === "retencao_trabalhista" && responsavel ? (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                          Responsável: {responsavel}
+                        </span>
+                      ) : prestadorNome ? (
                         <span className="rounded-full bg-slate-100 px-2 py-0.5">
                           Prestador: {prestadorNome}
                         </span>
-                      )}
+                      ) : null}
                       {numeroNf && (
                         <span className="rounded-full bg-slate-100 px-2 py-0.5">
                           NF: {numeroNf}

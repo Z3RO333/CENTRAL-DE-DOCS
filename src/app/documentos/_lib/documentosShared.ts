@@ -150,7 +150,7 @@ const identificacaoFieldMap: Record<
 > = {
   retencao_trabalhista: {
     label: "Empresa",
-    campos: ["empresa"],
+    campos: ["prestador"],
   },
   registro_laudos: {
     label: "Prestador",
