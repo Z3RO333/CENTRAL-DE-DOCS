@@ -29,6 +29,12 @@ export type PendenciaLoja = {
   total_faltante: number;
 };
 
+// Nomes curtos dos meses em português
+const MESES_NOMES = [
+  "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+  "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+];
+
 // Documentos mensais obrigatórios cobrados por loja
 const DOCUMENTOS_OBRIGATORIOS = [
   "Registro de laudos",
@@ -53,6 +59,7 @@ export async function enviarEmailCobranca(params: {
   prestador_nome: string;
   destinatarios: string[];
   ano_referencia: number;
+  mes_limite: number;
   pendencias_por_loja: PendenciaLoja[];
 }): Promise<void> {
   const apiKey = process.env.SENDGRID_API_KEY;
@@ -66,8 +73,14 @@ export async function enviarEmailCobranca(params: {
 
   sgMail.setApiKey(apiKey);
 
-  const { prestador_nome, destinatarios, ano_referencia, pendencias_por_loja } =
+  const { prestador_nome, destinatarios, ano_referencia, mes_limite, pendencias_por_loja } =
     params;
+
+  // "Jan–Mai/2026" — período de referência da cobrança
+  const periodoLabel =
+    mes_limite >= 1
+      ? `Jan–${MESES_NOMES[mes_limite - 1]}/${ano_referencia}`
+      : String(ano_referencia);
 
   const logoBase64 = carregarLogoBase64();
   const logoHtml = logoBase64
@@ -80,8 +93,9 @@ export async function enviarEmailCobranca(params: {
       <tr>
         <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#333;">${p.loja_nome}</td>
         <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#e67e22;">${formatarMeses(p.meses_pendentes)}</td>
-        <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#555;">${p.total_esperado}</td>
-        <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#27ae60;font-weight:600;">${p.total_recebido}</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;font-weight:700;">
+          <span style="color:#27ae60;">${p.total_recebido}</span><span style="color:#aaa;">/</span><span style="color:#555;">${mes_limite}</span>
+        </td>
         <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#c0392b;font-weight:700;">${p.total_faltante}</td>
       </tr>`,
     )
@@ -166,7 +180,7 @@ export async function enviarEmailCobranca(params: {
                       </tr>
                       <tr>
                         <td style="font-size:16px;font-weight:700;color:#1a2b4a;padding-top:4px;">${prestador_nome}</td>
-                        <td style="font-size:16px;font-weight:700;color:#c0392b;text-align:right;padding-top:4px;">${totalLojas} loja${totalLojas > 1 ? "s" : ""} · ${totalFaltante} doc${totalFaltante > 1 ? "s" : ""} faltando</td>
+                        <td style="font-size:16px;font-weight:700;color:#c0392b;text-align:right;padding-top:4px;">${totalLojas} loja${totalLojas > 1 ? "s" : ""} · ${totalFaltante} doc${totalFaltante > 1 ? "s" : ""} faltando · período ${periodoLabel}</td>
                       </tr>
                     </table>
                   </td>
@@ -182,8 +196,7 @@ export async function enviarEmailCobranca(params: {
                   <tr style="background:#f0f4f8;">
                     <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:left;text-transform:uppercase;letter-spacing:0.4px;">Loja / Unidade</th>
                     <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:left;text-transform:uppercase;letter-spacing:0.4px;">Meses pendentes</th>
-                    <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:center;text-transform:uppercase;letter-spacing:0.4px;">Esperados</th>
-                    <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:center;text-transform:uppercase;letter-spacing:0.4px;">Recebidos</th>
+                    <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:center;text-transform:uppercase;letter-spacing:0.4px;">Recebidos (${periodoLabel})</th>
                     <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:center;text-transform:uppercase;letter-spacing:0.4px;">Faltantes</th>
                   </tr>
                 </thead>
@@ -280,8 +293,7 @@ export async function enviarEmailCobranca(params: {
         (p) =>
           `Loja/Unidade: ${p.loja_nome}\n` +
           `Meses pendentes: ${formatarMeses(p.meses_pendentes)}\n` +
-          `Documentos esperados: ${p.total_esperado}\n` +
-          `Documentos recebidos: ${p.total_recebido}\n` +
+          `Recebidos (${periodoLabel}): ${p.total_recebido}/${mes_limite}\n` +
           `Documentos faltantes: ${p.total_faltante}`,
       )
       .join("\n\n") +

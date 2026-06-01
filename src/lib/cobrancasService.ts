@@ -238,6 +238,7 @@ export async function processarCobrancas(
         prestador_nome: first.prestador_nome,
         destinatarios: emails,
         ano_referencia: anoRef,
+        mes_limite: calcularMesLimite(anoRef),
         pendencias_por_loja: pendenciasLoja,
       });
 

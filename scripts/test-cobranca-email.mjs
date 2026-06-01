@@ -7,12 +7,15 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const MESES_PT = ["JANEIRO","FEVEREIRO","MARÇO","ABRIL","MAIO","JUNHO","JULHO","AGOSTO","SETEMBRO","OUTUBRO","NOVEMBRO","DEZEMBRO"];
 const fmt = (m) => m.map((x) => MESES_PT[x - 1]).join(", ");
 const DOCS = ["Registro de laudos", "Notas fiscais", "Retenção trabalhista"];
+const MESES_NOMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+const ano = 2026;
+const mesLimite = new Date().getMonth(); // jan=0 → 0, jun=5 → 5 meses decorridos (jan-mai)
+const periodoLabel = `Jan–${MESES_NOMES[mesLimite - 1]}/${ano}`;
 
 const pend = [
   { loja_nome: "Loja 01 - Manaus", meses_pendentes: [1, 3], total_esperado: 4, total_recebido: 2, total_faltante: 2 },
   { loja_nome: "Loja 05 - Manaus", meses_pendentes: [2],    total_esperado: 4, total_recebido: 3, total_faltante: 1 },
 ];
-const ano = 2026;
 const prestador = "Fornecedor Teste Ltda";
 const logo = fs.readFileSync(path.join(process.cwd(), "public", "logo-manutencao.png")).toString("base64");
 const portalUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
@@ -27,8 +30,7 @@ const totalLojas = pend.length;
 const rows = pend.map((p) => `<tr>
   <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#333;">${p.loja_nome}</td>
   <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#e67e22;">${fmt(p.meses_pendentes)}</td>
-  <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#555;">${p.total_esperado}</td>
-  <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#27ae60;font-weight:600;">${p.total_recebido}</td>
+  <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;font-weight:700;"><span style="color:#27ae60;">${p.total_recebido}</span><span style="color:#aaa;">/</span><span style="color:#555;">${mesLimite}</span></td>
   <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#c0392b;font-weight:700;">${p.total_faltante}</td>
 </tr>`).join("");
 
@@ -51,15 +53,14 @@ const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/></h
     <table width="100%" style="margin-bottom:28px;"><tr><td style="background:#f8f9fa;border-radius:6px;padding:16px 20px;">
       <table width="100%"><tr><td style="font-size:13px;color:#666;">Fornecedor</td><td style="font-size:13px;color:#666;text-align:right;">Lojas com pendência</td></tr>
       <tr><td style="font-size:16px;font-weight:700;color:#1a2b4a;padding-top:4px;">${prestador}</td>
-      <td style="font-size:16px;font-weight:700;color:#c0392b;text-align:right;padding-top:4px;">${totalLojas} lojas · ${totalFalt} docs faltando</td></tr></table>
+      <td style="font-size:16px;font-weight:700;color:#c0392b;text-align:right;padding-top:4px;">${totalLojas} lojas · ${totalFalt} docs faltando · período ${periodoLabel}</td></tr></table>
     </td></tr></table>
     <p style="margin:0 0 12px;font-size:14px;font-weight:700;color:#1a2b4a;text-transform:uppercase;">Pendências identificadas</p>
     <table width="100%" style="border:1px solid #e8e8e8;border-radius:6px;overflow:hidden;">
       <thead><tr style="background:#f0f4f8;">
         <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:left;">Loja / Unidade</th>
         <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:left;">Meses pendentes</th>
-        <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:center;">Esperados</th>
-        <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:center;">Recebidos</th>
+        <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:center;">Recebidos (${periodoLabel})</th>
         <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:center;">Faltantes</th>
       </tr></thead><tbody>${rows}</tbody></table>
     <p style="margin:28px 0 16px;font-size:15px;color:#333;">Solicitamos a <strong>regularização imediata</strong> das pendências acima.</p>
