@@ -129,21 +129,21 @@ export async function enviarEmailCobranca(params: {
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
 </head>
-<body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;">
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:Arial,Helvetica,sans-serif;">
 
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:32px 16px;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:20px 0;">
     <tr>
       <td align="center">
-        <table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;">
+        <table width="900" cellpadding="0" cellspacing="0" style="max-width:900px;width:100%;">
 
           <!-- HEADER -->
           <tr>
-            <td style="background:#1a2b4a;border-radius:8px 8px 0 0;padding:24px 32px;">
+            <td style="background:#1a2b4a;border-radius:10px 10px 0 0;padding:28px 40px;">
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td>${logoHtml}</td>
                   <td align="right" style="font-size:12px;color:#8fa3c0;vertical-align:bottom;">
-                    Ano de referência: <strong style="color:#ffffff;">${ano_referencia}</strong>
+                    Período: <strong style="color:#ffffff;">${periodoLabel}</strong>
                   </td>
                 </tr>
               </table>
@@ -152,8 +152,8 @@ export async function enviarEmailCobranca(params: {
 
           <!-- TÍTULO -->
           <tr>
-            <td style="background:#c0392b;padding:16px 32px;">
-              <p style="margin:0;font-size:15px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">
+            <td style="background:#c0392b;padding:18px 40px;">
+              <p style="margin:0;font-size:16px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">
                 ⚠️ Pendência de Documentação Mensal Obrigatória
               </p>
             </td>
@@ -161,43 +161,48 @@ export async function enviarEmailCobranca(params: {
 
           <!-- CORPO -->
           <tr>
-            <td style="background:#ffffff;padding:32px;">
+            <td style="background:#ffffff;padding:36px 40px;">
 
-              <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.6;">Prezados,</p>
-              <p style="margin:0 0 24px;font-size:15px;color:#333;line-height:1.6;">
+              <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.7;">Prezados,</p>
+              <p style="margin:0 0 28px;font-size:15px;color:#333;line-height:1.7;">
                 Identificamos pendências na documentação mensal obrigatória referente às
                 <strong>lojas/unidades</strong> atendidas por este fornecedor.
               </p>
 
               <!-- RESUMO -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
                 <tr>
-                  <td style="background:#f8f9fa;border-radius:6px;padding:16px 20px;">
+                  <td style="background:#f3f6fb;border-radius:8px;padding:20px 24px;">
                     <table width="100%" cellpadding="0" cellspacing="0">
                       <tr>
-                        <td style="font-size:13px;color:#666;">Fornecedor</td>
-                        <td style="font-size:13px;color:#666;text-align:right;">Lojas com pendência</td>
+                        <td style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:0.5px;">Fornecedor</td>
+                        <td style="font-size:12px;color:#888;text-align:right;text-transform:uppercase;letter-spacing:0.5px;">Resumo</td>
                       </tr>
                       <tr>
-                        <td style="font-size:16px;font-weight:700;color:#1a2b4a;padding-top:4px;">${prestador_nome}</td>
-                        <td style="font-size:16px;font-weight:700;color:#c0392b;text-align:right;padding-top:4px;">${totalLojas} loja${totalLojas > 1 ? "s" : ""} · ${totalFaltante} doc${totalFaltante > 1 ? "s" : ""} faltando · período ${periodoLabel}</td>
+                        <td style="font-size:20px;font-weight:700;color:#1a2b4a;padding-top:6px;">${prestador_nome}</td>
+                        <td style="text-align:right;padding-top:6px;">
+                          <span style="font-size:18px;font-weight:700;color:#c0392b;">${totalFaltante}</span>
+                          <span style="font-size:13px;color:#888;"> doc${totalFaltante > 1 ? "s" : ""} faltando em </span>
+                          <span style="font-size:18px;font-weight:700;color:#1a2b4a;">${totalLojas}</span>
+                          <span style="font-size:13px;color:#888;"> loja${totalLojas > 1 ? "s" : ""}</span>
+                        </td>
                       </tr>
                     </table>
                   </td>
                 </tr>
               </table>
 
-              <!-- TABELA -->
-              <p style="margin:0 0 12px;font-size:14px;font-weight:700;color:#1a2b4a;text-transform:uppercase;letter-spacing:0.5px;">
+              <!-- TABELA DE PENDÊNCIAS -->
+              <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#1a2b4a;text-transform:uppercase;letter-spacing:0.6px;">
                 Pendências identificadas
               </p>
-              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:6px;overflow:hidden;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e0e6ee;border-radius:8px;overflow:hidden;">
                 <thead>
-                  <tr style="background:#f0f4f8;">
-                    <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:left;text-transform:uppercase;letter-spacing:0.4px;">Loja / Unidade</th>
-                    <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:left;text-transform:uppercase;letter-spacing:0.4px;">Meses pendentes</th>
-                    <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:center;text-transform:uppercase;letter-spacing:0.4px;">Recebidos (${periodoLabel})</th>
-                    <th style="padding:12px 16px;font-size:12px;font-weight:700;color:#555;text-align:center;text-transform:uppercase;letter-spacing:0.4px;">Faltantes</th>
+                  <tr style="background:#f3f6fb;">
+                    <th style="padding:13px 18px;font-size:11px;font-weight:700;color:#555;text-align:left;text-transform:uppercase;letter-spacing:0.5px;">Loja / Unidade</th>
+                    <th style="padding:13px 18px;font-size:11px;font-weight:700;color:#555;text-align:left;text-transform:uppercase;letter-spacing:0.5px;">Meses pendentes</th>
+                    <th style="padding:13px 18px;font-size:11px;font-weight:700;color:#555;text-align:center;text-transform:uppercase;letter-spacing:0.5px;">Recebidos<br/><span style="font-size:10px;color:#999;text-transform:none;">${periodoLabel}</span></th>
+                    <th style="padding:13px 18px;font-size:11px;font-weight:700;color:#555;text-align:center;text-transform:uppercase;letter-spacing:0.5px;">Faltantes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -205,18 +210,18 @@ export async function enviarEmailCobranca(params: {
                 </tbody>
               </table>
 
-              <p style="margin:28px 0 16px;font-size:15px;color:#333;line-height:1.6;">
+              <p style="margin:28px 0 24px;font-size:15px;color:#333;line-height:1.7;">
                 Solicitamos a <strong>regularização imediata</strong> das pendências acima.
               </p>
 
               <!-- DOCUMENTOS ESPERADOS -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
                 <tr>
-                  <td style="background:#f0f4f8;border-radius:6px;padding:16px 20px;">
-                    <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1a2b4a;text-transform:uppercase;letter-spacing:0.4px;">
+                  <td style="background:#f3f6fb;border-radius:8px;padding:18px 24px;">
+                    <p style="margin:0 0 10px;font-size:12px;font-weight:700;color:#1a2b4a;text-transform:uppercase;letter-spacing:0.5px;">
                       Documentos obrigatórios por mês
                     </p>
-                    <ul style="margin:0;padding-left:20px;font-size:14px;color:#444;line-height:1.5;">
+                    <ul style="margin:0;padding-left:20px;font-size:14px;color:#444;line-height:1.7;">
                       ${docsHtml}
                     </ul>
                   </td>
@@ -224,18 +229,18 @@ export async function enviarEmailCobranca(params: {
               </table>
 
               <!-- PRAZO -->
-              <p style="margin:0 0 20px;font-size:15px;color:#333;line-height:1.6;">
+              <p style="margin:0 0 24px;font-size:15px;color:#333;line-height:1.7;">
                 Prazo para regularização: <strong style="color:#c0392b;">${prazoFormatado}</strong>.
               </p>
 
               ${
                 portalUrl
                   ? `<!-- CTA -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
                 <tr>
                   <td align="center">
                     <a href="${portalUrl}" target="_blank"
-                       style="display:inline-block;background:#1a2b4a;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:6px;">
+                       style="display:inline-block;background:#1a2b4a;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:16px 48px;border-radius:8px;letter-spacing:0.3px;">
                       Enviar documentação
                     </a>
                   </td>
@@ -244,20 +249,21 @@ export async function enviarEmailCobranca(params: {
                   : ""
               }
 
-              <!-- ALERTA -->
-              <table width="100%" cellpadding="0" cellspacing="0">
+              <!-- ALERTA DE PAGAMENTO - DESTAQUE -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
                 <tr>
-                  <td style="background:#fff8e1;border-left:4px solid #f39c12;border-radius:0 6px 6px 0;padding:14px 18px;">
-                    <p style="margin:0;font-size:14px;color:#7d5a00;line-height:1.6;">
-                      <strong>Atenção:</strong> A ausência da documentação obrigatória poderá
-                      impactar diretamente o <strong>processo de pagamento</strong> do fornecedor
-                      até que todos os documentos exigidos sejam enviados e validados.
+                  <td style="background:#7f1d1d;border-radius:8px;padding:24px 28px;">
+                    <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#fca5a5;text-transform:uppercase;letter-spacing:0.6px;">
+                      🚨 Impacto no Pagamento
+                    </p>
+                    <p style="margin:0;font-size:16px;font-weight:700;color:#ffffff;line-height:1.7;">
+                      A ausência da documentação obrigatória poderá <u>suspender o processo de pagamento</u> deste fornecedor até que todos os documentos exigidos sejam enviados e validados.
                     </p>
                   </td>
                 </tr>
               </table>
 
-              <p style="margin:28px 0 0;font-size:14px;color:#555;line-height:1.6;">
+              <p style="margin:0;font-size:14px;color:#555;line-height:1.6;">
                 Atenciosamente,<br/>
                 <strong style="color:#1a2b4a;">Equipe de Manutenção</strong>
               </p>
@@ -267,7 +273,7 @@ export async function enviarEmailCobranca(params: {
 
           <!-- FOOTER -->
           <tr>
-            <td style="background:#e8ecf0;border-radius:0 0 8px 8px;padding:16px 32px;text-align:center;">
+            <td style="background:#e4e8ed;border-radius:0 0 10px 10px;padding:16px 40px;text-align:center;">
               <p style="margin:0;font-size:11px;color:#888;">
                 Este é um e-mail automático. Por favor, não responda diretamente a esta mensagem.
               </p>
