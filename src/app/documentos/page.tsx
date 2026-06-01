@@ -418,6 +418,7 @@ export default function DocumentosPage() {
   const [editDialog, setEditDialog] = useState<{
     registro: FormularioRecord;
     values: Record<string, string>;
+    lojaId: string;
   } | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [filterOptions, setFilterOptions] = useState<{
@@ -1246,7 +1247,8 @@ export default function DocumentosPage() {
       acc[campo.name] = raw === null || raw === undefined ? "" : String(raw);
       return acc;
     }, {});
-    setEditDialog({ registro, values });
+    const lojaId = String(registro.dados?.loja_id ?? "");
+    setEditDialog({ registro, values, lojaId });
   };
 
   const atualizarEdicao = (campo: string, valor: string) => {
@@ -1284,6 +1286,11 @@ export default function DocumentosPage() {
         body: JSON.stringify({
           id: editDialog.registro.id,
           updates: editDialog.values,
+          ...(editDialog.lojaId &&
+          editDialog.lojaId !==
+            String(editDialog.registro.dados?.loja_id ?? "")
+            ? { lojaId: editDialog.lojaId }
+            : {}),
         }),
       });
       const payload = (await response.json()) as {
@@ -1996,6 +2003,38 @@ export default function DocumentosPage() {
               {editDialog.registro.id}
             </p>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {/* Seletor de loja — sempre visível, obrigatório quando ausente */}
+              <label className="text-xs font-semibold text-slate-600 md:col-span-2">
+                <span className="flex items-center gap-1">
+                  Loja / Unidade
+                  {!editDialog.lojaId && (
+                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-600">
+                      não atribuída
+                    </span>
+                  )}
+                </span>
+                <select
+                  value={editDialog.lojaId}
+                  onChange={(e) =>
+                    setEditDialog((prev) =>
+                      prev ? { ...prev, lojaId: e.target.value } : prev,
+                    )
+                  }
+                  className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400 ${
+                    !editDialog.lojaId
+                      ? "border-red-300 bg-red-50"
+                      : "border-slate-200 bg-slate-50"
+                  }`}
+                >
+                  <option value="">Selecione uma loja...</option>
+                  {filterOptions.lojas.map((loja) => (
+                    <option key={loja.id} value={loja.id}>
+                      {loja.codigo ? `${loja.codigo} — ` : ""}
+                      {loja.nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
               {getEditFields(editDialog.registro.tipo).map((campo) => {
                 const value = editDialog.values[campo.name] ?? "";
                 return (
