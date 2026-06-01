@@ -39,10 +39,10 @@ const cta = portalUrl
   : "";
 
 const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/></head>
-<body style="margin:0;padding:0;background:#f0f2f5;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:20px 0;"><tr><td align="center">
-<table width="900" cellpadding="0" cellspacing="0" style="max-width:900px;width:100%;">
-  <tr><td style="background:#1a2b4a;border-radius:10px 10px 0 0;padding:28px 40px;">
+<body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;"><tr><td>
+<table width="100%" cellpadding="0" cellspacing="0">
+  <tr><td style="background:#1a2b4a;padding:28px 40px;">
     <table width="100%"><tr><td><img src="cid:logo_manutencao" style="height:52px;display:block;"/></td>
     <td align="right" style="font-size:12px;color:#8fa3c0;vertical-align:bottom;">Período: <strong style="color:#fff;">${periodoLabel}</strong></td></tr></table>
   </td></tr>
@@ -80,7 +80,7 @@ const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/></h
     </tr></table>
     <p style="margin:0;font-size:14px;color:#555;line-height:1.6;">Atenciosamente,<br/><strong style="color:#1a2b4a;">Equipe de Manutenção</strong></p>
   </td></tr>
-  <tr><td style="background:#e4e8ed;border-radius:0 0 10px 10px;padding:16px 40px;text-align:center;"><p style="margin:0;font-size:11px;color:#888;">Este é um e-mail automático. Por favor, não responda diretamente a esta mensagem.</p></td></tr>
+  <tr><td style="background:#e4e8ed;padding:16px 40px;text-align:center;"><p style="margin:0;font-size:11px;color:#888;">Este é um e-mail automático. Por favor, não responda diretamente a esta mensagem.</p></td></tr>
 </table></td></tr></table></body></html>`;
 
 sgMail
