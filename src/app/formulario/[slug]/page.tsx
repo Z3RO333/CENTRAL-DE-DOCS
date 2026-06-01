@@ -58,6 +58,22 @@ const FORM_CONFIGS: FormConfig[] = [
         placeholder: "MM/AAAA",
       },
       {
+        name: "tipo_laudo",
+        label: "Tipo de documento",
+        type: "text",
+        placeholder: "Ex.: FGTS, INSS, FOPAG...",
+        options: [
+          "FGTS",
+          "INSS",
+          "FOPAG",
+          "SINETRAM",
+          "Vale-transporte",
+          "Vale-refeição",
+          "DIRF",
+          "PERDCOMP",
+        ],
+      },
+      {
         name: "prestador",
         label: "Prestador",
         type: "text",

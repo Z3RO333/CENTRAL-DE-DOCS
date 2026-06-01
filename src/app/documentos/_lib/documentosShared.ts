@@ -30,6 +30,7 @@ export const TIPO_LABEL = tipoLabel;
 const EDIT_FIELDS_BY_TIPO: Record<string, EditField[]> = {
   retencao_trabalhista: [
     { name: "competencia", label: "Competência" },
+    { name: "tipo_laudo", label: "Tipo de documento" },
     { name: "prestador", label: "Prestador" },
     { name: "observacoes", label: "Observações", type: "textarea" },
   ],
