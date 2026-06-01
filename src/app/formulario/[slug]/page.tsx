@@ -80,6 +80,12 @@ const FORM_CONFIGS: FormConfig[] = [
         placeholder: "Nome do prestador responsável pelo documento",
       },
       {
+        name: "responsavel",
+        label: "Responsável (diretor/dono)",
+        type: "text",
+        placeholder: "Diretor/dono responsável pelos funcionários",
+      },
+      {
         name: "observacoes",
         label: "Observações",
         type: "textarea",
@@ -849,7 +855,12 @@ export default function FormularioPage() {
                 <input
                   id={field.name}
                   type={field.type}
-                  required
+                  required={
+                    !(
+                      config.slug === "retencao-trabalhista" &&
+                      field.name === "responsavel"
+                    )
+                  }
                   value={values[field.name] ?? ""}
                   onChange={(e) => handleChange(field.name, e.target.value)}
                   placeholder={field.placeholder}
