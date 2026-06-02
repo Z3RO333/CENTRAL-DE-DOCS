@@ -261,6 +261,18 @@ export async function saveNfseToBtracker(
       : null;
 
   const digits = (s: string | null) => (s ? s.replace(/\D/g, "").slice(0, 14) : null);
+  const cepDigits = (s: string | null) => {
+    const d = s ? s.replace(/\D/g, "").slice(0, 8) : "";
+    return d.length === 8 ? d : null;
+  };
+  // servico.codigo não pode ser nulo; usa o código da lista de serviço ou um padrão
+  const servicoCodigo =
+    servicoErp?.codigo ?? input.servico.itemListaServico ?? "00.00";
+  const servicoDescricao =
+    servicoErp?.descricao ??
+    input.servico.discriminacao ??
+    input.servico.itemListaServico ??
+    "Servico";
 
   // O backend do BTracker faz json.loads() nos campos compostos → enviar como STRING JSON.
   // municipio/prestador/tomador exigem id; servicos é um DICT único (não array);
@@ -286,7 +298,7 @@ export async function saveNfseToBtracker(
       tipo_documento: 0,
       municipio: munObj(munPrest),
       inscricao_municipal: input.prestador.inscricaoMunicipal,
-      cep: input.prestador.cep,
+      cep: cepDigits(input.prestador.cep),
       logradouro: input.prestador.logradouro,
       numero: input.prestador.numero,
       complemento: input.prestador.complemento,
@@ -309,15 +321,15 @@ export async function saveNfseToBtracker(
     discriminacao: input.servico.discriminacao,
     item_lista_servico: input.servico.itemListaServico,
     servicos: JSON.stringify({
-      servico: servicoErp ?? {
-        id: null,
-        codigo: input.servico.itemListaServico,
-        descricao: input.servico.discriminacao ?? input.servico.itemListaServico ?? "Servico",
+      servico: {
+        id: servicoErp?.id ?? null,
+        codigo: servicoCodigo,
+        descricao: servicoDescricao,
       },
       quantidade: 1,
       valor_total: num(input.servico.valorServicos),
       valor_servicos: num(input.servico.valorServicos),
-      texto_breve: input.servico.discriminacao?.slice(0, 60) ?? "Servico",
+      texto_breve: (input.servico.discriminacao ?? servicoDescricao).slice(0, 60),
       nfse: null,
     }),
     valor_servicos: num(input.servico.valorServicos),
