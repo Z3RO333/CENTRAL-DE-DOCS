@@ -70,7 +70,11 @@ export async function GET(request: Request) {
       loja_id: string;
       loja_nome: string;
       meses_com_documentos: number[];
+      meses_com_documentos_laudos: number[];
+      meses_com_documentos_retencao: number[];
       meses_pendentes: number[];
+      meses_pendentes_laudos: number[];
+      meses_pendentes_retencao: number[];
       total_esperado: number;
       total_recebido: number;
       total_faltante: number;
@@ -104,7 +108,11 @@ export async function GET(request: Request) {
         loja_id: p.loja_id,
         loja_nome: p.loja_nome,
         meses_com_documentos: p.meses_com_documentos,
+        meses_com_documentos_laudos: p.meses_com_documentos_laudos,
+        meses_com_documentos_retencao: p.meses_com_documentos_retencao,
         meses_pendentes: p.meses_pendentes,
+        meses_pendentes_laudos: p.meses_pendentes_laudos,
+        meses_pendentes_retencao: p.meses_pendentes_retencao,
         total_esperado: p.total_esperado,
         total_recebido: p.total_recebido,
         total_faltante: p.total_faltante,

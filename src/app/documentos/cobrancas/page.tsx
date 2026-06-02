@@ -39,7 +39,7 @@ function anosDisponiveis(): number[] {
   return [atual, atual - 1, atual - 2];
 }
 
-function MesGrid({ loja }: { loja: LojaPendencia }) {
+function MesGridBase({ loja }: { loja: LojaPendencia }) {
   const presentes = new Set(loja.meses_com_documentos);
   const pendentes = new Set(loja.meses_pendentes);
   return (
@@ -68,6 +68,76 @@ function MesGrid({ loja }: { loja: LojaPendencia }) {
           </span>
         );
       })}
+    </div>
+  );
+}
+
+function MesTipoRow({
+  label,
+  recebidos,
+  pendentes,
+}: {
+  label: string;
+  recebidos: number[];
+  pendentes: number[];
+}) {
+  const recebidosSet = new Set(recebidos);
+  const pendentesSet = new Set(pendentes);
+
+  return (
+    <div className="grid grid-cols-[72px_1fr] items-center gap-2">
+      <span className="text-[11px] font-semibold text-slate-500">{label}</span>
+      <div className="flex flex-wrap gap-1">
+        {MESES_CURTOS.map((mesLabel, idx) => {
+          const mes = idx + 1;
+          let cls = "bg-slate-100 text-slate-400";
+          if (recebidosSet.has(mes)) {
+            cls = "bg-emerald-100 text-emerald-700";
+          } else if (pendentesSet.has(mes)) {
+            cls = "bg-red-100 text-red-700";
+          }
+          return (
+            <span
+              key={mesLabel}
+              className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${cls}`}
+              title={
+                recebidosSet.has(mes)
+                  ? `${mesLabel}: recebido`
+                  : pendentesSet.has(mes)
+                    ? `${mesLabel}: pendente`
+                    : `${mesLabel}: nao vencido`
+              }
+            >
+              {mesLabel}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MesGrid({ loja }: { loja: LojaPendencia }) {
+  const temTipos =
+    loja.meses_com_documentos_laudos.length > 0 ||
+    loja.meses_com_documentos_retencao.length > 0 ||
+    loja.meses_pendentes_laudos.length > 0 ||
+    loja.meses_pendentes_retencao.length > 0;
+
+  if (!temTipos) return <MesGridBase loja={loja} />;
+
+  return (
+    <div className="space-y-1.5">
+      <MesTipoRow
+        label="Laudos"
+        recebidos={loja.meses_com_documentos_laudos}
+        pendentes={loja.meses_pendentes_laudos}
+      />
+      <MesTipoRow
+        label="Retencao"
+        recebidos={loja.meses_com_documentos_retencao}
+        pendentes={loja.meses_pendentes_retencao}
+      />
     </div>
   );
 }

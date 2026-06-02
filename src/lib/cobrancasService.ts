@@ -29,6 +29,8 @@ export type PendenciaCobranca = {
   loja_nome: string;
   ano_referencia: number;
   meses_com_documentos: number[];
+  meses_com_documentos_laudos: number[];
+  meses_com_documentos_retencao: number[];
   meses_pendentes: number[];
   meses_pendentes_laudos: number[];
   meses_pendentes_retencao: number[];
@@ -59,6 +61,8 @@ type RpcRow = {
   loja_id: string;
   loja_nome: string | null;
   meses_com_documentos: number[] | null;
+  meses_com_documentos_laudos?: number[] | null;
+  meses_com_documentos_retencao?: number[] | null;
   meses_pendentes: number[] | null;
   // colunas adicionadas pela migração 202606011700 (podem ser null em ambientes antigos)
   meses_pendentes_laudos: number[] | null;
@@ -127,12 +131,17 @@ export async function levantarPendencias(
       if (nomeExcluido(prest.nome)) return null;
 
       const mesesCom = row.meses_com_documentos ?? [];
+      const laudosCom = row.meses_com_documentos_laudos ?? [];
+      const retencaoCom = row.meses_com_documentos_retencao ?? [];
       const mesesPend = row.meses_pendentes ?? [];
       const laudosPend = row.meses_pendentes_laudos ?? [];
       const retencaoPend = row.meses_pendentes_retencao ?? [];
+      const totalRecebido =
+        laudosCom.length + retencaoCom.length || mesesCom.length;
       // total_faltante = soma dos dois tipos (laudos + retenção), pode ser > meses únicos
       const totalFaltante =
         laudosPend.length + retencaoPend.length || mesesPend.length;
+      const totalEsperado = totalRecebido + totalFaltante;
 
       return {
         prestador_id: row.prestador_id,
@@ -142,11 +151,13 @@ export async function levantarPendencias(
         loja_nome: fixMojibakeText(row.loja_nome ?? row.loja_id),
         ano_referencia: anoRef,
         meses_com_documentos: mesesCom,
+        meses_com_documentos_laudos: laudosCom,
+        meses_com_documentos_retencao: retencaoCom,
         meses_pendentes: mesesPend,
         meses_pendentes_laudos: laudosPend,
         meses_pendentes_retencao: retencaoPend,
-        total_esperado: mesesCom.length + mesesPend.length,
-        total_recebido: mesesCom.length,
+        total_esperado: totalEsperado,
+        total_recebido: totalRecebido,
         total_faltante: totalFaltante,
       } satisfies PendenciaCobranca;
     })

@@ -7,7 +7,11 @@ export type LojaPendencia = {
   loja_id: string;
   loja_nome: string;
   meses_com_documentos: number[];
+  meses_com_documentos_laudos: number[];
+  meses_com_documentos_retencao: number[];
   meses_pendentes: number[];
+  meses_pendentes_laudos: number[];
+  meses_pendentes_retencao: number[];
   total_esperado: number;
   total_recebido: number;
   total_faltante: number;
