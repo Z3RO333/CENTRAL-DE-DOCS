@@ -211,26 +211,12 @@ export async function PATCH(request: Request) {
     }
 
     if (novosEmails.length > 0) {
-      const { data: authUsers, error: authUsersError } = await supabaseAdmin
-        .from("auth.users")
-        .select("email")
-        .in("email", novosEmails);
-
-      if (authUsersError) {
-        throw authUsersError;
-      }
-
-      const encontrados = new Set(
-        (authUsers ?? [])
-          .map((item) => (item.email as string | null) ?? "")
-          .map((value) => value.toLowerCase().trim())
-          .filter(Boolean),
-      );
-      const faltando = novosEmails.filter((emailItem) => !encontrados.has(emailItem));
-      if (faltando.length > 0) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const invalidos = novosEmails.filter((e) => !emailRegex.test(e));
+      if (invalidos.length > 0) {
         throw new HttpError(
           400,
-          `E-mails nao cadastrados na aplicacao: ${faltando.join(", ")}`,
+          `E-mails com formato invalido: ${invalidos.join(", ")}`,
         );
       }
     }
