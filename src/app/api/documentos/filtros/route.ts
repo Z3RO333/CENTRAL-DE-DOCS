@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 import { normalizeIds, sanitizeId, safeParseDados } from "@/lib/documentosApiUtils";
 import { toNullableArray } from "@/lib/documentosAggregateUtils";
 import { buildDocumentosAccessOr } from "@/lib/documentosAccessFilters";
+import { getCompetenciaFromDados } from "@/lib/competencia";
 import {
   ApiHttpError as HttpError,
   getAuthorizedPrestadorIds,
@@ -38,7 +39,28 @@ type FilterOptionsAggRow = {
   tipo_laudo: string[] | null;
 };
 
+type PeriodoRow = Pick<FormularioRow, "created_at" | "dados">;
+
 const parseDados = (raw: FormularioRow["dados"]) => safeParseDados(raw);
+
+function addAnoFromPeriodo(row: PeriodoRow, anos: Set<string>) {
+  const dados = normalizeDisplayData(parseDados(row.dados)) as Record<
+    string,
+    unknown
+  > | null;
+  const competencia = getCompetenciaFromDados(dados);
+  if (competencia) {
+    anos.add(competencia.ano);
+    return;
+  }
+
+  if (row.created_at) {
+    const ano = new Date(row.created_at).getFullYear().toString();
+    if (!Number.isNaN(Number(ano))) {
+      anos.add(ano);
+    }
+  }
+}
 
 const normalizeLojaOption = (loja: LojaOption): LojaOption => ({
   ...loja,
@@ -88,11 +110,27 @@ export async function GET(request: Request) {
     const filterUserId = searchParams.get("userId");
 
     if (canAccess) {
-      const [
-        { data: aggregateData, error: aggregateError },
-        { data: lojasAll, error: lojasError },
-        { data: prestadoresAll, error: prestadoresError },
-      ] = await Promise.all([
+      let anosQuery = supabaseAdmin
+        .from("formularios")
+        .select("created_at,dados", { count: "exact" })
+        .order("created_at", { ascending: false });
+      if (filterUserId) {
+        anosQuery = anosQuery.eq("user_id", filterUserId);
+      }
+      if (filterPrestadores.length === 1) {
+        anosQuery = anosQuery.eq("prestador_id", filterPrestadores[0]);
+      } else if (filterPrestadores.length > 1) {
+        anosQuery = anosQuery.in("prestador_id", filterPrestadores);
+      }
+      if (filterLojas.length === 1) {
+        anosQuery = anosQuery.eq("dados->>loja_id", filterLojas[0]);
+      } else if (filterLojas.length > 1) {
+        anosQuery = anosQuery.or(
+          filterLojas.map((lojaId) => `dados->>loja_id.eq.${lojaId}`).join(","),
+        );
+      }
+
+      const [{ data: aggregateData, error: aggregateError }, { data: lojasAll, error: lojasError }, { data: prestadoresAll, error: prestadoresError }] = await Promise.all([
         supabaseAdmin.rpc("documentos_filter_options_agg", {
           p_user_id: filterUserId || null,
           p_prestador_ids: toNullableArray(filterPrestadores),
@@ -124,8 +162,28 @@ export async function GET(request: Request) {
         tipo_laudo: [],
       };
 
+      const anos = new Set((aggregate.anos ?? []).map(String));
+      const { data: firstAnoPage, error: anosError, count: anosCount } =
+        await anosQuery.range(0, 999);
+      if (anosError) {
+        throw anosError;
+      }
+      const periodoRows = ((firstAnoPage as PeriodoRow[]) ?? []) as PeriodoRow[];
+      const totalAnos = anosCount ?? periodoRows.length;
+      for (let offset = periodoRows.length; offset < totalAnos; offset += 1000) {
+        const { data: batch, error: batchError } = await anosQuery.range(
+          offset,
+          Math.min(offset + 999, totalAnos - 1),
+        );
+        if (batchError) {
+          throw batchError;
+        }
+        periodoRows.push(...(((batch as PeriodoRow[]) ?? []) as PeriodoRow[]));
+      }
+      periodoRows.forEach((row) => addAnoFromPeriodo(row, anos));
+
       return NextResponse.json({
-        anos: (aggregate.anos ?? []).map(String),
+        anos: Array.from(anos).sort((a, b) => Number(b) - Number(a)),
         status: aggregate.status ?? [],
         tipoLaudo: (aggregate.tipo_laudo ?? []).map(fixMojibakeText),
         lojas: ((lojasAll as LojaOption[]) ?? []).map(normalizeLojaOption),
@@ -181,12 +239,6 @@ export async function GET(request: Request) {
     const tipoLaudoSet = new Set<string>();
 
     rows.forEach((row) => {
-      if (row.created_at) {
-        const ano = new Date(row.created_at).getFullYear().toString();
-        if (!Number.isNaN(Number(ano))) {
-          anos.add(ano);
-        }
-      }
       if (row.status) {
         statusSet.add(row.status);
       }
@@ -194,6 +246,15 @@ export async function GET(request: Request) {
         string,
         unknown
       > | null;
+      const competencia = getCompetenciaFromDados(dados);
+      if (competencia) {
+        anos.add(competencia.ano);
+      } else if (row.created_at) {
+        const ano = new Date(row.created_at).getFullYear().toString();
+        if (!Number.isNaN(Number(ano))) {
+          anos.add(ano);
+        }
+      }
       const tipoLaudo = dados?.tipo_laudo;
       if (typeof tipoLaudo === "string" && tipoLaudo.trim()) {
         tipoLaudoSet.add(tipoLaudo.trim());

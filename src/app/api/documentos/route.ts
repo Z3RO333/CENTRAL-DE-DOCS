@@ -7,6 +7,7 @@ import {
   safeParseDados,
   sanitizeId,
 } from "@/lib/documentosApiUtils";
+import { getCompetenciaFromDados } from "@/lib/competencia";
 import { buildDocumentosAccessOr } from "@/lib/documentosAccessFilters";
 import {
   ApiHttpError as HttpError,
@@ -42,6 +43,46 @@ type DocumentRecord = {
   user_id: string;
   prestador_id: string | null;
 };
+
+const PAGE_SIZE = 1000;
+
+function getPeriodoDocumento(row: FormularioRow): { ano: string; mes: string } | null {
+  const competencia = getCompetenciaFromDados(safeParseDados(row.dados));
+  if (competencia) {
+    return { ano: competencia.ano, mes: competencia.mes };
+  }
+
+  const createdAt = new Date(row.created_at);
+  if (Number.isNaN(createdAt.getTime())) {
+    return null;
+  }
+
+  return {
+    ano: String(createdAt.getFullYear()),
+    mes: String(createdAt.getMonth() + 1).padStart(2, "0"),
+  };
+}
+
+function matchesPeriodo(
+  row: FormularioRow,
+  anoFilter: string | null,
+  mesFilter: string | null,
+) {
+  if (!anoFilter || anoFilter === "todos") {
+    return true;
+  }
+
+  const periodo = getPeriodoDocumento(row);
+  if (!periodo || periodo.ano !== anoFilter) {
+    return false;
+  }
+
+  if (!mesFilter || mesFilter === "todos") {
+    return true;
+  }
+
+  return periodo.mes === mesFilter.padStart(2, "0");
+}
 
 function mapRows(rows: FormularioRow[]): DocumentRecord[] {
   return rows.map((item) => ({
@@ -174,27 +215,9 @@ export async function GET(request: Request) {
       );
     }
 
-    if (anoFilter && anoFilter !== "todos") {
-      const ano = Number(anoFilter);
-      if (!Number.isNaN(ano)) {
-        if (mesFilter && mesFilter !== "todos") {
-          const mes = Number(mesFilter);
-          if (!Number.isNaN(mes) && mes >= 1 && mes <= 12) {
-            const start = new Date(ano, mes - 1, 1);
-            const end = new Date(ano, mes, 1);
-            query = query
-              .gte("created_at", start.toISOString())
-              .lt("created_at", end.toISOString());
-          }
-        } else {
-          const start = new Date(ano, 0, 1);
-          const end = new Date(ano + 1, 0, 1);
-          query = query
-            .gte("created_at", start.toISOString())
-            .lt("created_at", end.toISOString());
-        }
-      }
-    }
+    const filtrarPeriodoEmMemoria = Boolean(
+      anoFilter && anoFilter !== "todos",
+    );
 
     if (identificacaoFilter) {
       const textSearchOr = buildDocumentosTextSearchOr(identificacaoFilter);
@@ -203,11 +226,40 @@ export async function GET(request: Request) {
       }
     }
 
-    query = query.range(offset, offset + limit - 1);
+    if (!filtrarPeriodoEmMemoria) {
+      query = query.range(offset, offset + limit - 1);
+    }
 
-    const { data, error, count } = await query;
+    const { data, error, count } = filtrarPeriodoEmMemoria
+      ? await query.range(0, PAGE_SIZE - 1)
+      : await query;
     if (error) {
       throw error;
+    }
+
+    if (filtrarPeriodoEmMemoria) {
+      const rows = ((data as FormularioRow[]) ?? []) as FormularioRow[];
+      const totalRaw = count ?? rows.length;
+
+      for (let nextOffset = rows.length; nextOffset < totalRaw; nextOffset += PAGE_SIZE) {
+        const { data: batch, error: batchError } = await query.range(
+          nextOffset,
+          Math.min(nextOffset + PAGE_SIZE - 1, totalRaw - 1),
+        );
+        if (batchError) {
+          throw batchError;
+        }
+        rows.push(...(((batch as FormularioRow[]) ?? []) as FormularioRow[]));
+      }
+
+      const filtrados = rows.filter((row) =>
+        matchesPeriodo(row, anoFilter, mesFilter),
+      );
+
+      return NextResponse.json({
+        registros: mapRows(filtrados.slice(offset, offset + limit)),
+        total: filtrados.length,
+      });
     }
 
     return NextResponse.json({

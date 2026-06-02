@@ -14,6 +14,7 @@ import { DocumentosEmptyState } from "./_components/DocumentosEmptyState";
 import { DocumentosFilters } from "./_components/DocumentosFilters";
 import { DocumentosPagination } from "./_components/DocumentosPagination";
 import { TIPO_LABEL } from "./_lib/documentosShared";
+import { getCompetenciaFromDados } from "@/lib/competencia";
 import { fixMojibakeText } from "@/lib/textEncoding";
 
 type FormularioRecord = {
@@ -332,6 +333,23 @@ const getDataLabel = (registro: FormularioRecord) => {
     if (competencia) return competencia;
   }
   return formatDateTime(registro.created_at);
+};
+
+const getPeriodoDocumento = (registro: FormularioRecord) => {
+  const competencia = getCompetenciaFromDados(registro.dados);
+  if (competencia) {
+    return { ano: competencia.ano, mes: competencia.mes };
+  }
+
+  const createdAt = new Date(registro.created_at);
+  if (Number.isNaN(createdAt.getTime())) {
+    return null;
+  }
+
+  return {
+    ano: String(createdAt.getFullYear()),
+    mes: String(createdAt.getMonth() + 1).padStart(2, "0"),
+  };
 };
 
 const getEdicaoInfo = (registro: FormularioRecord) => {
@@ -1455,7 +1473,9 @@ export default function DocumentosPage() {
     }
     return Array.from(
       new Set(
-        registros.map((r) => new Date(r.created_at).getFullYear().toString()),
+        registros
+          .map((registro) => getPeriodoDocumento(registro)?.ano)
+          .filter((ano): ano is string => Boolean(ano)),
       ),
     ).sort((a, b) => Number(b) - Number(a));
   }, [filterOptions.anos, registros]);
@@ -1485,13 +1505,10 @@ export default function DocumentosPage() {
       (registro) => registro.status !== "assinado" && registro.status !== "revisado",
     ).length;
     const now = new Date();
+    const mesAtual = String(now.getMonth() + 1).padStart(2, "0");
     const esteMes = registrosFiltrados.filter((registro) => {
-      const createdAt = new Date(registro.created_at);
-      return (
-        !Number.isNaN(createdAt.getTime()) &&
-        createdAt.getFullYear() === now.getFullYear() &&
-        createdAt.getMonth() === now.getMonth()
-      );
+      const periodo = getPeriodoDocumento(registro);
+      return periodo?.ano === String(now.getFullYear()) && periodo.mes === mesAtual;
     }).length;
     return { pendentes, emAnalise, assinados, esteMes };
   }, [registrosFiltrados]);

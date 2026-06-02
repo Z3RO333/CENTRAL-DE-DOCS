@@ -42,13 +42,22 @@ AS $$
       f.prestador_id,
       f.dados->>'loja_id' AS loja_id,
       f.tipo,
-      EXTRACT(MONTH FROM (f.created_at AT TIME ZONE 'America/Manaus'))::integer AS mes
+      CASE
+        WHEN f.dados->>'competencia' ~ '^(0?[1-9]|1[0-2])/[0-9]{4}$'
+          THEN split_part(f.dados->>'competencia', '/', 1)::integer
+        ELSE EXTRACT(MONTH FROM (f.created_at AT TIME ZONE 'America/Manaus'))::integer
+      END AS mes
     FROM formularios f
     WHERE f.prestador_id IS NOT NULL
       AND f.dados->>'loja_id' IS NOT NULL
       AND f.tipo IN ('registro_laudos','retencao_trabalhista')
-      AND (f.created_at AT TIME ZONE 'America/Manaus') >= make_timestamp(p_ano,1,1,0,0,0)
-      AND (f.created_at AT TIME ZONE 'America/Manaus') <  make_timestamp(p_ano+1,1,1,0,0,0)
+      AND (
+        CASE
+          WHEN f.dados->>'competencia' ~ '^(0?[1-9]|1[0-2])/[0-9]{4}$'
+            THEN split_part(f.dados->>'competencia', '/', 2)::integer
+          ELSE EXTRACT(YEAR FROM (f.created_at AT TIME ZONE 'America/Manaus'))::integer
+        END
+      ) = p_ano
   ),
   primeiro_envio AS (
     SELECT

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildDocumentosAccessOr } from "@/lib/documentosAccessFilters";
-import { normalizeIds, sanitizeId } from "@/lib/documentosApiUtils";
+import { normalizeIds, safeParseDados, sanitizeId } from "@/lib/documentosApiUtils";
+import { getCompetenciaFromDados } from "@/lib/competencia";
 import {
   ApiHttpError as HttpError,
   getAuthorizedPrestadorIds,
@@ -31,11 +32,6 @@ type SubpastaNode = {
   children: SubpastaNode[];
 };
 
-type DateFilterQuery<T> = {
-  gte: (column: string, value: string) => T;
-  lt: (column: string, value: string) => T;
-};
-
 const PAGE_SIZE = 1000;
 
 const TIPO_LABEL: Record<string, string> = {
@@ -61,42 +57,50 @@ const MESES: Record<string, string> = {
   "12": "Dezembro",
 };
 
-const applyDateFilter = <T extends DateFilterQuery<T>>(
-  query: T,
-  anoFilter: string | null,
-  mesFilter: string | null,
-) => {
-  if (!anoFilter || anoFilter === "todos") {
-    return query;
-  }
-  const ano = Number(anoFilter);
-  if (Number.isNaN(ano)) {
-    return query;
-  }
-  if (mesFilter && mesFilter !== "todos") {
-    const mes = Number(mesFilter);
-    if (!Number.isNaN(mes) && mes >= 1 && mes <= 12) {
-      const start = new Date(ano, mes - 1, 1);
-      const end = new Date(ano, mes, 1);
-      return query
-        .gte("created_at", start.toISOString())
-        .lt("created_at", end.toISOString());
-    }
-    return query;
-  }
-  const start = new Date(ano, 0, 1);
-  const end = new Date(ano + 1, 0, 1);
-  return query
-    .gte("created_at", start.toISOString())
-    .lt("created_at", end.toISOString());
-};
-
 const touchStats = (node: SubpastaNode, createdAt: string) => {
   node.totalDocumentos += 1;
   if (!node.ultimoEnvioAt || createdAt > node.ultimoEnvioAt) {
     node.ultimoEnvioAt = createdAt;
   }
 };
+
+function getPeriodoDocumento(row: FormularioRow): { ano: string; mes: string } | null {
+  const competencia = getCompetenciaFromDados(safeParseDados(row.dados));
+  if (competencia) {
+    return { ano: competencia.ano, mes: competencia.mes };
+  }
+
+  const createdAt = new Date(row.created_at);
+  if (Number.isNaN(createdAt.getTime())) {
+    return null;
+  }
+
+  return {
+    ano: String(createdAt.getFullYear()),
+    mes: String(createdAt.getMonth() + 1).padStart(2, "0"),
+  };
+}
+
+function matchesPeriodo(
+  row: FormularioRow,
+  anoFilter: string | null,
+  mesFilter: string | null,
+) {
+  if (!anoFilter || anoFilter === "todos") {
+    return true;
+  }
+
+  const periodo = getPeriodoDocumento(row);
+  if (!periodo || periodo.ano !== anoFilter) {
+    return false;
+  }
+
+  if (!mesFilter || mesFilter === "todos") {
+    return true;
+  }
+
+  return periodo.mes === mesFilter.padStart(2, "0");
+}
 
 const createNode = (input: {
   key: string;
@@ -138,13 +142,12 @@ function buildExplorerFromRows(rows: FormularioRow[]): SubpastaNode[] {
     const tipoNode = tipoMap.get(tipoKey)!;
     touchStats(tipoNode, row.created_at);
 
-    const createdAt = new Date(row.created_at);
-    if (Number.isNaN(createdAt.getTime())) {
+    const periodo = getPeriodoDocumento(row);
+    if (!periodo) {
       return;
     }
 
-    const ano = String(createdAt.getFullYear());
-    const mes = String(createdAt.getMonth() + 1).padStart(2, "0");
+    const { ano, mes } = periodo;
     const monthKey = `${tipoKey}|periodo:${ano}-${mes}`;
     if (!monthMap.has(monthKey)) {
       const monthNode = createNode({
@@ -244,8 +247,6 @@ export async function GET(request: Request) {
       }
     }
 
-    query = applyDateFilter(query, anoFilter, mesFilter);
-
     const { data: firstPage, error, count } = await query.range(
       0,
       PAGE_SIZE - 1,
@@ -267,7 +268,11 @@ export async function GET(request: Request) {
       rows.push(...(((batch as FormularioRow[]) ?? []) as FormularioRow[]));
     }
 
-    return NextResponse.json({ subpastas: buildExplorerFromRows(rows) });
+    const rowsFiltradas = rows.filter((row) =>
+      matchesPeriodo(row, anoFilter, mesFilter),
+    );
+
+    return NextResponse.json({ subpastas: buildExplorerFromRows(rowsFiltradas) });
   } catch (err) {
     console.error("Erro ao listar explorador de loja:", err);
     if (err instanceof HttpError) {
