@@ -16,6 +16,7 @@ import { extractPdfViaBtracker } from "@/lib/btrackerApi";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 function resolveMimeType(path: string) {
   const p = path.toLowerCase();

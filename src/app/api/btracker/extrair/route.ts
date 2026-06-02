@@ -7,6 +7,10 @@ import {
 } from "@/lib/nfseExtractor";
 import { extractPdfViaBtracker } from "@/lib/btrackerApi";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 function getAzureOpenAiConfig() {
   const apiKey = process.env.AZURE_OPENAI_API_KEY?.trim();
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim();

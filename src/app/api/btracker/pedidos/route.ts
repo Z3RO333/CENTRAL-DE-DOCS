@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { searchOpenNfsesByPrestador } from "@/lib/btrackerApi";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   const cookieStore = await cookies();
   const jwt = cookieStore.get("btracker_jwt")?.value;
