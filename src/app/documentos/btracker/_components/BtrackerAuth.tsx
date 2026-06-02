@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Copy, ExternalLink, Link2, Link2Off, Loader2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Bookmark, Copy, ExternalLink, Link2, Link2Off, Loader2, X } from "lucide-react";
 
 type Props = {
   connected: boolean;
@@ -9,8 +9,10 @@ type Props = {
   onDisconnected: () => void;
 };
 
-const CONSOLE_CMD =
-  `(()=>{let done=false;const grab=v=>{if(done||typeof v!=='string')return false;const t=v.replace(/^Bearer\\s+/i,'');const parts=t.split('.');if(parts.length!==3||t.indexOf('eyJ')!==0)return false;try{const p=JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));if(!(p.token_type==='access'||p.user_id))return false}catch(e){return false}done=true;copy(t);console.log('%c✓ TOKEN COPIADO! Volte ao formulario e cole (Ctrl+V).','color:green;font-weight:bold;font-size:16px');return true};const o=XMLHttpRequest.prototype.setRequestHeader;XMLHttpRequest.prototype.setRequestHeader=function(k,v){try{if(String(k).toLowerCase()==='authorization')grab(v)}catch(e){}return o.apply(this,arguments)};const f=window.fetch;window.fetch=function(){try{const a=arguments[1];const h=a&&a.headers;if(h){const t=h.get?h.get('authorization'):(h.authorization||h.Authorization);grab(t)}}catch(e){}return f.apply(this,arguments)};console.log('%c➜ Agora clique em qualquer menu do BTracker (ex: Pendencias). NAO atualize (F5) a pagina.','color:#ea580c;font-weight:bold;font-size:14px')})()`;
+// Bookmarklet: roda na página do BTracker SEM abrir DevTools (evita o anti-debugger).
+// Intercepta XHR e fetch, captura o token do BTracker (token_type=access) e copia para a área de transferência.
+const BOOKMARKLET =
+  `javascript:(()=>{let done=false;const grab=v=>{if(done||typeof v!=='string')return false;const t=v.replace(/^Bearer\\s+/i,'');const parts=t.split('.');if(parts.length!==3||t.indexOf('eyJ')!==0)return false;try{const p=JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));if(!(p.token_type==='access'||p.user_id))return false}catch(e){return false}done=true;const ok=()=>alert('✓ Token BTracker copiado! Volte ao formulario e cole (Ctrl+V).');navigator.clipboard.writeText(t).then(ok,()=>prompt('Copie o token (Ctrl+C):',t));return true};const o=XMLHttpRequest.prototype.setRequestHeader;XMLHttpRequest.prototype.setRequestHeader=function(k,v){try{if(String(k).toLowerCase()==='authorization')grab(v)}catch(e){}return o.apply(this,arguments)};const f=window.fetch;window.fetch=function(){try{const a=arguments[1];const h=a&&a.headers;if(h){const t=h.get?h.get('authorization'):(h.authorization||h.Authorization);grab(t)}}catch(e){}return f.apply(this,arguments)};alert('Pronto! Agora clique em qualquer menu do BTracker (ex: Pendencias) sem atualizar a pagina. O token sera copiado automaticamente.')})()`;
 
 export function BtrackerAuth({ connected, onConnected, onDisconnected }: Props) {
   const [open, setOpen] = useState(false);
@@ -18,21 +20,32 @@ export function BtrackerAuth({ connected, onConnected, onDisconnected }: Props) 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const linkRef = useRef<HTMLAnchorElement>(null);
+
+  // Define o href javascript: diretamente no DOM (React sanitiza javascript: hrefs)
+  useEffect(() => {
+    if (open && linkRef.current) {
+      linkRef.current.setAttribute("href", BOOKMARKLET);
+    }
+  }, [open]);
 
   async function handleSave() {
-    if (!token.trim()) { setError("Cole o token antes de confirmar."); return; }
+    if (!token.trim()) {
+      setError("Cole o token antes de confirmar.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      // The pasted value may be the raw JWT or a JSON string like '{"token_type":"access",...}'
       let jwt = token.trim();
       try {
         const parsed = JSON.parse(jwt) as Record<string, unknown>;
-        if (typeof parsed === "object" && typeof parsed.secret === "string") jwt = parsed.secret;
+        if (typeof parsed.secret === "string") jwt = parsed.secret;
         else if (typeof parsed.access === "string") jwt = parsed.access;
-      } catch { /* raw JWT, use as is */ }
+      } catch {
+        /* raw JWT */
+      }
 
-      // Validate it looks like a JWT
       if (!jwt.startsWith("eyJ") || jwt.split(".").length !== 3) {
         throw new Error("Formato inválido — cole o token JWT completo.");
       }
@@ -60,8 +73,8 @@ export function BtrackerAuth({ connected, onConnected, onDisconnected }: Props) 
     onDisconnected();
   }
 
-  function copyCmd() {
-    void navigator.clipboard.writeText(CONSOLE_CMD);
+  function copyBookmarklet() {
+    void navigator.clipboard.writeText(BOOKMARKLET);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -99,16 +112,52 @@ export function BtrackerAuth({ connected, onConnected, onDisconnected }: Props) 
           <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <p className="text-sm font-semibold text-slate-800">Conectar ao BTracker</p>
-              <button type="button" onClick={() => setOpen(false)} aria-label="Fechar" className="rounded-full p-1 text-slate-400 hover:bg-slate-100">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Fechar"
+                className="rounded-full p-1 text-slate-400 hover:bg-slate-100"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
+            <p className="mb-3 rounded-lg bg-sky-50 px-3 py-2 text-[11px] leading-5 text-sky-800">
+              Configuração única: arraste o botão abaixo para a barra de favoritos do navegador.
+              Depois é só clicar nele dentro do BTracker para copiar seu token.
+            </p>
+
             <ol className="mb-4 space-y-3 text-xs text-slate-700">
-              <li className="flex gap-2">
+              <li className="flex items-center gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[10px] font-bold text-sky-700">1</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>Arraste este botão para a barra de favoritos:</span>
+                  {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
+                  <a
+                    ref={linkRef}
+                    href="#"
+                    onClick={(e) => e.preventDefault()}
+                    draggable
+                    className="inline-flex cursor-grab items-center gap-1 rounded-lg border border-sky-300 bg-sky-600 px-3 py-1.5 text-[11px] font-bold text-white active:cursor-grabbing"
+                  >
+                    <Bookmark className="h-3 w-3" />
+                    Pegar token BTracker
+                  </a>
+                  <button
+                    type="button"
+                    onClick={copyBookmarklet}
+                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 hover:bg-slate-100"
+                    title="Copiar código (alternativa: criar favorito manualmente e colar como URL)"
+                  >
+                    <Copy className="h-3 w-3" />
+                    {copied ? "Copiado!" : "Copiar código"}
+                  </button>
+                </div>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[10px] font-bold text-sky-700">2</span>
                 <div>
-                  Abra o BTracker e autentique-se normalmente.
+                  Abra o BTracker e faça login.
                   <a
                     href="https://btracker.bemol.com.br/notas/recebimento"
                     target="_blank"
@@ -120,37 +169,8 @@ export function BtrackerAuth({ connected, onConnected, onDisconnected }: Props) 
                 </div>
               </li>
               <li className="flex gap-2">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[10px] font-bold text-sky-700">2</span>
-                <div>
-                  Com o BTracker aberto, pressione <kbd className="rounded border border-slate-200 bg-slate-100 px-1">F12</kbd> → aba <strong>Console</strong>, cole o comando abaixo e tecle Enter.
-                  <span className="mt-1 block text-[10px] text-slate-400">
-                    Se o Chrome pedir, digite <strong>permitir colar</strong> e tecle Enter antes.
-                  </span>
-                </div>
-              </li>
-            </ol>
-
-            <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50">
-              <div className="flex items-center justify-between border-b border-slate-200 px-3 py-1.5">
-                <span className="text-[10px] font-semibold uppercase text-slate-400">Console do BTracker</span>
-                <button
-                  type="button"
-                  onClick={copyCmd}
-                  className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold text-slate-500 hover:bg-slate-200"
-                >
-                  <Copy className="h-3 w-3" />
-                  {copied ? "Copiado!" : "Copiar"}
-                </button>
-              </div>
-              <pre className="overflow-x-auto px-3 py-2 text-[10px] leading-5 text-slate-700">{CONSOLE_CMD}</pre>
-            </div>
-
-            <ol className="mb-4 space-y-3 text-xs text-slate-700" start={3}>
-              <li className="flex gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[10px] font-bold text-sky-700">3</span>
-                <div>
-                  Clique em <strong>qualquer menu do BTracker</strong> (ex: Pendências) — <em>sem atualizar a página</em>. O token é copiado automaticamente (mensagem verde no console).
-                </div>
+                Com o BTracker aberto, clique no favorito <strong>“Pegar token BTracker”</strong>, depois clique em qualquer menu (ex: Pendências). O token é copiado automaticamente.
               </li>
               <li className="flex gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[10px] font-bold text-sky-700">4</span>
@@ -162,7 +182,7 @@ export function BtrackerAuth({ connected, onConnected, onDisconnected }: Props) 
               value={token}
               onChange={(e) => setToken(e.target.value)}
               rows={3}
-              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              placeholder="Cole o token aqui (eyJhbG...)"
               className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11px] text-slate-700 placeholder-slate-300 focus:border-sky-400 focus:outline-none"
             />
 
