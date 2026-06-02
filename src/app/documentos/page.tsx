@@ -323,6 +323,18 @@ const formatDateTime = (value: string) => {
   return date.toLocaleString("pt-BR");
 };
 
+// Para nota fiscal, mostra competência no lugar da data de envio
+const getDataLabel = (registro: FormularioRecord) => {
+  if (registro.tipo === "notas_fiscais") {
+    const competencia = getCampoTexto(registro.dados, ["competencia"]);
+    if (competencia) return competencia;
+  }
+  return formatDateTime(registro.created_at);
+};
+
+const getDataColLabel = (tipo: string) =>
+  tipo === "notas_fiscais" ? "Competência" : "Enviado em";
+
 const getEdicaoInfo = (registro: FormularioRecord) => {
   const editedBy = getCampoTexto(registro.dados, ["edited_by"]);
   const editedAtRaw = getCampoTexto(registro.dados, ["edited_at"]);
@@ -2336,7 +2348,7 @@ export default function DocumentosPage() {
                   </th>
                   <th className="w-[130px] px-4 py-3 text-left">Status</th>
                   <th className="hidden w-[180px] px-4 py-3 text-left md:table-cell">
-                    Enviado em
+                    Enviado em / Competência
                   </th>
                   <th className="sticky right-0 z-20 w-[180px] min-w-[180px] whitespace-nowrap border-l border-slate-100 bg-slate-50 px-4 py-3 text-right">
                     Ações
@@ -2498,8 +2510,8 @@ export default function DocumentosPage() {
                         </span>
                       </td>
                       <td className="hidden px-4 py-3 text-xs text-slate-500 md:table-cell">
-                        {formatDateTime(registro.created_at)}
-                        {enviadoPor && (
+                        <span className="font-medium">{getDataLabel(registro)}</span>
+                        {registro.tipo !== "notas_fiscais" && enviadoPor && (
                           <p className="mt-1 max-w-[180px] truncate text-[11px] text-slate-400">
                             por {enviadoPor}
                           </p>
@@ -2749,7 +2761,9 @@ export default function DocumentosPage() {
                       {formatStatusLabel(registro.status)}
                     </span>
                     <span className="text-[11px] text-slate-500">
-                      {formatDateTime(registro.created_at)}
+                      {registro.tipo === "notas_fiscais"
+                        ? getDataLabel(registro)
+                        : formatDateTime(registro.created_at)}
                     </span>
                     {enviadoPor && (
                       <span className="text-[11px] text-slate-400">
