@@ -59,6 +59,8 @@ type DocumentoAnaliseResultado = {
   }>;
   alertas?: string[];
   confianca_geral?: number | null;
+  observacoes?: string | null;
+  recomendacoes?: string[];
 };
 
 type DocumentoAnaliseIa = {
@@ -764,6 +766,42 @@ export function DocumentDetailsDrawer({
                     {analiseResultado.alertas && analiseResultado.alertas.length > 0 ? (
                       <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
                         {analiseResultado.alertas.join(" ")}
+                      </div>
+                    ) : null}
+                    {analiseResultado.observacoes ? (
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          Observacoes do documento
+                        </p>
+                        <p className="mt-1 rounded-xl bg-white px-3 py-2 text-sm leading-6 text-slate-700 italic">
+                          &ldquo;{analiseResultado.observacoes}&rdquo;
+                        </p>
+                      </div>
+                    ) : null}
+                    {analiseResultado.recomendacoes && analiseResultado.recomendacoes.length > 0 ? (
+                      <div className="rounded-xl border border-orange-100 bg-orange-50 px-4 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-orange-700">
+                          Recomendacoes identificadas
+                        </p>
+                        <ul className="mt-2 space-y-1.5">
+                          {analiseResultado.recomendacoes.map((rec, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs text-orange-900">
+                              <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400" />
+                              {rec}
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="mt-3 border-t border-orange-100 pt-3">
+                          <a
+                            href="https://witty-stone-0805fa60f.2.azurestaticapps.net/auth/login"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-full bg-orange-600 px-4 py-1.5 text-[11px] font-semibold text-white transition hover:bg-orange-500"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Gerar ordem
+                          </a>
+                        </div>
                       </div>
                     ) : null}
                     <p className="text-[11px] text-slate-400">

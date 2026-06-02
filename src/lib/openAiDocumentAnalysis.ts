@@ -25,6 +25,8 @@ export type DocumentoAnaliseIa = {
   }>;
   alertas: string[];
   confianca_geral: number;
+  observacoes: string | null;
+  recomendacoes: string[];
 };
 
 type AnalyzeInput = {
@@ -55,6 +57,8 @@ const ANALISE_SCHEMA = {
     "itens",
     "alertas",
     "confianca_geral",
+    "observacoes",
+    "recomendacoes",
   ],
   properties: {
     tipo_documento: {
@@ -111,6 +115,8 @@ const ANALISE_SCHEMA = {
     },
     alertas: { type: "array", items: { type: "string" } },
     confianca_geral: { type: "number", minimum: 0, maximum: 1 },
+    observacoes: { anyOf: [{ type: "string" }, { type: "null" }] },
+    recomendacoes: { type: "array", items: { type: "string" } },
   },
 };
 
@@ -325,7 +331,7 @@ export async function analisarDocumentoComOpenAi(
         {
           role: "system",
           content:
-            "Voce analisa documentos administrativos brasileiros. Extraia apenas dados presentes ou fortemente inferiveis no arquivo. Se houver mais de uma loja, competencia ou item, liste todos separadamente. Retorne somente JSON valido, sem markdown. Use competencias sempre como MM/AAAA. Se houver divergencia com os dados atuais, coloque em alertas.",
+            "Voce analisa documentos administrativos brasileiros, incluindo laudos tecnicos, checklists de manutencao, notas fiscais e contratos. Extraia apenas dados presentes ou fortemente inferiveis no arquivo. Se houver mais de uma loja, competencia ou item, liste todos separadamente. Retorne somente JSON valido, sem markdown. Use competencias sempre como MM/AAAA. Se houver divergencia com os dados atuais, coloque em alertas. Para 'observacoes': extraia o texto literal da secao de observacoes ou comentarios finais do documento (ex: anotacoes do tecnico, parecer final). Para 'recomendacoes': extraia como lista de acoes especificas recomendadas ou itens que precisam de atencao identificados no documento — por exemplo, itens marcados como nao conformes em checklists, irregularidades encontradas, servicos sugeridos ou qualquer indicacao de que uma ordem de servico ou acao corretiva seja necessaria. Se nao houver recomendacoes, retorne array vazio.",
         },
         {
           role: "user",
