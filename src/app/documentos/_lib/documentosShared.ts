@@ -43,6 +43,7 @@ const EDIT_FIELDS_BY_TIPO: Record<string, EditField[]> = {
     { name: "observacoes", label: "Observações", type: "textarea" },
   ],
   notas_fiscais: [
+    { name: "competencia", label: "Competência" },
     { name: "prestador", label: "Prestador" },
     { name: "numero_pedido", label: "Número do pedido" },
     { name: "numero_nf", label: "Número da nota" },

@@ -158,6 +158,12 @@ const FORM_CONFIGS: FormConfig[] = [
         placeholder: "Nome do prestador responsável pelo documento",
       },
       {
+        name: "competencia",
+        label: "Competência",
+        type: "text",
+        placeholder: "MM/AAAA",
+      },
+      {
         name: "numero_pedido",
         label: "Número do pedido",
         type: "text",
@@ -450,7 +456,9 @@ export default function FormularioPage() {
   const handleChange = (name: string, value: string) => {
     setValues((prev) => {
       const nextValue =
-        config.slug === "retencao-trabalhista" && name === "competencia"
+        (config.slug === "retencao-trabalhista" ||
+          config.slug === "notas-fiscais") &&
+        name === "competencia"
           ? formatCompetenciaInput(value)
           : value;
       const updated = { ...prev, [name]: nextValue };
@@ -662,7 +670,10 @@ export default function FormularioPage() {
         return;
       }
 
-      if (config.slug === "retencao-trabalhista") {
+      if (
+        config.slug === "retencao-trabalhista" ||
+        config.slug === "notas-fiscais"
+      ) {
         const competencia = values.competencia ?? "";
         if (!isCompetenciaValida(competencia)) {
           setError("Competencia invalida. Use o formato MM/AAAA.");
