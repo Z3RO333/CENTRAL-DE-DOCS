@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
-import { sanitizeId } from "@/lib/documentosApiUtils";
+import { sanitizeId, safeParseDados } from "@/lib/documentosApiUtils";
 import {
   ApiHttpError as HttpError,
   getSessionUserFromRequest,
@@ -111,7 +111,7 @@ export async function POST(
 
     const { data: registro, error: regErr } = await supabaseAdmin
       .from("formularios")
-      .select("id,tipo,arquivo_path,arquivo_assinado_path,nome_arquivo")
+      .select("id,tipo,dados,arquivo_path,arquivo_assinado_path")
       .eq("id", id)
       .maybeSingle();
     if (regErr) throw regErr;
@@ -120,16 +120,21 @@ export async function POST(
     const row = registro as {
       id: string;
       tipo: string;
+      dados: Record<string, unknown> | string | null;
       arquivo_path: string | null;
       arquivo_assinado_path: string | null;
-      nome_arquivo: string | null;
     };
 
     const path = row.arquivo_assinado_path ?? row.arquivo_path;
     if (!path) throw new HttpError(400, "Documento sem arquivo.");
 
+    // nome_arquivo fica em dados (campo JSON), com fallback para o path
+    const dados = safeParseDados(row.dados);
     const mimeType = resolveMimeType(path);
-    const fileName = row.nome_arquivo ?? path.split("/").pop() ?? "documento";
+    const fileName =
+      (typeof dados?.nome_arquivo === "string" ? dados.nome_arquivo : null) ??
+      path.split("/").pop() ??
+      "documento";
 
     const { data: fileBlob, error: dlErr } = await supabaseAdmin.storage
       .from("formularios")
