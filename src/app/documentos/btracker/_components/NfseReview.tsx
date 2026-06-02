@@ -23,6 +23,8 @@ type Props = {
   btrackerConnected: boolean;
   matchedPedido: BtrackerNfse | null;
   fileName: string;
+  initialNroPedido?: string | null;
+  initialNumeroNf?: string | null;
   onReset: () => void;
 };
 
@@ -84,12 +86,23 @@ function FieldRow<T>({
   );
 }
 
-export function NfseReview({ data, btrackerConnected, matchedPedido, fileName, onReset }: Props) {
+export function NfseReview({
+  data,
+  btrackerConnected,
+  matchedPedido,
+  fileName,
+  initialNroPedido,
+  initialNumeroNf,
+  onReset,
+}: Props) {
   const [openSection, setOpenSection] = useState<string | null>("geral");
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<"ok" | "error" | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [nroPedido, setNroPedido] = useState(matchedPedido?.nroPedido ?? "");
+  // Prioridade do pedido: o que veio do documento (preenchido pelo prestador) > match do BTracker
+  const [nroPedido, setNroPedido] = useState(
+    initialNroPedido ?? matchedPedido?.nroPedido ?? "",
+  );
   const [nroItemPedido, setNroItemPedido] = useState(matchedPedido?.nroItemPedido ?? "");
   const [nroItemServico, setNroItemServico] = useState(matchedPedido?.nroItemServico ?? "");
   const [justVencimento, setJustVencimento] = useState("");
@@ -105,6 +118,7 @@ export function NfseReview({ data, btrackerConnected, matchedPedido, fileName, o
     setSubmitError(null);
     try {
       const payload = buildBtrackerPayload(data, nroPedido, nroItemPedido, nroItemServico);
+      if (!payload.numero && initialNumeroNf) payload.numero = initialNumeroNf;
       payload.justificativaVencimento = justVencimento.trim() || null;
       payload.justificativaLiberacao = justLiberacao.trim() || null;
       const res = await fetch("/api/btracker/nfse", {

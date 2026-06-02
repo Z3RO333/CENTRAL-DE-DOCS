@@ -15,11 +15,21 @@ type Props = {
   documentoId: string;
   fileName: string;
   cnpj?: string | null;
+  initialNroPedido?: string | null;
+  initialNumeroNf?: string | null;
   accessToken: string;
   onClose: () => void;
 };
 
-export function BtrackerModal({ documentoId, fileName, cnpj, accessToken, onClose }: Props) {
+export function BtrackerModal({
+  documentoId,
+  fileName,
+  cnpj,
+  initialNroPedido,
+  initialNumeroNf,
+  accessToken,
+  onClose,
+}: Props) {
   const [btConnected, setBtConnected] = useState(false);
   const [extraction, setExtraction] = useState<ExtractionResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -147,6 +157,8 @@ export function BtrackerModal({ documentoId, fileName, cnpj, accessToken, onClos
               btrackerConnected={btConnected}
               matchedPedido={matchedPedido}
               fileName={fileName}
+              initialNroPedido={initialNroPedido}
+              initialNumeroNf={initialNumeroNf}
               onReset={() => void extract()}
             />
           )}

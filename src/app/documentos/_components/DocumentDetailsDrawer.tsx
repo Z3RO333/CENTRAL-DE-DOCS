@@ -876,6 +876,16 @@ export function DocumentDetailsDrawer({
                 ? registro.dados.cnpj
                 : null
             }
+            initialNroPedido={
+              typeof registro.dados?.numero_pedido === "string"
+                ? registro.dados.numero_pedido
+                : null
+            }
+            initialNumeroNf={
+              typeof registro.dados?.numero_nf === "string"
+                ? registro.dados.numero_nf
+                : null
+            }
             accessToken={btrackerModal.token}
             onClose={() => setBtrackerModal(null)}
           />
