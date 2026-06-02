@@ -9,6 +9,7 @@ import {
   History,
   LoaderCircle,
   PenLine,
+  Sparkles,
   Signature,
   X,
 } from "lucide-react";
@@ -37,6 +38,40 @@ type TimelineEvent = {
   created_at: string;
 };
 
+type DocumentoAnaliseResultado = {
+  tipo_documento?: string;
+  competencias?: string[];
+  lojas?: Array<{
+    codigo?: string | null;
+    nome?: string | null;
+    confianca?: number | null;
+  }>;
+  prestador?: string | null;
+  numero_nf?: string | null;
+  numero_pedido?: string | null;
+  valor_total?: number | null;
+  descricao?: string | null;
+  itens?: Array<{
+    descricao?: string;
+    competencia?: string | null;
+    loja_codigo?: string | null;
+    valor?: number | null;
+  }>;
+  alertas?: string[];
+  confianca_geral?: number | null;
+};
+
+type DocumentoAnaliseIa = {
+  id: string;
+  documento_id: string;
+  provider: string;
+  model: string;
+  status: string;
+  resultado: DocumentoAnaliseResultado;
+  erro: string | null;
+  created_at: string;
+};
+
 type DetailsPayload = {
   documento: DrawerFormularioRecord;
   detalhes: {
@@ -53,6 +88,7 @@ type DetailsPayload = {
     } | null;
   };
   timeline: TimelineEvent[];
+  analise_ia: DocumentoAnaliseIa | null;
   error?: string;
 };
 
@@ -69,6 +105,7 @@ type DocumentDetailsDrawerProps = {
   onEdit: (registro: DrawerFormularioRecord) => void;
   onReview: (registro: DrawerFormularioRecord) => void;
   onSign: (registro: DrawerFormularioRecord) => void;
+  onAppliedSuggestions: (registro: DrawerFormularioRecord) => void;
 };
 
 const TIPO_ASSINAVEL = "registro_laudos";
@@ -152,6 +189,40 @@ const getMetadataText = (event: TimelineEvent) => {
     return "Download registrado para rastreabilidade.";
   }
   return null;
+};
+
+const formatConfidence = (value: number | null | undefined) => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return "--";
+  }
+  return `${Math.round(value * 100)}%`;
+};
+
+const stringifyValor = (value: number | null | undefined) => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return null;
+  }
+  return value.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+const buildUpdatesFromAnalise = (resultado: DocumentoAnaliseResultado) => {
+  const updates: Record<string, string> = {};
+  const competencia = resultado.competencias?.[0]?.trim();
+  const valor = stringifyValor(resultado.valor_total);
+
+  if (competencia) updates.competencia = competencia;
+  if (resultado.numero_nf?.trim()) updates.numero_nf = resultado.numero_nf.trim();
+  if (resultado.numero_pedido?.trim()) {
+    updates.numero_pedido = resultado.numero_pedido.trim();
+  }
+  if (valor) updates.valor = valor;
+  if (resultado.descricao?.trim()) updates.descricao = resultado.descricao.trim();
+  if (resultado.prestador?.trim()) updates.prestador = resultado.prestador.trim();
+
+  return updates;
 };
 
 const parseObservationItems = (value: string) => {
@@ -282,10 +353,13 @@ export function DocumentDetailsDrawer({
   onEdit,
   onReview,
   onSign,
+  onAppliedSuggestions,
 }: DocumentDetailsDrawerProps) {
   const [payload, setPayload] = useState<DetailsPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [applyingSuggestions, setApplyingSuggestions] = useState(false);
 
   const getAccessToken = useCallback(async () => {
     const { data, error: sessionError } = await supabase.auth.getSession();
@@ -351,6 +425,11 @@ export function DocumentDetailsDrawer({
   const registro = payload?.documento ?? fallbackRegistro;
   const details = payload?.detalhes;
   const timeline = payload?.timeline ?? [];
+  const analiseIa = payload?.analise_ia ?? null;
+  const analiseResultado = analiseIa?.resultado ?? null;
+  const suggestedUpdates = analiseResultado
+    ? buildUpdatesFromAnalise(analiseResultado)
+    : {};
 
   const campos = useMemo(() => {
     if (!registro) {
@@ -418,6 +497,80 @@ export function DocumentDetailsDrawer({
     canManageDocuments &&
     registro?.tipo === TIPO_ASSINAVEL &&
     registro?.status !== "assinado";
+
+  const analisarComIa = async () => {
+    if (!registro) return;
+    try {
+      setAnalyzing(true);
+      setError(null);
+      const token = await getAccessToken();
+      const response = await fetch(`/api/documentos/${registro.id}/analisar`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const nextPayload = (await response.json()) as {
+        analise?: DocumentoAnaliseIa;
+        error?: string;
+      };
+      if (!response.ok || !nextPayload.analise) {
+        throw new Error(nextPayload.error ?? "Nao foi possivel analisar com IA.");
+      }
+      setPayload((current) =>
+        current ? { ...current, analise_ia: nextPayload.analise ?? null } : current,
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Nao foi possivel analisar com IA.",
+      );
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const aplicarSugestoes = async () => {
+    if (!registro || !analiseResultado) return;
+    const updates = buildUpdatesFromAnalise(analiseResultado);
+    if (Object.keys(updates).length === 0) {
+      setError("A analise nao trouxe campos seguros para aplicar.");
+      return;
+    }
+
+    try {
+      setApplyingSuggestions(true);
+      setError(null);
+      const token = await getAccessToken();
+      const response = await fetch("/api/documentos", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: registro.id,
+          updates,
+        }),
+      });
+      const nextPayload = (await response.json()) as {
+        registro?: DrawerFormularioRecord;
+        error?: string;
+      };
+      if (!response.ok || !nextPayload.registro) {
+        throw new Error(nextPayload.error ?? "Nao foi possivel aplicar sugestoes.");
+      }
+      setPayload((current) =>
+        current ? { ...current, documento: nextPayload.registro! } : current,
+      );
+      onAppliedSuggestions(nextPayload.registro);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Nao foi possivel aplicar sugestoes.",
+      );
+    } finally {
+      setApplyingSuggestions(false);
+    }
+  };
 
   return (
     <div
@@ -498,6 +651,132 @@ export function DocumentDetailsDrawer({
                   </div>
                 ))}
               </div>
+
+              <section className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-sky-600" />
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Analise por IA
+                    </p>
+                  </div>
+                  {canManageDocuments ? (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void analisarComIa()}
+                        disabled={analyzing || applyingSuggestions}
+                        className="rounded-full border border-sky-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {analyzing ? "Analisando..." : "Analisar com IA"}
+                      </button>
+                      {analiseResultado ? (
+                        <button
+                          type="button"
+                          onClick={() => void aplicarSugestoes()}
+                          disabled={
+                            applyingSuggestions ||
+                            analyzing ||
+                            Object.keys(suggestedUpdates).length === 0
+                          }
+                          className="rounded-full bg-sky-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {applyingSuggestions ? "Aplicando..." : "Aplicar sugestoes"}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+
+                {analiseResultado ? (
+                  <div className="mt-4 space-y-3 text-sm">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          Tipo detectado
+                        </p>
+                        <p className="mt-1 font-medium text-slate-900">
+                          {analiseResultado.tipo_documento ?? "Nao informado"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          Confianca
+                        </p>
+                        <p className="mt-1 font-medium text-slate-900">
+                          {formatConfidence(analiseResultado.confianca_geral)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          Competencias
+                        </p>
+                        <p className="mt-1 font-medium text-slate-900">
+                          {analiseResultado.competencias?.join(", ") ||
+                            "Nao informado"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          NF / Pedido
+                        </p>
+                        <p className="mt-1 font-medium text-slate-900">
+                          {[analiseResultado.numero_nf, analiseResultado.numero_pedido]
+                            .filter(Boolean)
+                            .join(" / ") || "Nao informado"}
+                        </p>
+                      </div>
+                    </div>
+                    {analiseResultado.valor_total ? (
+                      <p className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-800">
+                        Valor total: R$ {stringifyValor(analiseResultado.valor_total)}
+                      </p>
+                    ) : null}
+                    {analiseResultado.descricao ? (
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          Descricao
+                        </p>
+                        <p className="mt-1 leading-6 text-slate-700">
+                          {analiseResultado.descricao}
+                        </p>
+                      </div>
+                    ) : null}
+                    {analiseResultado.lojas && analiseResultado.lojas.length > 0 ? (
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          Lojas detectadas
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {analiseResultado.lojas.map((loja, index) => (
+                            <span
+                              key={`${loja.codigo ?? loja.nome ?? index}`}
+                              className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700"
+                            >
+                              {[loja.codigo, loja.nome].filter(Boolean).join(" - ") ||
+                                "Loja nao identificada"}{" "}
+                              ({formatConfidence(loja.confianca)})
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    {analiseResultado.alertas && analiseResultado.alertas.length > 0 ? (
+                      <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        {analiseResultado.alertas.join(" ")}
+                      </div>
+                    ) : null}
+                    <p className="text-[11px] text-slate-400">
+                      Ultima analise: {formatDateTime(analiseIa?.created_at)} via{" "}
+                      {analiseIa?.provider} / {analiseIa?.model}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-slate-500">
+                    Nenhuma analise salva para este documento ainda.
+                  </p>
+                )}
+              </section>
 
               <section className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4">
                 <div className="flex items-center gap-2">

@@ -2129,6 +2129,11 @@ export default function DocumentosPage() {
         onEdit={(registro) => abrirEdicao(registro)}
         onReview={(registro) => void marcarComoRevisado(registro)}
         onSign={(registro) => router.push(`/documentos/${registro.id}`)}
+        onAppliedSuggestions={(registro) => {
+          setRegistros((prev) =>
+            prev.map((item) => (item.id === registro.id ? registro : item)),
+          );
+        }}
       />
       <div className="flex items-center justify-between gap-3">
         <div>

@@ -36,6 +36,17 @@ type EntityRow = {
   tipo_servico?: string | null;
 };
 
+type DocumentoAnaliseIaRow = {
+  id: string;
+  documento_id: string;
+  provider: string;
+  model: string;
+  status: string;
+  resultado: Record<string, unknown>;
+  erro: string | null;
+  created_at: string;
+};
+
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -146,7 +157,7 @@ export async function GET(
       unknown
     > | null;
     const lojaId = getCampoTexto(dados, ["loja_id"]);
-    const [lojaResult, prestadorResult, userResult, auditoriaResult] =
+    const [lojaResult, prestadorResult, userResult, auditoriaResult, analiseResult] =
       await Promise.all([
         isUuidLike(lojaId)
           ? supabaseAdmin
@@ -171,6 +182,13 @@ export async function GET(
           .eq("documento_id", registro.id)
           .order("created_at", { ascending: false })
           .limit(60),
+        supabaseAdmin
+          .from("documentos_analises_ia")
+          .select("id,documento_id,provider,model,status,resultado,erro,created_at")
+          .eq("documento_id", registro.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
       ]);
 
     if (lojaResult.error) {
@@ -196,6 +214,9 @@ export async function GET(
           auditoriaResult.error,
         );
       }
+    }
+    if (analiseResult.error) {
+      console.error("Erro ao buscar analise IA do documento:", analiseResult.error);
     }
 
     const loja = lojaResult.data as EntityRow | null;
@@ -272,6 +293,9 @@ export async function GET(
           : null,
       },
       timeline,
+      analise_ia: analiseResult.error
+        ? null
+        : ((analiseResult.data as DocumentoAnaliseIaRow | null) ?? null),
     });
   } catch (err) {
     console.error("Erro ao buscar detalhes do documento:", err);
