@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Download,
   ExternalLink,
+  FileCheck2,
   FileText,
   History,
   LoaderCircle,
@@ -14,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { BtrackerModal } from "@/app/documentos/_components/BtrackerModal";
 
 export type DrawerFormularioRecord = {
   id: string;
@@ -362,6 +364,7 @@ export function DocumentDetailsDrawer({
   const [error, setError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [applyingSuggestions, setApplyingSuggestions] = useState(false);
+  const [btrackerModal, setBtrackerModal] = useState<{ token: string } | null>(null);
 
   const getAccessToken = useCallback(async () => {
     const { data, error: sessionError } = await supabase.auth.getSession();
@@ -859,6 +862,25 @@ export function DocumentDetailsDrawer({
           ) : null}
         </div>
 
+        {/* BTracker Modal */}
+        {btrackerModal && registro ? (
+          <BtrackerModal
+            documentoId={registro.id}
+            fileName={
+              registro.nome_arquivo ??
+              registro.arquivo_path?.split("/").pop() ??
+              "documento"
+            }
+            cnpj={
+              typeof registro.dados?.cnpj === "string"
+                ? registro.dados.cnpj
+                : null
+            }
+            accessToken={btrackerModal.token}
+            onClose={() => setBtrackerModal(null)}
+          />
+        ) : null}
+
         {registro ? (
           <footer className="border-t border-slate-100 bg-white px-5 py-4">
             <div className="flex flex-wrap justify-end gap-2 text-xs">
@@ -888,6 +910,20 @@ export function DocumentDetailsDrawer({
                 >
                   <PenLine className="h-4 w-4" />
                   Editar dados
+                </button>
+              ) : null}
+              {registro.tipo === "notas_fiscais" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void getAccessToken().then((token) =>
+                      setBtrackerModal({ token }),
+                    );
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
+                >
+                  <FileCheck2 className="h-4 w-4" />
+                  Enviar ao BTracker
                 </button>
               ) : null}
               {canReview ? (
