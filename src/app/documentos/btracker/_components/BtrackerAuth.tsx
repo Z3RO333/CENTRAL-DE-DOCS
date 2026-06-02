@@ -10,7 +10,7 @@ type Props = {
 };
 
 const CONSOLE_CMD =
-  `copy([...Object.values(localStorage),...Object.values(sessionStorage)].map(v=>{try{const o=JSON.parse(v);return o.access||(o.token_type==='access'?o.secret:null)}catch{return /^eyJ[\\w-]+\\.[\\w-]+\\.[\\w-]+$/.test(v)?v:null}}).find(Boolean)||'NAO ENCONTRADO - faca login no BTracker primeiro')`;
+  `(()=>{const o=XMLHttpRequest.prototype.setRequestHeader;XMLHttpRequest.prototype.setRequestHeader=function(k,v){try{if(String(k).toLowerCase()==='authorization'&&typeof v==='string'&&v.indexOf('Bearer ')===0){copy(v.slice(7));console.log('%c✓ TOKEN COPIADO! Volte ao formulario e cole (Ctrl+V).','color:green;font-weight:bold;font-size:16px');XMLHttpRequest.prototype.setRequestHeader=o}}catch(e){}return o.apply(this,arguments)};console.log('%c➜ Agora clique em qualquer menu do BTracker (ex: Pendencias). NAO atualize a pagina.','color:#ea580c;font-weight:bold;font-size:14px')})()`;
 
 export function BtrackerAuth({ connected, onConnected, onDisconnected }: Props) {
   const [open, setOpen] = useState(false);
@@ -122,7 +122,10 @@ export function BtrackerAuth({ connected, onConnected, onDisconnected }: Props) 
               <li className="flex gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[10px] font-bold text-sky-700">2</span>
                 <div>
-                  Com o BTracker aberto, pressione <kbd className="rounded border border-slate-200 bg-slate-100 px-1">F12</kbd> → aba <strong>Console</strong> e cole o comando abaixo:
+                  Com o BTracker aberto, pressione <kbd className="rounded border border-slate-200 bg-slate-100 px-1">F12</kbd> → aba <strong>Console</strong>, cole o comando abaixo e tecle Enter.
+                  <span className="mt-1 block text-[10px] text-slate-400">
+                    Se o Chrome pedir, digite <strong>permitir colar</strong> e tecle Enter antes.
+                  </span>
                 </div>
               </li>
             </ol>
@@ -145,7 +148,13 @@ export function BtrackerAuth({ connected, onConnected, onDisconnected }: Props) 
             <ol className="mb-4 space-y-3 text-xs text-slate-700" start={3}>
               <li className="flex gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[10px] font-bold text-sky-700">3</span>
-                O token é copiado automaticamente. Cole abaixo (Ctrl+V) e clique em Confirmar.
+                <div>
+                  Clique em <strong>qualquer menu do BTracker</strong> (ex: Pendências) — <em>sem atualizar a página</em>. O token é copiado automaticamente (mensagem verde no console).
+                </div>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[10px] font-bold text-sky-700">4</span>
+                Volte aqui, cole abaixo (Ctrl+V) e clique em Confirmar.
               </li>
             </ol>
 
