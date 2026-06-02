@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { saveNfseToBtracker, type BtrackerNfse } from "@/lib/btrackerApi";
+import { saveNfseToBtracker, type SaveNfseInput } from "@/lib/btrackerApi";
 
 export async function POST(req: Request) {
   const cookieStore = await cookies();
@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   if (!jwt) return NextResponse.json({ error: "Nao autenticado no BTracker." }, { status: 401 });
 
   try {
-    const payload = (await req.json()) as Partial<BtrackerNfse>;
+    const payload = (await req.json()) as SaveNfseInput;
     const result = await saveNfseToBtracker(payload, jwt);
     return NextResponse.json(result);
   } catch (err) {

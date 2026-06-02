@@ -148,12 +148,200 @@ export async function extractPdfViaBtracker(
   return res.json() as Promise<BtrackerNfse>;
 }
 
+type BtrackerMunicipio = { id: number; codigo: number; nome: string; siglaEstado: string };
+
+async function resolveMunicipio(
+  nome: string | null,
+  uf: string | null,
+  jwt: string,
+): Promise<BtrackerMunicipio | null> {
+  if (!nome || !uf) return null;
+  const url = `${BTRACKER_API}/nfses/municipios/?nome=${encodeURIComponent(nome)}&sigla_estado=${encodeURIComponent(uf)}`;
+  const res = await fetch(url, { headers: btrackerHeaders(jwt) });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { results?: BtrackerMunicipio[] };
+  // exact match first, else first result
+  const exact = data.results?.find(
+    (m) => m.nome.toLowerCase() === nome.toLowerCase() && m.siglaEstado === uf,
+  );
+  return exact ?? data.results?.[0] ?? null;
+}
+
+type BtrackerServicoErp = { id: number; codigo: string; descricao: string };
+
+async function resolveServicoErp(
+  itemListaServico: string | null,
+  jwt: string,
+): Promise<BtrackerServicoErp | null> {
+  if (!itemListaServico) return null;
+  const url = `${BTRACKER_API}/integracao_erp/servico_nfse/?busca=${encodeURIComponent(itemListaServico)}`;
+  const res = await fetch(url, { headers: btrackerHeaders(jwt) });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { results?: BtrackerServicoErp[] };
+  const r = data.results?.[0];
+  return r ? { id: r.id, codigo: r.codigo, descricao: r.descricao } : null;
+}
+
+export type SaveNfseInput = {
+  numero: string | null;
+  serie: string | null;
+  codigoVerificacao: string | null;
+  emissao: string | null; // YYYY-MM-DD
+  vencimento: string | null; // YYYY-MM-DD
+  municipioNome: string | null;
+  uf: string | null;
+  prestador: {
+    razaoSocial: string | null;
+    documento: string | null;
+    municipioNome: string | null;
+    uf: string | null;
+    inscricaoMunicipal: string | null;
+    cep: string | null;
+    logradouro: string | null;
+    numero: string | null;
+    complemento: string | null;
+    bairro: string | null;
+    fone: string | null;
+  };
+  tomador: {
+    razaoSocial: string | null;
+    documento: string | null;
+    municipioNome: string | null;
+    uf: string | null;
+    logradouro: string | null;
+    numero: string | null;
+    complemento: string | null;
+    bairro: string | null;
+  };
+  servico: {
+    discriminacao: string | null;
+    itemListaServico: string | null;
+    valorServicos: number | null;
+    baseCalculo: number | null;
+    aliquota: number | null;
+    valorIss: number | null;
+    issRetido: boolean | null;
+  };
+  retencoes: {
+    valorPis: number | null;
+    valorCofins: number | null;
+    valorCsll: number | null;
+    valorIr: number | null;
+    valorInss: number | null;
+    outrasRetencoes: number | null;
+    totalRetencoes: number | null;
+  };
+  valorLiquido: number | null;
+  nroPedido: string | null;
+  nroItemPedido: string | null;
+  nroItemServico: string | null;
+  tipoPagamento: number | null;
+  justificativaVencimento?: string | null;
+  justificativaLiberacao?: string | null;
+};
+
+const num = (v: number | null | undefined) => (v != null ? v.toFixed(2) : "0.00");
+const today = () => new Date().toISOString().slice(0, 10);
+
 export async function saveNfseToBtracker(
-  payload: Partial<BtrackerNfse>,
+  input: SaveNfseInput,
   jwt: string,
 ): Promise<BtrackerNfse> {
-  // Try the list create endpoint first
-  const res = await fetch(`${BTRACKER_API}/recebimento/nfses/`, {
+  const [munNf, munPrest, munTom] = await Promise.all([
+    resolveMunicipio(input.municipioNome, input.uf, jwt),
+    resolveMunicipio(input.prestador.municipioNome, input.prestador.uf, jwt),
+    resolveMunicipio(input.tomador.municipioNome, input.tomador.uf, jwt),
+  ]);
+
+  const servicoErp = await resolveServicoErp(input.servico.itemListaServico, jwt);
+
+  const munObj = (m: BtrackerMunicipio | null) =>
+    m
+      ? { id: m.id, codigo: m.codigo, nome: m.nome, sigla_estado: m.siglaEstado }
+      : null;
+
+  const digits = (s: string | null) => (s ? s.replace(/\D/g, "").slice(0, 14) : null);
+
+  // O backend do BTracker faz json.loads() nos campos compostos → enviar como STRING JSON.
+  // municipio/prestador/tomador exigem id; servicos é um DICT único (não array);
+  // iss_retido é choice (1=retido, 2=não retido); documento só dígitos.
+  const payload = {
+    numero: input.numero ? Number(input.numero) || input.numero : null,
+    serie: input.serie,
+    nro_pedido: input.nroPedido,
+    nro_item_pedido: input.nroItemPedido,
+    nro_item_servico: input.nroItemServico,
+    quantidade: 1,
+    codigo_verificacao: input.codigoVerificacao,
+    emissao: input.emissao,
+    vencimento: input.vencimento,
+    data_entrada: today(),
+    tipo_pagamento: input.tipoPagamento,
+    municipio: JSON.stringify(munObj(munNf)),
+    codigo_municipio: munNf?.codigo ?? null,
+    prestador: JSON.stringify({
+      id: null,
+      razao_social: input.prestador.razaoSocial,
+      documento: digits(input.prestador.documento),
+      tipo_documento: 0,
+      municipio: munObj(munPrest),
+      inscricao_municipal: input.prestador.inscricaoMunicipal,
+      cep: input.prestador.cep,
+      logradouro: input.prestador.logradouro,
+      numero: input.prestador.numero,
+      complemento: input.prestador.complemento,
+      bairro: input.prestador.bairro,
+      fone: input.prestador.fone,
+      uf: input.prestador.uf,
+    }),
+    tomador: JSON.stringify({
+      id: null,
+      razao_social: input.tomador.razaoSocial,
+      documento: digits(input.tomador.documento),
+      tipo_documento: 0,
+      municipio: munObj(munTom),
+      logradouro: input.tomador.logradouro,
+      numero: input.tomador.numero,
+      complemento: input.tomador.complemento,
+      bairro: input.tomador.bairro,
+      uf: input.tomador.uf,
+    }),
+    discriminacao: input.servico.discriminacao,
+    item_lista_servico: input.servico.itemListaServico,
+    servicos: JSON.stringify({
+      servico: servicoErp ?? {
+        id: null,
+        codigo: input.servico.itemListaServico,
+        descricao: input.servico.discriminacao ?? input.servico.itemListaServico ?? "Servico",
+      },
+      quantidade: 1,
+      valor_total: num(input.servico.valorServicos),
+      valor_servicos: num(input.servico.valorServicos),
+      texto_breve: input.servico.discriminacao?.slice(0, 60) ?? "Servico",
+      nfse: null,
+    }),
+    valor_servicos: num(input.servico.valorServicos),
+    base_calculo: num(input.servico.baseCalculo ?? input.servico.valorServicos),
+    aliquota: input.servico.aliquota != null ? num(input.servico.aliquota) : "0.00",
+    valor_iss: num(input.servico.valorIss),
+    iss_retido: input.servico.issRetido ? 1 : 2,
+    valor_pis: num(input.retencoes.valorPis),
+    valor_cofins: num(input.retencoes.valorCofins),
+    valor_csll: num(input.retencoes.valorCsll),
+    valor_ir: num(input.retencoes.valorIr),
+    valor_inss: num(input.retencoes.valorInss),
+    outras_retencoes: num(input.retencoes.outrasRetencoes),
+    total_retencoes: num(input.retencoes.totalRetencoes),
+    valor_liquido_nfse: num(input.valorLiquido),
+    ...(input.justificativaVencimento
+      ? { justificativa_vencimento: input.justificativaVencimento }
+      : {}),
+    ...(input.justificativaLiberacao
+      ? { justificativa_liberacao_bloqueio_solicitacao: input.justificativaLiberacao }
+      : {}),
+  };
+
+  const res = await fetch(`${BTRACKER_API}/nfses/`, {
     method: "POST",
     headers: btrackerHeaders(jwt),
     body: JSON.stringify(payload),
@@ -161,7 +349,22 @@ export async function saveNfseToBtracker(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`BTracker save falhou (${res.status}): ${text.slice(0, 400)}`);
+    let detail = text.slice(0, 600);
+    try {
+      const j = JSON.parse(text) as { detalhes?: unknown; erro?: unknown; detail?: unknown };
+      const raw = j.erro ?? j.detalhes ?? j.detail;
+      if (typeof raw === "string") {
+        detail = raw;
+      } else if (raw && typeof raw === "object") {
+        // Achata mensagens de validação aninhadas (ex: justificativas)
+        detail = Object.entries(raw as Record<string, unknown>)
+          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(" ") : JSON.stringify(v)}`)
+          .join(" | ");
+      }
+    } catch {
+      /* keep raw */
+    }
+    throw new Error(detail);
   }
 
   return res.json() as Promise<BtrackerNfse>;

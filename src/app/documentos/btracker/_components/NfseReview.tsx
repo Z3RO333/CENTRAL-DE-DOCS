@@ -16,7 +16,7 @@ import {
   XCircle,
 } from "lucide-react";
 import type { NfseExtracted, NfseField, NfseRisco, NfseStatus } from "@/lib/nfseExtractor";
-import type { BtrackerNfse } from "@/lib/btrackerApi";
+import type { BtrackerNfse, SaveNfseInput } from "@/lib/btrackerApi";
 
 type Props = {
   data: NfseExtracted;
@@ -92,6 +92,8 @@ export function NfseReview({ data, btrackerConnected, matchedPedido, fileName, o
   const [nroPedido, setNroPedido] = useState(matchedPedido?.nroPedido ?? "");
   const [nroItemPedido, setNroItemPedido] = useState(matchedPedido?.nroItemPedido ?? "");
   const [nroItemServico, setNroItemServico] = useState(matchedPedido?.nroItemServico ?? "");
+  const [justVencimento, setJustVencimento] = useState("");
+  const [justLiberacao, setJustLiberacao] = useState("");
 
   function toggleSection(s: string) {
     setOpenSection((prev) => (prev === s ? null : s));
@@ -103,6 +105,8 @@ export function NfseReview({ data, btrackerConnected, matchedPedido, fileName, o
     setSubmitError(null);
     try {
       const payload = buildBtrackerPayload(data, nroPedido, nroItemPedido, nroItemServico);
+      payload.justificativaVencimento = justVencimento.trim() || null;
+      payload.justificativaLiberacao = justLiberacao.trim() || null;
       const res = await fetch("/api/btracker/nfse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -324,6 +328,37 @@ export function NfseReview({ data, btrackerConnected, matchedPedido, fileName, o
         </div>
       </Section>
 
+      {/* Justificativas (preencha apenas se o BTracker bloquear por data) */}
+      <details className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-600">
+          Justificativas (se houver bloqueio de data)
+        </summary>
+        <div className="mt-3 space-y-3">
+          <div>
+            <p className="mb-1 text-[10px] text-slate-500">
+              Justificativa de vencimento (vencimento &lt; 30 dias da emissão)
+            </p>
+            <input
+              value={justVencimento}
+              onChange={(e) => setJustVencimento(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs focus:border-sky-400 focus:outline-none"
+              placeholder="Ex: vencimento conforme acordo comercial"
+            />
+          </div>
+          <div>
+            <p className="mb-1 text-[10px] text-slate-500">
+              Justificativa de liberação (data de emissão fora do período)
+            </p>
+            <input
+              value={justLiberacao}
+              onChange={(e) => setJustLiberacao(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs focus:border-sky-400 focus:outline-none"
+              placeholder="Ex: nota recebida com atraso pelo prestador"
+            />
+          </div>
+        </div>
+      </details>
+
       {/* Ações */}
       <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
         {btrackerConnected ? (
@@ -461,74 +496,60 @@ function buildBtrackerPayload(
   nroPedido: string,
   nroItemPedido: string,
   nroItemServico: string,
-): Partial<BtrackerNfse> {
-  const str = (n: number | null) => (n != null ? String(n) : null);
+): SaveNfseInput {
   return {
-    id: null,
-    numero: d.numero.value ? parseInt(d.numero.value) : null,
-    nroPedido: nroPedido || null,
-    nroItemPedido: nroItemPedido || null,
-    nroItemServico: nroItemServico || null,
-    quantidade: 1,
+    numero: d.numero.value,
+    serie: d.serie.value,
     codigoVerificacao: d.codigoVerificacao.value,
     emissao: d.dataEmissao.value,
     vencimento: d.dataVencimento.value,
-    discriminacao: d.servico.discriminacao.value,
-    itemListaServico: d.servico.itemListaServico.value,
-    valorServicos: str(d.servico.valorServicos.value),
-    baseCalculo: str(d.servico.baseCalculo.value),
-    aliquota: d.servico.aliquotaIss.value != null ? str(d.servico.aliquotaIss.value) : null,
-    valorIss: str(d.servico.valorIss.value),
-    valorIssRetido: d.servico.issRetido.value ? str(d.servico.valorIss.value) : null,
-    valorInss: str(d.retencoes.valorInss.value),
-    valorPis: str(d.retencoes.valorPis.value),
-    valorCofins: str(d.retencoes.valorCofins.value),
-    valorCsll: str(d.retencoes.valorCsll.value),
-    valorIr: str(d.retencoes.valorIr.value),
-    outrasRetencoes: str(d.retencoes.outrasRetencoes.value),
-    totalRetencoes: str(d.retencoes.totalRetencoes.value),
-    valorLiquidoNfse: str(d.valorLiquidoNfse.value),
-    prestador: d.emitente.cnpj.value
-      ? {
-          id: null,
-          razaoSocial: d.emitente.razaoSocial.value,
-          documento: d.emitente.cnpj.value,
-          inscricaoMunicipal: d.emitente.inscricaoMunicipal.value,
-          cep: d.emitente.cep.value,
-          logradouro: d.emitente.logradouro.value,
-          numero: d.emitente.numero.value,
-          complemento: d.emitente.complemento.value,
-          bairro: d.emitente.bairro.value,
-          uf: d.emitente.uf.value,
-          fone: d.emitente.fone.value,
-          municipio: null,
-          email: null,
-          nomeFantasia: null,
-          tipoDocumento: null,
-          bloqueadoErp: false,
-        }
-      : null,
-    tomador: d.tomador.cnpj.value
-      ? {
-          id: null,
-          razaoSocial: d.tomador.razaoSocial.value,
-          documento: d.tomador.cnpj.value,
-          logradouro: d.tomador.logradouro.value,
-          numero: d.tomador.numero.value,
-          complemento: d.tomador.complemento.value,
-          bairro: d.tomador.bairro.value,
-          uf: d.tomador.uf.value,
-          municipio: null,
-          inscricaoMunicipal: null,
-          cep: null,
-          fone: null,
-          email: null,
-          nomeFantasia: null,
-          tipoDocumento: null,
-          bloqueadoErp: false,
-        }
-      : null,
-    statusSolicitacao: 0,
-    statusNota: 0,
+    municipioNome: d.municipioEmissao.value ?? d.emitente.municipio.value,
+    uf: d.ufEmissao.value ?? d.emitente.uf.value,
+    prestador: {
+      razaoSocial: d.emitente.razaoSocial.value,
+      documento: d.emitente.cnpj.value,
+      municipioNome: d.emitente.municipio.value,
+      uf: d.emitente.uf.value,
+      inscricaoMunicipal: d.emitente.inscricaoMunicipal.value,
+      cep: d.emitente.cep.value,
+      logradouro: d.emitente.logradouro.value,
+      numero: d.emitente.numero.value,
+      complemento: d.emitente.complemento.value,
+      bairro: d.emitente.bairro.value,
+      fone: d.emitente.fone.value,
+    },
+    tomador: {
+      razaoSocial: d.tomador.razaoSocial.value,
+      documento: d.tomador.cnpj.value,
+      municipioNome: d.tomador.municipio.value,
+      uf: d.tomador.uf.value,
+      logradouro: d.tomador.logradouro.value,
+      numero: d.tomador.numero.value,
+      complemento: d.tomador.complemento.value,
+      bairro: d.tomador.bairro.value,
+    },
+    servico: {
+      discriminacao: d.servico.discriminacao.value,
+      itemListaServico: d.servico.itemListaServico.value,
+      valorServicos: d.servico.valorServicos.value,
+      baseCalculo: d.servico.baseCalculo.value,
+      aliquota: d.servico.aliquotaIss.value,
+      valorIss: d.servico.valorIss.value,
+      issRetido: d.servico.issRetido.value,
+    },
+    retencoes: {
+      valorPis: d.retencoes.valorPis.value,
+      valorCofins: d.retencoes.valorCofins.value,
+      valorCsll: d.retencoes.valorCsll.value,
+      valorIr: d.retencoes.valorIr.value,
+      valorInss: d.retencoes.valorInss.value,
+      outrasRetencoes: d.retencoes.outrasRetencoes.value,
+      totalRetencoes: d.retencoes.totalRetencoes.value,
+    },
+    valorLiquido: d.valorLiquidoNfse.value,
+    nroPedido: nroPedido || null,
+    nroItemPedido: nroItemPedido || null,
+    nroItemServico: nroItemServico || null,
+    tipoPagamento: null,
   };
 }
