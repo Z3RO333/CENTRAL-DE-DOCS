@@ -254,6 +254,21 @@ const formatCompetenciaInput = (value: string) => {
   return `${digits.slice(0, 2)}/${digits.slice(2)}`;
 };
 
+// Gera opções MM/AAAA do mês atual retroativo a 24 meses
+const gerarOpcoesCompetencia = (): string[] => {
+  const opts: string[] = [];
+  const hoje = new Date();
+  for (let i = 0; i <= 24; i++) {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const aaaa = d.getFullYear();
+    opts.push(`${mm}/${aaaa}`);
+  }
+  return opts;
+};
+
+const OPCOES_COMPETENCIA = gerarOpcoesCompetencia();
+
 const isCompetenciaValida = (value: string) => {
   const match = value.match(/^(\d{2})\/(\d{4})$/);
   if (!match) {
@@ -839,6 +854,21 @@ export default function FormularioPage() {
                   value={values[field.name] ?? ""}
                   onChange={handleLojaSelection}
                 />
+              ) : field.name === "competencia" ? (
+                <select
+                  id={field.name}
+                  required
+                  value={values[field.name] ?? ""}
+                  onChange={(e) => handleChange(field.name, e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-sky-500/40 focus:border-sky-500 focus:ring"
+                >
+                  <option value="">Selecione a competência</option>
+                  {OPCOES_COMPETENCIA.map((op) => (
+                    <option key={op} value={op}>
+                      {op}
+                    </option>
+                  ))}
+                </select>
               ) : field.type === "textarea" ? (
                 <textarea
                   id={field.name}
@@ -892,11 +922,6 @@ export default function FormularioPage() {
                     : lojas.length === 0
                       ? "Cadastre uma loja antes de enviar documentos."
                       : "Busque por centro (ex.: 101) ou nome (ex.: matriz, farma, shopping)."}
-                </p>
-              )}
-              {field.name === "competencia" && (
-                <p className="text-[11px] text-slate-500">
-                  Digite apenas numeros. O formato sera aplicado automaticamente: MM/AAAA.
                 </p>
               )}
             </div>
