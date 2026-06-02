@@ -36,10 +36,10 @@ const EDIT_FIELDS_BY_TIPO: Record<string, EditField[]> = {
     { name: "observacoes", label: "Observações", type: "textarea" },
   ],
   registro_laudos: [
+    { name: "competencia", label: "Competência" },
     { name: "prestador", label: "Prestador" },
     { name: "tipo_laudo", label: "Tipo de laudo" },
     { name: "responsavel", label: "Responsável" },
-    { name: "data_emissao", label: "Data de emissão", type: "date" },
     { name: "observacoes", label: "Observações", type: "textarea" },
   ],
   notas_fiscais: [

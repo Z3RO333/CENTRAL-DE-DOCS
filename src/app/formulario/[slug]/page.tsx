@@ -126,9 +126,10 @@ const FORM_CONFIGS: FormConfig[] = [
         placeholder: "Nome do responsável técnico",
       },
       {
-        name: "data_emissao",
-        label: "Data de emissão",
-        type: "date",
+        name: "competencia",
+        label: "Competência",
+        type: "text",
+        placeholder: "MM/AAAA",
       },
       {
         name: "observacoes",
@@ -472,7 +473,8 @@ export default function FormularioPage() {
     setValues((prev) => {
       const nextValue =
         (config.slug === "retencao-trabalhista" ||
-          config.slug === "notas-fiscais") &&
+          config.slug === "notas-fiscais" ||
+          config.slug === "registro-laudos") &&
         name === "competencia"
           ? formatCompetenciaInput(value)
           : value;
@@ -687,7 +689,8 @@ export default function FormularioPage() {
 
       if (
         config.slug === "retencao-trabalhista" ||
-        config.slug === "notas-fiscais"
+        config.slug === "notas-fiscais" ||
+        config.slug === "registro-laudos"
       ) {
         const competencia = values.competencia ?? "";
         if (!isCompetenciaValida(competencia)) {

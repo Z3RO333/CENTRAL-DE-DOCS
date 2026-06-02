@@ -323,17 +323,16 @@ const formatDateTime = (value: string) => {
   return date.toLocaleString("pt-BR");
 };
 
-// Para nota fiscal, mostra competência no lugar da data de envio
+// Para nota fiscal e laudos, mostra competência no lugar da data de envio
+const TIPOS_COM_COMPETENCIA = new Set(["notas_fiscais", "registro_laudos"]);
+
 const getDataLabel = (registro: FormularioRecord) => {
-  if (registro.tipo === "notas_fiscais") {
+  if (TIPOS_COM_COMPETENCIA.has(registro.tipo)) {
     const competencia = getCampoTexto(registro.dados, ["competencia"]);
     if (competencia) return competencia;
   }
   return formatDateTime(registro.created_at);
 };
-
-const getDataColLabel = (tipo: string) =>
-  tipo === "notas_fiscais" ? "Competência" : "Enviado em";
 
 const getEdicaoInfo = (registro: FormularioRecord) => {
   const editedBy = getCampoTexto(registro.dados, ["edited_by"]);
