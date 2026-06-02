@@ -34,7 +34,11 @@ type AnalyzeInput = {
   dadosAtuais?: Record<string, unknown> | null;
 };
 
-const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
+type AzureDocumentIntelligenceConfig = {
+  endpoint: string;
+  key: string;
+  apiVersion: string;
+};
 
 const ANALISE_SCHEMA = {
   type: "object",
@@ -110,117 +114,242 @@ const ANALISE_SCHEMA = {
   },
 };
 
-function getOpenAiConfig() {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  const model = process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini";
+function getAzureOpenAiConfig() {
+  const apiKey = process.env.AZURE_OPENAI_API_KEY?.trim();
+  const endpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim();
+  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT?.trim();
+  const apiVersion =
+    process.env.AZURE_OPENAI_API_VERSION?.trim() || "2025-01-01-preview";
 
-  if (!apiKey) {
-    throw new Error("Configure OPENAI_API_KEY no .env.");
+  if (!apiKey || !endpoint || !deployment) {
+    throw new Error(
+      "Configure AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT e AZURE_OPENAI_DEPLOYMENT no .env.",
+    );
   }
 
-  return { apiKey, model };
+  const url = endpoint.includes("/chat/completions")
+    ? endpoint
+    : `${endpoint.replace(/\/+$/, "")}/openai/deployments/${encodeURIComponent(
+        deployment,
+      )}/chat/completions?api-version=${encodeURIComponent(apiVersion)}`;
+
+  return { apiKey, deployment, url };
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer) {
   return Buffer.from(buffer).toString("base64");
 }
 
-function resolveContentPart(input: AnalyzeInput) {
+function getAzureDocumentIntelligenceConfig(): AzureDocumentIntelligenceConfig {
+  const endpoint =
+    process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT?.trim() ||
+    process.env.AZURE_OCR_DOCUMENT_ENDPOINT?.trim() ||
+    process.env.AZURE_OCR_ENDPOINT?.trim();
+  const key =
+    process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY?.trim() ||
+    process.env.AZURE_OCR_DOCUMENT_KEY?.trim() ||
+    process.env.AZURE_OCR_DOCUMENT?.trim();
+  const apiVersion =
+    process.env.AZURE_DOCUMENT_INTELLIGENCE_API_VERSION?.trim() || "2024-11-30";
+
+  if (!endpoint || !key) {
+    throw new Error(
+      "Configure AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT e AZURE_OCR_DOCUMENT no .env para analisar PDF por OCR.",
+    );
+  }
+
+  return {
+    endpoint: endpoint.replace(/\/+$/, ""),
+    key,
+    apiVersion,
+  };
+}
+
+function getAnalyzeUrl(config: AzureDocumentIntelligenceConfig) {
+  return `${config.endpoint}/documentintelligence/documentModels/prebuilt-read:analyze?api-version=${encodeURIComponent(
+    config.apiVersion,
+  )}`;
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function extrairTextoComDocumentIntelligence(input: AnalyzeInput) {
+  const config = getAzureDocumentIntelligenceConfig();
+  const response = await fetch(getAnalyzeUrl(config), {
+    method: "POST",
+    headers: {
+      "Content-Type": input.mimeType,
+      "Ocp-Apim-Subscription-Key": config.key,
+    },
+    body: Buffer.from(input.bytes),
+  });
+
+  if (response.status !== 202) {
+    const raw = (await response.json().catch(() => null)) as
+      | { error?: { message?: string } }
+      | null;
+    throw new Error(
+      raw?.error?.message ??
+        `Document Intelligence retornou status ${response.status}.`,
+    );
+  }
+
+  const operationLocation = response.headers.get("operation-location");
+  if (!operationLocation) {
+    throw new Error("Document Intelligence nao retornou Operation-Location.");
+  }
+
+  for (let attempt = 0; attempt < 30; attempt++) {
+    await sleep(1000);
+    const resultResponse = await fetch(operationLocation, {
+      headers: {
+        "Ocp-Apim-Subscription-Key": config.key,
+      },
+    });
+    const result = (await resultResponse.json().catch(() => null)) as
+      | {
+          status?: string;
+          error?: { message?: string };
+          analyzeResult?: {
+            content?: string;
+            pages?: Array<{
+              lines?: Array<{ content?: string }>;
+            }>;
+          };
+        }
+      | null;
+
+    if (!resultResponse.ok) {
+      throw new Error(
+        result?.error?.message ??
+          `Document Intelligence retornou status ${resultResponse.status}.`,
+      );
+    }
+
+    if (result?.status === "succeeded") {
+      const content = result.analyzeResult?.content?.trim();
+      if (content) {
+        return content;
+      }
+
+      const lines = result.analyzeResult?.pages
+        ?.flatMap((page) => page.lines ?? [])
+        .map((line) => line.content)
+        .filter((line): line is string => Boolean(line?.trim()))
+        .join("\n")
+        .trim();
+
+      if (!lines) {
+        throw new Error("OCR concluido, mas nenhum texto foi extraido.");
+      }
+
+      return lines;
+    }
+
+    if (result?.status === "failed") {
+      throw new Error(result.error?.message ?? "OCR falhou.");
+    }
+  }
+
+  throw new Error("OCR demorou demais para concluir.");
+}
+
+function resolveAzureContentPart(input: AnalyzeInput) {
   const base64 = arrayBufferToBase64(input.bytes);
 
   if (input.mimeType === "application/pdf") {
-    return {
-      type: "input_file",
-      filename: input.fileName,
-      file_data: `data:application/pdf;base64,${base64}`,
-    };
+    throw new Error(
+      "A configuracao atual usa Azure OpenAI Chat, que nao aceita PDF direto. Envie PNG/JPEG ou configure um OCR de PDF.",
+    );
   }
 
   if (input.mimeType.startsWith("image/")) {
     return {
-      type: "input_image",
-      image_url: `data:${input.mimeType};base64,${base64}`,
+      type: "image_url",
+      image_url: {
+        url: `data:${input.mimeType};base64,${base64}`,
+      },
     };
   }
 
   throw new Error(`Tipo de arquivo nao suportado para analise: ${input.mimeType}`);
 }
 
-function extractOutputText(payload: unknown): string {
+function extractAzureOutputText(payload: unknown): string {
   const response = payload as {
-    output_text?: string;
-    output?: Array<{
-      content?: Array<{
-        type?: string;
-        text?: string;
-      }>;
+    choices?: Array<{
+      message?: {
+        content?: string | null;
+      };
     }>;
   };
 
-  if (typeof response.output_text === "string" && response.output_text.trim()) {
-    return response.output_text.trim();
+  const content = response.choices?.[0]?.message?.content?.trim();
+  if (!content) {
+    throw new Error("Azure OpenAI nao retornou texto de analise.");
   }
 
-  const text = response.output
-    ?.flatMap((item) => item.content ?? [])
-    .map((content) => content.text)
-    .filter((value): value is string => Boolean(value?.trim()))
-    .join("\n")
+  return content;
+}
+
+function parseJsonObject(text: string): DocumentoAnaliseIa {
+  const cleaned = text
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
     .trim();
 
-  if (!text) {
-    throw new Error("OpenAI nao retornou texto de analise.");
-  }
-
-  return text;
+  return JSON.parse(cleaned) as DocumentoAnaliseIa;
 }
 
 export async function analisarDocumentoComOpenAi(
   input: AnalyzeInput,
-): Promise<{ model: string; resultado: DocumentoAnaliseIa }> {
-  const { apiKey, model } = getOpenAiConfig();
-  const filePart = resolveContentPart(input);
+): Promise<{ provider: string; model: string; resultado: DocumentoAnaliseIa }> {
+  const { apiKey, deployment, url } = getAzureOpenAiConfig();
+  const textoExtraido =
+    input.mimeType === "application/pdf"
+      ? await extrairTextoComDocumentIntelligence(input)
+      : null;
+  const filePart = textoExtraido ? null : resolveAzureContentPart(input);
 
-  const response = await fetch(OPENAI_RESPONSES_URL, {
+  const response = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      "api-key": apiKey,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model,
-      input: [
+      messages: [
         {
           role: "system",
-          content: [
-            {
-              type: "input_text",
-              text:
-                "Voce analisa documentos administrativos brasileiros. Extraia apenas dados presentes ou fortemente inferiveis no arquivo. Se houver mais de uma loja, competencia ou item, liste todos separadamente. Retorne JSON no schema solicitado. Use competencias sempre como MM/AAAA. Se houver divergencia com os dados atuais, coloque em alertas.",
-            },
-          ],
+          content:
+            "Voce analisa documentos administrativos brasileiros. Extraia apenas dados presentes ou fortemente inferiveis no arquivo. Se houver mais de uma loja, competencia ou item, liste todos separadamente. Retorne somente JSON valido, sem markdown. Use competencias sempre como MM/AAAA. Se houver divergencia com os dados atuais, coloque em alertas.",
         },
         {
           role: "user",
-          content: [
-            filePart,
-            {
-              type: "input_text",
-              text: `Dados atuais do cadastro, se existirem: ${JSON.stringify(
+          content: textoExtraido
+            ? `Texto extraido por OCR do arquivo ${input.fileName}:\n\n${textoExtraido.slice(
+                0,
+                45000,
+              )}\n\nDados atuais do cadastro, se existirem: ${JSON.stringify(
                 input.dadosAtuais ?? {},
-              )}`,
-            },
-          ],
+              )}\n\nSchema esperado: ${JSON.stringify(ANALISE_SCHEMA)}`
+            : [
+                filePart,
+                {
+                  type: "text",
+                  text: `Dados atuais do cadastro, se existirem: ${JSON.stringify(
+                    input.dadosAtuais ?? {},
+                  )}\n\nSchema esperado: ${JSON.stringify(ANALISE_SCHEMA)}`,
+                },
+              ],
         },
       ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "analise_documento",
-          strict: true,
-          schema: ANALISE_SCHEMA,
-        },
-      },
+      response_format: { type: "json_object" },
+      max_tokens: 1600,
+      temperature: 0.1,
     }),
   });
 
@@ -229,12 +358,13 @@ export async function analisarDocumentoComOpenAi(
   if (!response.ok) {
     const message =
       (raw as { error?: { message?: string } } | null)?.error?.message ??
-      `OpenAI retornou status ${response.status}.`;
+      `Azure OpenAI retornou status ${response.status}.`;
     throw new Error(message);
   }
 
   return {
-    model,
-    resultado: JSON.parse(extractOutputText(raw)) as DocumentoAnaliseIa,
+    provider: "azure-openai",
+    model: deployment,
+    resultado: parseJsonObject(extractAzureOutputText(raw)),
   };
 }

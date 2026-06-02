@@ -91,7 +91,7 @@ export async function POST(
       throw new HttpError(400, `Tipo de arquivo nao suportado: ${mimeType}.`);
     }
 
-    const { model, resultado } = await analisarDocumentoComOpenAi({
+    const { provider, model, resultado } = await analisarDocumentoComOpenAi({
       fileName: resolveFileName(path),
       mimeType,
       bytes: await fileBlob.arrayBuffer(),
@@ -102,7 +102,7 @@ export async function POST(
       .from("documentos_analises_ia")
       .insert({
         documento_id: row.id,
-        provider: "openai",
+        provider,
         model,
         status: "concluida",
         resultado,
