@@ -29,8 +29,11 @@ type PrestadorComboboxProps = {
 const formatLabel = (p: Prestador) =>
   p.tipo_servico ? `${p.nome} — ${p.tipo_servico}` : p.nome;
 
+const normalize = (s: string) =>
+  s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
 const buildSearchKey = (p: Prestador) =>
-  `${p.nome} ${p.tipo_servico ?? ""}`.toLowerCase();
+  normalize(`${p.nome} ${p.tipo_servico ?? ""}`);
 
 export default function PrestadorCombobox({
   prestadores,
@@ -54,7 +57,7 @@ export default function PrestadorCombobox({
   );
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalize(query.trim());
     if (!q) return sorted;
     return sorted.filter((p) => buildSearchKey(p).includes(q));
   }, [sorted, query]);
@@ -136,7 +139,7 @@ export default function PrestadorCombobox({
         disabled={disabled || loading || prestadores.length === 0}
         onClick={() => (open ? closeMenu() : openMenu())}
         aria-haspopup="listbox"
-        aria-expanded={open}
+        aria-expanded={open ? "true" : "false"}
         className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm shadow-sm outline-none transition focus:border-sky-500 focus:ring focus:ring-sky-500/40 disabled:cursor-not-allowed disabled:bg-slate-50"
       >
         <span className={`flex-1 truncate ${!selected ? "text-slate-400" : "text-slate-900"}`}>
@@ -168,6 +171,7 @@ export default function PrestadorCombobox({
               onChange={(e) => { setQuery(e.target.value); setHighlightIndex(0); }}
               onKeyDown={handleKeyDown}
               placeholder="Buscar por nome ou tipo de serviço..."
+              aria-label="Buscar prestador"
               className="w-full text-sm text-slate-900 outline-none placeholder:text-slate-400"
             />
           </div>
@@ -189,7 +193,7 @@ export default function PrestadorCombobox({
                     key={p.id}
                     data-index={index}
                     role="option"
-                    aria-selected={isSelected}
+                    aria-selected={isSelected ? "true" : "false"}
                     onMouseEnter={() => setHighlightIndex(index)}
                     onClick={() => commit(p)}
                     tabIndex={-1}
