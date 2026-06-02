@@ -13,12 +13,34 @@ function nomeExcluido(nome: string): boolean {
 // Domínio interno: e-mails @bemol.com.br não são cobrados como fornecedor
 // (a manutenção ainda recebe cópia via CC do próprio remetente).
 const DOMINIO_INTERNO = "@bemol.com.br";
+const TIMEZONE_MANAUS = "America/Manaus";
 
 function emailsExternos(usuarios: string[] | null): string[] {
   return (usuarios ?? [])
     .map((e) => e.trim())
     .filter(Boolean)
     .filter((e) => !e.toLowerCase().endsWith(DOMINIO_INTERNO));
+}
+
+function partesDataManaus(date = new Date()): { ano: number; mes: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIMEZONE_MANAUS,
+    year: "numeric",
+    month: "numeric",
+  }).formatToParts(date);
+
+  const ano = Number(parts.find((part) => part.type === "year")?.value);
+  const mes = Number(parts.find((part) => part.type === "month")?.value);
+
+  if (!Number.isFinite(ano) || !Number.isFinite(mes)) {
+    throw new Error("Falha ao calcular data no fuso de Manaus.");
+  }
+
+  return { ano, mes };
+}
+
+export function anoManaus(date = new Date()): number {
+  return partesDataManaus(date).ano;
 }
 
 export type PendenciaCobranca = {
@@ -77,7 +99,7 @@ type PrestadorRow = {
 
 // Retorna a data "hoje" no fuso de Manaus (UTC-4) no formato YYYY-MM-DD
 export function diaManaus(date = new Date()): string {
-  return date.toLocaleDateString("en-CA", { timeZone: "America/Manaus" });
+  return date.toLocaleDateString("en-CA", { timeZone: TIMEZONE_MANAUS });
 }
 
 // Quantos meses do ano já devem ter documentação:
@@ -85,10 +107,10 @@ export function diaManaus(date = new Date()): string {
 //  - anos fechados: os 12 meses
 //  - anos futuros: nenhum
 export function calcularMesLimite(anoRef: number, hoje = new Date()): number {
-  const anoAtual = hoje.getFullYear();
+  const { ano: anoAtual, mes: mesAtual } = partesDataManaus(hoje);
   if (anoRef > anoAtual) return 0;
   if (anoRef < anoAtual) return 12;
-  return hoje.getMonth(); // mês atual (1-12) menos 1 == getMonth() (0-11)
+  return mesAtual - 1;
 }
 
 // Retorna as pendências sem enviar e-mails – usado no relatório (admin/gerente)
@@ -96,7 +118,7 @@ export async function levantarPendencias(
   ano?: number,
   supabase: SupabaseClient = createSupabaseAdminClient(),
 ): Promise<PendenciaCobranca[]> {
-  const anoRef = ano ?? new Date().getFullYear();
+  const anoRef = ano ?? anoManaus();
   const mesLimite = calcularMesLimite(anoRef);
 
   if (mesLimite < 1) return [];
@@ -190,7 +212,7 @@ export async function processarCobrancas(
 ): Promise<ResultadoDisparo> {
   const dryRun = opts.dryRun ?? false;
   const supabase = createSupabaseAdminClient();
-  const anoRef = ano ?? new Date().getFullYear();
+  const anoRef = ano ?? anoManaus();
   const pendencias = await levantarPendencias(anoRef, supabase);
 
   const resultado: ResultadoDisparo = {

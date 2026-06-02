@@ -134,7 +134,7 @@ function MesGrid({ loja }: { loja: LojaPendencia }) {
         pendentes={loja.meses_pendentes_laudos}
       />
       <MesTipoRow
-        label="Retencao"
+        label="Retenção"
         recebidos={loja.meses_com_documentos_retencao}
         pendentes={loja.meses_pendentes_retencao}
       />

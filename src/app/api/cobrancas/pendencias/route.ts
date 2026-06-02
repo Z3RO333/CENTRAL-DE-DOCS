@@ -7,7 +7,7 @@ import {
   hasDocumentosAccess,
   ApiHttpError as HttpError,
 } from "@/lib/apiAuth";
-import { levantarPendencias } from "@/lib/cobrancasService";
+import { anoManaus, levantarPendencias } from "@/lib/cobrancasService";
 import { filtrarPendenciasPorAcesso } from "@/lib/cobrancasAccess";
 
 export const runtime = "nodejs";
@@ -126,7 +126,7 @@ export async function GET(request: Request) {
     );
 
     return NextResponse.json({
-      ano: ano ?? new Date().getFullYear(),
+      ano: ano ?? anoManaus(),
       perfil: isAdmin ? "admin" : "gerente",
       total_fornecedores: fornecedores.length,
       total_pendencias: pendencias.length,

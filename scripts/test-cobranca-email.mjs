@@ -21,7 +21,7 @@ const pend = [
     meses_pendentes: [1, 3],
     meses_pendentes_laudos: [1, 3],
     meses_pendentes_retencao: [3],
-    total_esperado: 4, total_recebido: 2, total_faltante: 3,
+    total_esperado: 5, total_recebido: 2, total_faltante: 3,
   },
   {
     loja_nome: "Loja 05 - Manaus",
@@ -64,7 +64,7 @@ const rows = pend.map((p) => {
   return `<tr>
   <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#333;font-weight:600;">${p.loja_nome}</td>
   <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#e67e22;">${pendenciaCell}</td>
-  <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;font-weight:700;"><span style="color:#27ae60;">${p.total_recebido}</span><span style="color:#aaa;">/</span><span style="color:#555;">${mesLimite}</span></td>
+  <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;font-weight:700;"><span style="color:#27ae60;">${p.total_recebido}</span><span style="color:#aaa;">/</span><span style="color:#555;">${p.total_esperado}</span></td>
   <td style="padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;text-align:center;color:#c0392b;font-weight:700;">${p.total_faltante}</td>
 </tr>`;
 }).join("");
