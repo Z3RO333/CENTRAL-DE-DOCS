@@ -19,6 +19,7 @@ import {
   Menu,
   CircleAlert,
   MailWarning,
+  FileCheck2,
   ChevronLeft,
   ChevronRight,
   X,
@@ -91,7 +92,8 @@ export default function AppShell({
             pathname?.startsWith("/documentos") &&
             !pathname?.startsWith("/documentos/por-loja") &&
             !pathname?.startsWith("/documentos/pendencias") &&
-            !pathname?.startsWith("/documentos/cobrancas"),
+            !pathname?.startsWith("/documentos/cobrancas") &&
+            !pathname?.startsWith("/documentos/btracker"),
           isVisible: canAccessDocuments,
         },
         {
@@ -114,6 +116,13 @@ export default function AppShell({
           icon: MailWarning,
           isActive: pathname?.startsWith("/documentos/cobrancas"),
           isVisible: canAccessCobrancas,
+        },
+        {
+          href: "/documentos/btracker",
+          label: "NFS-e BTracker",
+          icon: FileCheck2,
+          isActive: pathname?.startsWith("/documentos/btracker"),
+          isVisible: canAccessDocuments,
         },
         {
           href: "/copilot",
