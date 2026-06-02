@@ -18,6 +18,7 @@ import { usePrestadores } from "@/hooks/usePrestadores";
 import { useLojas } from "@/hooks/useLojas";
 import { resolveServicoOficial } from "@/lib/servicosVocab";
 import LojaCombobox from "./_components/LojaCombobox";
+import PrestadorCombobox from "./_components/PrestadorCombobox";
 
 type FormField = {
   name: string;
@@ -810,27 +811,14 @@ export default function FormularioPage() {
                 {field.label}
               </label>
               {enablePrestadorDropdown && field.name === "prestador" ? (
-                <select
+                <PrestadorCombobox
                   id={field.name}
                   required
+                  prestadores={prestadoresDisponiveis}
+                  loading={prestadoresLoading}
                   value={selectedPrestadorId}
-                  onChange={(e) => handlePrestadorSelection(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-sky-500/40 placeholder:text-slate-400 focus:border-sky-500 focus:ring"
-                  disabled={prestadoresLoading || prestadoresDisponiveis.length === 0}
-                >
-                  <option value="">
-                    {prestadoresLoading
-                      ? "Carregando prestadores..."
-                      : prestadoresDisponiveis.length === 0
-                        ? "Nenhum prestador disponível"
-                        : "Selecione um prestador"}
-                  </option>
-                  {prestadoresDisponiveis.map((prestador) => (
-                    <option key={prestador.id} value={prestador.id}>
-                      {prestador.nome} - {prestador.tipo_servico}
-                    </option>
-                  ))}
-                </select>
+                  onChange={handlePrestadorSelection}
+                />
               ) : field.type === "select" && field.name === "loja_id" ? (
                 <LojaCombobox
                   id={field.name}
