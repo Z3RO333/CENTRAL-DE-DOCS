@@ -108,16 +108,17 @@ export default function PrestadoresPage() {
 
   const selectedPrestador =
     prestadores.find((item) => item.id === selectedPrestadorId) ?? null;
-  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const normalizedSearch = norm(searchTerm.trim());
   const filteredPrestadores = useMemo(() => {
     if (!normalizedSearch) {
       return prestadores;
     }
     return prestadores.filter((prestador) => {
-      const nome = prestador.nome?.toLowerCase() ?? "";
-      const tipo = prestador.tipo_servico?.toLowerCase() ?? "";
-      const cnpj = prestador.cnpj?.toLowerCase() ?? "";
-      const emails = prestador.usuarios.join(" ").toLowerCase();
+      const nome = norm(prestador.nome ?? "");
+      const tipo = norm(prestador.tipo_servico ?? "");
+      const cnpj = norm(prestador.cnpj ?? "");
+      const emails = norm(prestador.usuarios.join(" "));
       return (
         nome.includes(normalizedSearch) ||
         tipo.includes(normalizedSearch) ||
@@ -403,12 +404,12 @@ const getDocumentoNome = (registro: {
   }, [regrasPorPrestador, selectedPrestadorId, vinculoRegraId]);
 
   const documentosFiltrados = useMemo(() => {
-    const termo = documentoSearch.trim().toLowerCase();
+    const termo = norm(documentoSearch.trim());
     if (!termo) {
       return documentosVinculo;
     }
     return documentosVinculo.filter((doc) => {
-      const tipo = doc.tipo?.toLowerCase() ?? "";
+      const tipo = norm(doc.tipo ?? "");
       const createdAt = doc.created_at ?? "";
       return tipo.includes(termo) || createdAt.includes(termo);
     });

@@ -89,17 +89,15 @@ export default function LojasPage() {
       categoriaFilter === "todas"
         ? lojas
         : lojas.filter((loja) => loja.categoria === categoriaFilter);
-    const query = searchTerm.trim().toLowerCase();
+    const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const query = norm(searchTerm.trim());
     const filtered = !query
       ? base
       : base.filter((loja) => {
-          const nome = loja.nome.toLowerCase();
-          const codigo = loja.codigo?.toLowerCase() ?? "";
-          const emails = loja.usuarios.join(" ").toLowerCase();
           return (
-            nome.includes(query) ||
-            codigo.includes(query) ||
-            emails.includes(query)
+            norm(loja.nome).includes(query) ||
+            norm(loja.codigo ?? "").includes(query) ||
+            norm(loja.usuarios.join(" ")).includes(query)
           );
         });
     return [...filtered].sort((a, b) => compareCodigo(a.codigo, b.codigo));

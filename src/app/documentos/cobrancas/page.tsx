@@ -217,10 +217,11 @@ export default function CobrancasPage() {
 
   const fornecedoresFiltrados = useMemo(() => {
     if (!data) return [];
-    const termo = busca.trim().toLowerCase();
+    const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const termo = norm(busca.trim());
     if (!termo) return data.fornecedores;
     return data.fornecedores.filter((f) =>
-      f.prestador_nome.toLowerCase().includes(termo),
+      norm(f.prestador_nome).includes(termo),
     );
   }, [data, busca]);
 

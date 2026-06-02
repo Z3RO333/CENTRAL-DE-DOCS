@@ -34,8 +34,11 @@ const compareCodigo = (a: string | null, b: string | null) => {
 const formatLabel = (loja: Loja) =>
   loja.codigo ? `${loja.codigo} - ${loja.nome}` : loja.nome;
 
+const norm = (s: string) =>
+  s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
 const buildSearchKey = (loja: Loja) =>
-  `${loja.codigo ?? ""} ${loja.nome}`.toLowerCase();
+  norm(`${loja.codigo ?? ""} ${loja.nome}`);
 
 export default function LojaCombobox({
   lojas,
@@ -59,7 +62,7 @@ export default function LojaCombobox({
   );
 
   const filteredLojas = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = norm(query.trim());
     if (!q) return sortedLojas;
     return sortedLojas.filter((loja) => buildSearchKey(loja).includes(q));
   }, [sortedLojas, query]);
@@ -218,7 +221,7 @@ export default function LojaCombobox({
                     key={loja.id}
                     data-index={index}
                     role="option"
-                    aria-selected={isSelected}
+                    aria-selected={isSelected ? "true" : "false"}
                     onMouseEnter={() => setHighlightIndex(index)}
                     onClick={() => commit(loja)}
                     onKeyDown={(event) => {

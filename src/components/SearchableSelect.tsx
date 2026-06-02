@@ -44,11 +44,14 @@ export function SearchableSelect({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
 
+  const norm = (s: string) =>
+    s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
   const filteredOptions = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = norm(query.trim());
     if (!q) return options;
     return options.filter((option) =>
-      `${option.label} ${option.hint ?? ""}`.toLowerCase().includes(q),
+      norm(`${option.label} ${option.hint ?? ""}`).includes(q),
     );
   }, [options, query]);
 

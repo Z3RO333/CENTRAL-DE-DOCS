@@ -576,14 +576,13 @@ export default function DocumentosPorLojaPage() {
   );
 
   const filteredLojas = useMemo(() => {
-    const term = lojaSearch.trim().toLowerCase();
+    const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const term = norm(lojaSearch.trim());
     if (!term) {
       return lojas;
     }
     return lojas.filter((loja) => {
-      const nome = loja.lojaNome.toLowerCase();
-      const codigo = loja.lojaCodigo?.toLowerCase() ?? "";
-      return nome.includes(term) || codigo.includes(term);
+      return norm(loja.lojaNome).includes(term) || norm(loja.lojaCodigo ?? "").includes(term);
     });
   }, [lojas, lojaSearch]);
 
