@@ -352,7 +352,11 @@ export async function saveNfseToBtracker(
     let detail = text.slice(0, 600);
     try {
       const j = JSON.parse(text) as { detalhes?: unknown; erro?: unknown; detail?: unknown };
-      const raw = j.erro ?? j.detalhes ?? j.detail;
+      // 'detalhes' tem a mensagem específica; 'erro' costuma ser genérico ("Erro interno...")
+      const isGeneric = (s: unknown) =>
+        typeof s === "string" && /erro interno no servidor/i.test(s);
+      const raw =
+        j.detalhes ?? (isGeneric(j.erro) ? undefined : j.erro) ?? j.detail ?? j.erro;
       if (typeof raw === "string") {
         detail = raw;
       } else if (raw && typeof raw === "object") {
