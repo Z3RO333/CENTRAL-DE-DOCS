@@ -281,10 +281,14 @@ export async function saveNfseToBtracker(
     boletoName?: string;
   },
 ): Promise<BtrackerNfse> {
+  // Padrão Bemol: Amazonas / Manaus quando não identificado na nota.
+  const uf = (s: string | null) => (s?.trim() ? s.trim() : "AM");
+  const mun = (s: string | null) => (s?.trim() ? s.trim() : "Manaus");
+
   const [munNf, munPrest, munTom] = await Promise.all([
-    resolveMunicipio(input.municipioNome, input.uf, jwt),
-    resolveMunicipio(input.prestador.municipioNome, input.prestador.uf, jwt),
-    resolveMunicipio(input.tomador.municipioNome, input.tomador.uf, jwt),
+    resolveMunicipio(mun(input.municipioNome), uf(input.uf), jwt),
+    resolveMunicipio(mun(input.prestador.municipioNome), uf(input.prestador.uf), jwt),
+    resolveMunicipio(mun(input.tomador.municipioNome), uf(input.tomador.uf), jwt),
   ]);
 
   const servicoErp = await resolveServicoErp(input.servico.itemListaServico, jwt);
@@ -367,7 +371,7 @@ export async function saveNfseToBtracker(
       complemento: input.prestador.complemento,
       bairro: input.prestador.bairro,
       fone: input.prestador.fone,
-      uf: input.prestador.uf,
+      uf: uf(input.prestador.uf),
     }),
   );
   fd.append(
@@ -382,7 +386,7 @@ export async function saveNfseToBtracker(
       numero: input.tomador.numero,
       complemento: input.tomador.complemento,
       bairro: input.tomador.bairro,
-      uf: input.tomador.uf,
+      uf: uf(input.tomador.uf),
     }),
   );
   fd.append(
