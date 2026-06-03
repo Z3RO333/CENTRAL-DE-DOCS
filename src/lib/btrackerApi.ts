@@ -301,6 +301,11 @@ export async function saveNfseToBtracker(
     const d = s ? s.replace(/\D/g, "").slice(0, 8) : "";
     return d.length === 8 ? d : null;
   };
+  // BTracker limita o fone a 14 caracteres → só dígitos, máx 14 (opcional)
+  const foneDigits = (s: string | null) => {
+    const d = s ? s.replace(/\D/g, "").slice(0, 14) : "";
+    return d || null;
+  };
   const servicoCodigo = servicoErp?.codigo ?? input.servico.itemListaServico ?? "00.00";
   const servicoDescricao =
     servicoErp?.descricao ??
@@ -393,7 +398,7 @@ export async function saveNfseToBtracker(
       numero: input.prestador.numero,
       complemento: input.prestador.complemento,
       bairro: input.prestador.bairro,
-      fone: input.prestador.fone,
+      fone: foneDigits(input.prestador.fone),
       uf: uf(input.prestador.uf),
     }),
   );
