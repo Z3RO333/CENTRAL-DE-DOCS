@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 import {
+  getActorFromRequest,
   getSessionUserFromRequest,
   getAuthorizedPrestadorIds,
   getGerenteAccessEntries,
@@ -25,11 +26,11 @@ function mascararEmail(email: string): string {
 
 export async function GET(request: Request) {
   try {
-    const user = await getSessionUserFromRequest(request);
-    const email = user.email?.toLowerCase().trim() ?? null;
     const supabase = createSupabaseAdminClient();
+    const actor = await getActorFromRequest(request, supabase);
+    const email = actor.email;
 
-    const isAdmin = await hasDocumentosAccess(user.id, email, supabase);
+    const isAdmin = actor.isAdmin;
 
     // Gerente/fornecedor: precisa ter algum escopo concedido
     const allowedPrestadores = isAdmin
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
       : await getAuthorizedPrestadorIds(email, supabase);
     const gerenteEntries = isAdmin
       ? []
-      : await getGerenteAccessEntries(user.id, email, supabase);
+      : await getGerenteAccessEntries(actor.userId, email, supabase);
 
     if (
       !isAdmin &&

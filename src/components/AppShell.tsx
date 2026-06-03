@@ -27,6 +27,7 @@ import {
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabaseClient";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
+import { SimulacaoControl, SimulacaoBanner } from "@/components/SimulacaoControl";
 
 export default function AppShell({
   children,
@@ -369,6 +370,7 @@ export default function AppShell({
                   Ajuda rápida
                   <HelpCircle className="h-4 w-4 text-sky-600" />
                 </button>
+                <SimulacaoControl canStart={isAdmin} />
                 {isAuthenticated && (
                   <button
                     type="button"
@@ -409,6 +411,8 @@ export default function AppShell({
               <span>Formulário Central</span>
             </div>
           </header>
+
+          <SimulacaoBanner />
 
           <main
             className={`relative min-w-0 flex-1 px-4 pb-10 pt-6 md:px-8 ${

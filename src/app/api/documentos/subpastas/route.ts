@@ -4,6 +4,7 @@ import { normalizeIds, safeParseDados, sanitizeId } from "@/lib/documentosApiUti
 import { getCompetenciaFromDados } from "@/lib/competencia";
 import {
   ApiHttpError as HttpError,
+  getActorFromRequest,
   getAuthorizedPrestadorIds,
   getGerenteAccessEntries,
   getSessionUserFromRequest,
@@ -191,13 +192,13 @@ function buildExplorerFromRows(rows: FormularioRow[]): SubpastaNode[] {
 
 export async function GET(request: Request) {
   try {
-    const user = await getSessionUserFromRequest(request);
-    const email = user.email?.toLowerCase().trim() ?? null;
     const supabaseAdmin = createSupabaseAdminClient();
-    const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
+    const actor = await getActorFromRequest(request, supabaseAdmin);
+    const email = actor.email;
+    const canAccess = actor.isAdmin;
     const allowedPrestadores = await getAuthorizedPrestadorIds(email, supabaseAdmin);
     const gerenteEntries = await getGerenteAccessEntries(
-      user.id,
+      actor.userId,
       email,
       supabaseAdmin,
     );
@@ -233,8 +234,8 @@ export async function GET(request: Request) {
         canAccess,
         allowedPrestadores,
         gerenteEntries,
-        userId: user.id,
-        filterUserId: filterUserId || user.id,
+        userId: actor.userId,
+        filterUserId: filterUserId || actor.userId,
         filterPrestadores,
         filterLojas: [lojaId],
       });

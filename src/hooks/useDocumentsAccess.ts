@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
+import { useSimulacao } from "@/components/SimulacaoProvider";
 
 type ModuleKey = "documentos" | "dashboards" | "perfil";
 
@@ -25,12 +26,18 @@ const ADMIN_MODULE_SET = new Set<string>(ADMIN_MODULES);
 
 export function useDocumentsAccess(): UseDocumentsAccessResult {
   const { user, isLoading: authLoading } = useAuth();
+  const { simulacao } = useSimulacao();
   const isMountedRef = useRef(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const userId = user?.id ?? null;
-  const normalizedEmail = user?.email?.toLowerCase().trim() ?? null;
+  // Em simulação, calcula o acesso pela identidade simulada (só por email).
+  const realUserId = user?.id ?? null;
+  const userId = simulacao ? null : realUserId;
+  const normalizedEmail = simulacao
+    ? simulacao.email.toLowerCase().trim()
+    : user?.email?.toLowerCase().trim() ?? null;
+  const sessionActive = Boolean(realUserId);
   const [modules, setModules] = useState<ModulesAccess>({
     documentos: false,
     dashboards: false,
@@ -47,7 +54,7 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
   }, []);
 
   const fetchAccess = useCallback(async () => {
-    if (!userId) {
+    if (!sessionActive) {
       if (isMountedRef.current) {
         setHasAccess(false);
         setIsAdmin(false);
@@ -124,30 +131,33 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
 
       let dataResult: { modulo?: string | null }[] | null = null;
 
-      let { data, error } = await selectWithModule("user_id", userId);
-      if (error && error.message?.toLowerCase().includes("modulo")) {
-        const fallback = await selectWithoutModule("user_id", userId);
-        data =
-          fallback.data?.map((item) => ({
-            ...item,
-            modulo: null,
-          })) ?? null;
-        error = fallback.error;
-      }
-      if (error && error.message?.toLowerCase().includes("scope")) {
-        const fallback = await supabase
-          .from("documentos_acesso")
-          .select("id,modulo")
-          .eq("user_id", userId);
-        data = fallback.data ?? null;
-        error = fallback.error;
-      }
-      if (error) {
-        throw error;
-      }
+      // Em simulação, userId é null → pula as queries por user_id e usa só email.
+      if (userId) {
+        let { data, error } = await selectWithModule("user_id", userId);
+        if (error && error.message?.toLowerCase().includes("modulo")) {
+          const fallback = await selectWithoutModule("user_id", userId);
+          data =
+            fallback.data?.map((item) => ({
+              ...item,
+              modulo: null,
+            })) ?? null;
+          error = fallback.error;
+        }
+        if (error && error.message?.toLowerCase().includes("scope")) {
+          const fallback = await supabase
+            .from("documentos_acesso")
+            .select("id,modulo")
+            .eq("user_id", userId);
+          data = fallback.data ?? null;
+          error = fallback.error;
+        }
+        if (error) {
+          throw error;
+        }
 
-      dataResult = data;
-      applyRecords(dataResult);
+        dataResult = data;
+        applyRecords(dataResult);
+      }
 
       if ((!dataResult || dataResult.length === 0) && normalizedEmail) {
         let {
@@ -182,7 +192,9 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
 
       let isGerenteLoja = false;
       if (!resolvedIsAdmin) {
-        const gerenteById = await selectGerenteAccess("user_id", userId);
+        const gerenteById = userId
+          ? await selectGerenteAccess("user_id", userId)
+          : { data: [] as { id: string }[], error: null };
         if (gerenteById.error?.message?.toLowerCase().includes("scope")) {
           isGerenteLoja = false;
         } else if (gerenteById.error) {
@@ -205,7 +217,7 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         baseModules.documentos = true;
         baseModules.dashboards = true;
         baseModules.perfil = true;
-      } else if (isGerenteLoja || hasAnyModulePermission || Boolean(userId)) {
+      } else if (isGerenteLoja || hasAnyModulePermission || sessionActive) {
         // Colaborador autenticado deve manter acesso ao fluxo de formularios/documentos.
         baseModules.documentos = true;
       }
@@ -250,7 +262,7 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         setLoading(false);
       }
     }
-  }, [userId, normalizedEmail]);
+  }, [userId, normalizedEmail, sessionActive]);
 
   useEffect(() => {
     if (!authLoading) {

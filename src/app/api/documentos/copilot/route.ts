@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ApiHttpError as HttpError, getSessionUserFromRequest } from "@/lib/apiAuth";
+import { ApiHttpError as HttpError, getActorFromRequest } from "@/lib/apiAuth";
 import {
   runDocumentoCopilot,
   type DocumentoCopilotFilters,
@@ -7,7 +7,7 @@ import {
 
 export async function POST(request: Request) {
   try {
-    const user = await getSessionUserFromRequest(request);
+    const actor = await getActorFromRequest(request);
     const body = (await request.json().catch(() => ({}))) as {
       message?: string;
       currentFilters?: DocumentoCopilotFilters;
@@ -24,8 +24,8 @@ export async function POST(request: Request) {
         currentFilters: body.currentFilters,
       },
       {
-        userId: user.id,
-        email: user.email?.toLowerCase().trim() ?? null,
+        userId: actor.userId,
+        email: actor.email,
       },
     );
 

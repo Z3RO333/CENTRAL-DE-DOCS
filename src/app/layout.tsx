@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Poppins } from "next/font/google";
 import "./globals.css";
 import AppShell from "@/components/AppShell";
 import { AuthProvider } from "@/components/AuthProvider";
+import { SimulacaoProvider } from "@/components/SimulacaoProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,7 +37,9 @@ export default function RootLayout({
         className={`${poppins.className} font-semibold ${poppins.variable} ${geistSans.variable} ${geistMono.variable} bg-background text-foreground antialiased`}
       >
         <AuthProvider>
-          <AppShell>{children}</AppShell>
+          <SimulacaoProvider>
+            <AppShell>{children}</AppShell>
+          </SimulacaoProvider>
         </AuthProvider>
       </body>
     </html>

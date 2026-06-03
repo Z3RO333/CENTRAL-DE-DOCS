@@ -47,6 +47,77 @@ export async function getSessionUserFromRequest(request: Request): Promise<User>
   return data.user;
 }
 
+function readCookie(request: Request, name: string): string | null {
+  const raw = request.headers.get("cookie");
+  if (!raw) return null;
+  const match = raw
+    .split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith(`${name}=`));
+  if (!match) return null;
+  const value = match.slice(name.length + 1).trim();
+  try {
+    return decodeURIComponent(value) || null;
+  } catch {
+    return value || null;
+  }
+}
+
+export type Actor = {
+  /** id efetivo (vazio quando simulando por email) */
+  userId: string;
+  /** email efetivo (real ou simulado) */
+  email: string | null;
+  /** é admin na identidade efetiva */
+  isAdmin: boolean;
+  /** usuário real autenticado (sempre o Gustavo, mesmo simulando) */
+  realUserId: string;
+  realEmail: string | null;
+  realIsAdmin: boolean;
+  isSimulating: boolean;
+};
+
+/**
+ * Resolve a identidade efetiva da requisição. Autentica o usuário real e,
+ * se ele for admin E houver o cookie `simular_email`, retorna a identidade
+ * SIMULADA (apenas leitura/visualização). Só admin pode simular.
+ */
+export async function getActorFromRequest(
+  request: Request,
+  supabaseAdmin = createSupabaseAdminClient(),
+): Promise<Actor> {
+  const realUser = await getSessionUserFromRequest(request);
+  const realEmail = realUser.email?.toLowerCase().trim() ?? null;
+  const realIsAdmin = await hasDocumentosAccess(realUser.id, realEmail, supabaseAdmin);
+
+  const simEmailRaw = readCookie(request, "simular_email");
+  const simEmail = simEmailRaw?.toLowerCase().trim() || null;
+
+  if (realIsAdmin && simEmail && simEmail !== realEmail) {
+    // identidade simulada é resolvida só por email (toda filtragem já é por email)
+    const simIsAdmin = await hasDocumentosAccess("", simEmail, supabaseAdmin);
+    return {
+      userId: "",
+      email: simEmail,
+      isAdmin: simIsAdmin,
+      realUserId: realUser.id,
+      realEmail,
+      realIsAdmin,
+      isSimulating: true,
+    };
+  }
+
+  return {
+    userId: realUser.id,
+    email: realEmail,
+    isAdmin: realIsAdmin,
+    realUserId: realUser.id,
+    realEmail,
+    realIsAdmin,
+    isSimulating: false,
+  };
+}
+
 export async function hasDocumentosAccess(
   userId: string,
   email: string | null,

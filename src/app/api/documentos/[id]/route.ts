@@ -8,6 +8,7 @@ import {
 } from "@/lib/documentosAudit";
 import {
   ApiHttpError as HttpError,
+  getActorFromRequest,
   getAuthorizedPrestadorIds,
   getGerenteAccessEntries,
   getSessionUserFromRequest,
@@ -89,16 +90,17 @@ async function getVisibleDocumento(input: {
   request: Request;
   id: string;
 }) {
-  const user = await getSessionUserFromRequest(input.request);
-  const email = user.email?.toLowerCase().trim() ?? null;
   const supabaseAdmin = createSupabaseAdminClient();
+  // Visibilidade pela identidade efetiva (simulada quando admin está em "Simular visão")
+  const actor = await getActorFromRequest(input.request, supabaseAdmin);
+  const email = actor.email;
   const allowedPrestadores = await getAuthorizedPrestadorIds(email, supabaseAdmin);
   const gerenteEntries = await getGerenteAccessEntries(
-    user.id,
+    actor.userId,
     email,
     supabaseAdmin,
   );
-  const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
+  const canAccess = actor.isAdmin;
 
   let query = supabaseAdmin
     .from("formularios")
@@ -112,8 +114,8 @@ async function getVisibleDocumento(input: {
       canAccess,
       allowedPrestadores,
       gerenteEntries,
-      userId: user.id,
-      filterUserId: user.id,
+      userId: actor.userId,
+      filterUserId: actor.userId,
       filterPrestadores: [],
       filterLojas: [],
     });
@@ -128,9 +130,10 @@ async function getVisibleDocumento(input: {
     throw new HttpError(404, "Documento nao encontrado.");
   }
 
+  // user/email retornados = identidade REAL (para auditoria e escrita)
   return {
-    user,
-    email,
+    user: { id: actor.realUserId, email: actor.realEmail },
+    email: actor.realEmail,
     supabaseAdmin,
     registro: data as FormularioRow,
   };

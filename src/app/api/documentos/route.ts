@@ -11,6 +11,7 @@ import { getCompetenciaFromDados } from "@/lib/competencia";
 import { buildDocumentosAccessOr } from "@/lib/documentosAccessFilters";
 import {
   ApiHttpError as HttpError,
+  getActorFromRequest,
   getAuthorizedPrestadorIds,
   getGerenteAccessEntries,
   getSessionUserFromRequest,
@@ -104,20 +105,20 @@ function mapRows(rows: FormularioRow[]): DocumentRecord[] {
 
 export async function GET(request: Request) {
   try {
-    const user = await getSessionUserFromRequest(request);
-    const email = user.email?.toLowerCase().trim() ?? null;
     const supabaseAdmin = createSupabaseAdminClient();
+    const actor = await getActorFromRequest(request, supabaseAdmin);
+    const email = actor.email;
     const allowedPrestadores = await getAuthorizedPrestadorIds(
       email,
       supabaseAdmin,
     );
     const gerenteEntries = await getGerenteAccessEntries(
-      user.id,
+      actor.userId,
       email,
       supabaseAdmin,
     );
 
-    const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
+    const canAccess = actor.isAdmin;
     const { searchParams } = new URL(request.url);
     const filterUserId = searchParams.get("userId");
     const filterPrestadores = normalizeIds(
@@ -171,7 +172,7 @@ export async function GET(request: Request) {
         canAccess,
         allowedPrestadores,
         gerenteEntries,
-        userId: user.id,
+        userId: actor.userId,
         filterUserId: userFilter,
         filterPrestadores,
         filterLojas,

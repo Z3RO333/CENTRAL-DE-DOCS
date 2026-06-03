@@ -4,6 +4,7 @@ import { safeParseDados, sanitizeId } from "@/lib/documentosApiUtils";
 import { resolveDateRange, toNullableArray } from "@/lib/documentosAggregateUtils";
 import {
   ApiHttpError as HttpError,
+  getActorFromRequest,
   getGerenteAccessEntries,
   getSessionUserFromRequest,
   hasDocumentosAccess,
@@ -43,12 +44,12 @@ function getLojaIdFromDados(
 
 export async function GET(request: Request) {
   try {
-    const user = await getSessionUserFromRequest(request);
-    const email = user.email?.toLowerCase().trim() ?? null;
     const supabaseAdmin = createSupabaseAdminClient();
-    const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
+    const actor = await getActorFromRequest(request, supabaseAdmin);
+    const email = actor.email;
+    const canAccess = actor.isAdmin;
     const gerenteEntries = await getGerenteAccessEntries(
-      user.id,
+      actor.userId,
       email,
       supabaseAdmin,
     );
@@ -71,7 +72,7 @@ export async function GET(request: Request) {
     if (canAccess || !hasGerenteAccess) {
       const { data: aggregateData, error: aggregateError } =
         await supabaseAdmin.rpc("documentos_lojas_agg", {
-          p_user_id: canAccess ? filterUserId || null : user.id,
+          p_user_id: canAccess ? filterUserId || null : actor.userId,
           p_prestador_ids: toNullableArray(filterPrestadores),
           p_start_at: startAt,
           p_end_at: endAt,
@@ -171,7 +172,7 @@ export async function GET(request: Request) {
       query = query.or(accessOr.join(","));
     } else {
       // Regra do colaborador: somente lojas em que ele proprio enviou documentos.
-      query = query.eq("user_id", user.id);
+      query = query.eq("user_id", actor.userId);
     }
 
     if (filterPrestadores.length === 1) {

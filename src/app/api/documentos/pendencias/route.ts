@@ -3,6 +3,7 @@ import { buildDocumentosAccessOr } from "@/lib/documentosAccessFilters";
 import { safeParseDados } from "@/lib/documentosApiUtils";
 import {
   ApiHttpError as HttpError,
+  getActorFromRequest,
   getAuthorizedPrestadorIds,
   getGerenteAccessEntries,
   getSessionUserFromRequest,
@@ -102,16 +103,16 @@ const buildItem = (row: Row, now: Date): PendenciaItem => {
 
 export async function GET(request: Request) {
   try {
-    const user = await getSessionUserFromRequest(request);
-    const email = user.email?.toLowerCase().trim() ?? null;
     const supabaseAdmin = createSupabaseAdminClient();
+    const actor = await getActorFromRequest(request, supabaseAdmin);
+    const email = actor.email;
     const allowedPrestadores = await getAuthorizedPrestadorIds(email, supabaseAdmin);
     const gerenteEntries = await getGerenteAccessEntries(
-      user.id,
+      actor.userId,
       email,
       supabaseAdmin,
     );
-    const canAccess = await hasDocumentosAccess(user.id, email, supabaseAdmin);
+    const canAccess = actor.isAdmin;
 
     let query = supabaseAdmin
       .from("formularios")
@@ -126,8 +127,8 @@ export async function GET(request: Request) {
         canAccess,
         allowedPrestadores,
         gerenteEntries,
-        userId: user.id,
-        filterUserId: user.id,
+        userId: actor.userId,
+        filterUserId: actor.userId,
         filterPrestadores: [],
         filterLojas: [],
       });
