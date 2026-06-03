@@ -28,6 +28,20 @@ type Props = {
   onReset: () => void;
 };
 
+// Valores conforme o dropdown nativo do BTracker (índice = valor da API)
+const TIPO_PAGAMENTO_OPTIONS = [
+  { value: 0, label: "BOLETO" },
+  { value: 1, label: "DEPÓSITO" },
+  { value: 2, label: "PAGO VIA ADIANTAMENTO" },
+  { value: 3, label: "PAGO PARC. ADIANTAMENTO + DEPÓSITO" },
+  { value: 4, label: "PAGO PARC. ADIANTAMENTO + BOLETO" },
+  { value: 5, label: "PAGO VIA CARTÃO CORPORATIVO" },
+  { value: 6, label: "PAGO PELO CAIXA" },
+  { value: 7, label: "DÉBITO AUTOMÁTICO" },
+  { value: 8, label: "BOLETO - PGTO PARCELADO" },
+  { value: 9, label: "DEPÓSITO - PGTO PARCELADO" },
+];
+
 function fmt(n: number | null | undefined) {
   if (n == null) return "—";
   return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -105,6 +119,9 @@ export function NfseReview({
   );
   const [nroItemPedido, setNroItemPedido] = useState(matchedPedido?.nroItemPedido ?? "");
   const [nroItemServico, setNroItemServico] = useState(matchedPedido?.nroItemServico ?? "");
+  const [tipoPagamento, setTipoPagamento] = useState<number | "">(
+    matchedPedido?.tipoPagamento ?? "",
+  );
   const [justVencimento, setJustVencimento] = useState("");
   const [justLiberacao, setJustLiberacao] = useState("");
 
@@ -114,11 +131,18 @@ export function NfseReview({
 
   async function handleSubmit() {
     if (!btrackerConnected) return;
+    if (tipoPagamento === "") {
+      setSubmitError("Selecione o Tipo de Pagamento antes de enviar.");
+      setSubmitResult("error");
+      setOpenSection("pedido");
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
       const payload = buildBtrackerPayload(data, nroPedido, nroItemPedido, nroItemServico);
       if (!payload.numero && initialNumeroNf) payload.numero = initialNumeroNf;
+      payload.tipoPagamento = tipoPagamento;
       payload.justificativaVencimento = justVencimento.trim() || null;
       payload.justificativaLiberacao = justLiberacao.trim() || null;
       const res = await fetch("/api/btracker/nfse", {
@@ -339,6 +363,30 @@ export function NfseReview({
               />
             </div>
           ))}
+        </div>
+        <div className="mt-3">
+          <p className="mb-1 text-[10px] font-semibold text-slate-600">
+            Tipo de Pagamento <span className="text-red-500">*</span>
+          </p>
+          <select
+            aria-label="Tipo de Pagamento"
+            value={tipoPagamento}
+            onChange={(e) =>
+              setTipoPagamento(e.target.value === "" ? "" : Number(e.target.value))
+            }
+            className={`w-full rounded-lg border px-2 py-1.5 text-xs focus:outline-none ${
+              tipoPagamento === ""
+                ? "border-red-300 bg-red-50 text-red-700"
+                : "border-slate-200 focus:border-sky-400"
+            }`}
+          >
+            <option value="">Selecione…</option>
+            {TIPO_PAGAMENTO_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
       </Section>
 

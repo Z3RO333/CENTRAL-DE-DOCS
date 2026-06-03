@@ -333,9 +333,13 @@ export async function saveNfseToBtracker(
       nfse: null,
     }),
     valor_servicos: num(input.servico.valorServicos),
+    // Obrigatórios numéricos — BTracker bloqueia se vierem nulos; default 0,00.
+    desconto_incondicionado: "0.00",
+    valor_deducoes: "0.00",
     base_calculo: num(input.servico.baseCalculo ?? input.servico.valorServicos),
     aliquota: input.servico.aliquota != null ? num(input.servico.aliquota) : "0.00",
     valor_iss: num(input.servico.valorIss),
+    valor_iss_retido: "0.00",
     iss_retido: input.servico.issRetido ? 1 : 2,
     valor_pis: num(input.retencoes.valorPis),
     valor_cofins: num(input.retencoes.valorCofins),
