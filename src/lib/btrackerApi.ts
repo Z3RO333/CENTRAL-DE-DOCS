@@ -336,14 +336,8 @@ export async function saveNfseToBtracker(
   // Obrigatórios numéricos — BTracker bloqueia se vierem vazios; default 0.
   set("descontoIncondicionado", "0");
   set("valorDeducoes", "0");
-  set(
-    "baseCalculo",
-    num(
-      input.servico.baseCalculo && input.servico.baseCalculo > 0
-        ? input.servico.baseCalculo
-        : input.servico.valorServicos,
-    ),
-  );
+  // Base de cálculo = valor dos serviços (tributos incidem sobre ela, não a reduzem)
+  set("baseCalculo", num(input.servico.valorServicos));
   set("valorServicos", num(input.servico.valorServicos));
   set("aliquota", input.servico.aliquota != null ? num(input.servico.aliquota) : "0");
   set("valorIss", num(input.servico.valorIss));
