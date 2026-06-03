@@ -361,10 +361,18 @@ export async function saveNfseToBtracker(
     (input.retencoes.outrasRetencoes ?? 0) +
     issRetidoVal;
   set("totalRetencoes", num(input.retencoes.totalRetencoes ?? totalRet));
-  set(
-    "valorLiquidoNfse",
-    num(input.valorLiquido ?? (input.servico.valorServicos ?? 0) - totalRet),
-  );
+  // CRÍTICO: líquido 0,00 com valor de serviço faz o BTracker bloquear a nota
+  // automaticamente. Sempre calcula a partir do serviço − retenções e nunca
+  // envia 0 quando há valor de serviço.
+  const servicos = input.servico.valorServicos ?? 0;
+  const liquidoCalc = servicos - totalRet;
+  const liquidoFinal =
+    input.valorLiquido && input.valorLiquido > 0
+      ? input.valorLiquido
+      : liquidoCalc > 0
+        ? liquidoCalc
+        : servicos;
+  set("valorLiquidoNfse", num(liquidoFinal));
   set("outrasInformacoes", "");
   set("justificativaVencimento", input.justificativaVencimento ?? "");
   set("justificativaLiberacaoBloqueioSolicitacao", input.justificativaLiberacao ?? "");
