@@ -307,7 +307,13 @@ export function parseNfseXml(xmlContent: string): NfseExtracted {
       cfop: field(getXmlText(servEl, "Cfop, cfop"), 1, "xml"),
       ncm: field(getXmlText(servEl, "CodigoNbs, codigoNbs, Ncm, ncm"), 1, "xml"),
       valorServicos: field(valorServicos, 1, "xml"),
-      baseCalculo: field(parseVal(getXmlText(valoresEl, "BaseCalculo, baseCalculo")), 1, "xml"),
+      baseCalculo: (() => {
+        const b = parseVal(getXmlText(valoresEl, "BaseCalculo, baseCalculo"));
+        // Sem base própria (0/nulo) → base = valor dos serviços
+        return b && b > 0
+          ? field(b, 1, "xml")
+          : field(valorServicos, valorServicos != null ? 0.9 : 1, "calculated");
+      })(),
       aliquotaIss: field(parseVal(getXmlText(valoresEl, "Aliquota, aliquota")), 1, "xml"),
       valorIss: field(valorIss, 1, "xml"),
       issRetido: field(issRetido, 1, "xml"),
@@ -620,7 +626,11 @@ export function aiResultToNfseExtracted(ai: AiNfseResult, src: "ocr" | "ai"): Nf
       cfop: f(ai.servico.cfop, 0.8),
       ncm: f(ai.servico.ncm, 0.8),
       valorServicos: f(ai.servico.valorServicos, 0.95),
-      baseCalculo: f(ai.servico.baseCalculo, 0.95),
+      // Sem base própria (0/nulo) → base = valor dos serviços
+      baseCalculo:
+        ai.servico.baseCalculo && ai.servico.baseCalculo > 0
+          ? f(ai.servico.baseCalculo, 0.95)
+          : field(ai.servico.valorServicos, 0.9, "calculated"),
       aliquotaIss: f(ai.servico.aliquotaIss, 0.85),
       valorIss: f(ai.servico.valorIss, 0.9),
       issRetido: f(ai.servico.issRetido, 0.8),
