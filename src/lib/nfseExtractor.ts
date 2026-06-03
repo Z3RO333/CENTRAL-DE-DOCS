@@ -458,7 +458,8 @@ REGRAS DE EXTRAÇÃO:
 - CNPJ: mantenha pontuação original do documento
 - issRetido: true se ISS é retido pelo tomador; false se pago pelo prestador à prefeitura
 - pisDestacado / cofinsDestacado: valor que aparece destacado no documento, mesmo que seja 0
-- valorLiquidoNfse: valor real a pagar = valorServicos − retenções de fonte (ISS NÃO retido NÃO desconta)
+- baseCalculo: é o valor dos serviços (valorServicos), MENOS apenas deduções da base de cálculo (ex: materiais na construção civil), quando houver. Os tributos (ISS, ISSQN, PIS, COFINS, etc.) incidem SOBRE a base — NÃO a reduzem. Na ausência de dedução de base, baseCalculo = valorServicos. Ex: serviços 1000 com ISS 100 e ISSQN 100 → baseCalculo = 1000 (não 800).
+- valorLiquidoNfse: valor real a PAGAR ao prestador = valorServicos − retenções de fonte (ISS NÃO retido NÃO desconta). É só aqui que os tributos retidos descontam. Ex: serviços 1000, ISS retido 100, ISSQN 100 → valorLiquidoNfse = 800.
 - Nunca aceite o campo "valor líquido" sem recalcular: bruto − (pis+cofins+csll+ir+inss+outrasRetencoes + issRetido? iss: 0)
 - Se valor líquido informado ≠ calculado, gere alerta em "alertas"
 
