@@ -346,11 +346,25 @@ export async function saveNfseToBtracker(
   set("valorCofins", num(input.retencoes.valorCofins));
   set("valorCsll", num(input.retencoes.valorCsll));
   set("valorIr", num(input.retencoes.valorIr));
-  set("valorIssRetido", "0");
+  // ISS retido pelo tomador entra como ISSQN/Retido e reduz o líquido
+  const issRetidoVal = input.servico.issRetido ? (input.servico.valorIss ?? 0) : 0;
+  set("valorIssRetido", num(issRetidoVal));
   set("issRetido", input.servico.issRetido ? 1 : 2);
   set("outrasRetencoes", num(input.retencoes.outrasRetencoes));
-  set("totalRetencoes", num(input.retencoes.totalRetencoes));
-  set("valorLiquidoNfse", num(input.valorLiquido));
+  // Total de retenções e líquido incluindo o ISS retido
+  const totalRet =
+    (input.retencoes.valorPis ?? 0) +
+    (input.retencoes.valorCofins ?? 0) +
+    (input.retencoes.valorCsll ?? 0) +
+    (input.retencoes.valorIr ?? 0) +
+    (input.retencoes.valorInss ?? 0) +
+    (input.retencoes.outrasRetencoes ?? 0) +
+    issRetidoVal;
+  set("totalRetencoes", num(input.retencoes.totalRetencoes ?? totalRet));
+  set(
+    "valorLiquidoNfse",
+    num(input.valorLiquido ?? (input.servico.valorServicos ?? 0) - totalRet),
+  );
   set("outrasInformacoes", "");
   set("justificativaVencimento", input.justificativaVencimento ?? "");
   set("justificativaLiberacaoBloqueioSolicitacao", input.justificativaLiberacao ?? "");
