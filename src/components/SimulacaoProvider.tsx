@@ -42,6 +42,21 @@ function setCookie(value: string | null) {
   }
 }
 
+// Filtros/cache de documentos do usuário NÃO devem vazar entre identidades:
+// limpa o estado salvo ao entrar/sair de simulação (evita 403 por filtro de
+// prestador/loja que a identidade simulada não pode ver).
+function limparEstadoDocumentos() {
+  if (typeof window === "undefined") return;
+  try {
+    const ss = window.sessionStorage;
+    Object.keys(ss)
+      .filter((k) => k.startsWith("documentos:") || k.startsWith("documentos-"))
+      .forEach((k) => ss.removeItem(k));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function SimulacaoProvider({ children }: { children: React.ReactNode }) {
   const [simulacao, setSimulacao] = useState<Simulacao | null>(null);
 
@@ -64,6 +79,7 @@ export function SimulacaoProvider({ children }: { children: React.ReactNode }) {
   const iniciar = useCallback((s: Simulacao) => {
     setSimulacao(s);
     setCookie(s.email);
+    limparEstadoDocumentos();
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
     } catch {
@@ -74,6 +90,7 @@ export function SimulacaoProvider({ children }: { children: React.ReactNode }) {
   const encerrar = useCallback(() => {
     setSimulacao(null);
     setCookie(null);
+    limparEstadoDocumentos();
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
