@@ -243,9 +243,43 @@ export type SaveNfseInput = {
 const num = (v: number | null | undefined) => (v != null ? v.toFixed(2) : "0.00");
 const today = () => new Date().toISOString().slice(0, 10);
 
+/**
+ * Sobe o PDF da NF ao BTracker (extrair_pdf_nfse) e retorna o hashcodigo,
+ * que liga o arquivo enviado ao registro salvo. Obrigatório no save.
+ */
+export async function uploadPdfParaHashcodigo(
+  fileBytes: ArrayBuffer,
+  fileName: string,
+  jwt: string,
+): Promise<string | null> {
+  const form = new FormData();
+  form.append("modo_automatico", "true");
+  form.append("nfse_arquivo", new Blob([fileBytes], { type: "application/pdf" }), fileName);
+
+  const res = await fetch(`${BTRACKER_API}/nfses/extrair_pdf_nfse/`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${jwt}`, "time-zone": "America/Manaus" },
+    body: form,
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { hashcodigo?: string };
+  return data.hashcodigo ?? null;
+}
+
+/**
+ * Salva a NFS-e no BTracker via multipart/form-data (formato real capturado).
+ * - fileBytes: PDF da NF (também usado como boleto quando tipoPagamento=BOLETO)
+ * - boletoBytes: PDF do boleto, se separado da NF (opcional)
+ */
 export async function saveNfseToBtracker(
   input: SaveNfseInput,
   jwt: string,
+  files?: {
+    nfBytes?: ArrayBuffer;
+    nfName?: string;
+    boletoBytes?: ArrayBuffer;
+    boletoName?: string;
+  },
 ): Promise<BtrackerNfse> {
   const [munNf, munPrest, munTom] = await Promise.all([
     resolveMunicipio(input.municipioNome, input.uf, jwt),
@@ -256,48 +290,77 @@ export async function saveNfseToBtracker(
   const servicoErp = await resolveServicoErp(input.servico.itemListaServico, jwt);
 
   const munObj = (m: BtrackerMunicipio | null) =>
-    m
-      ? { id: m.id, codigo: m.codigo, nome: m.nome, sigla_estado: m.siglaEstado }
-      : null;
+    m ? { id: m.id, codigo: m.codigo, nome: m.nome, siglaEstado: m.siglaEstado } : null;
 
   const digits = (s: string | null) => (s ? s.replace(/\D/g, "").slice(0, 14) : null);
   const cepDigits = (s: string | null) => {
     const d = s ? s.replace(/\D/g, "").slice(0, 8) : "";
     return d.length === 8 ? d : null;
   };
-  // servico.codigo não pode ser nulo; usa o código da lista de serviço ou um padrão
-  const servicoCodigo =
-    servicoErp?.codigo ?? input.servico.itemListaServico ?? "00.00";
+  const servicoCodigo = servicoErp?.codigo ?? input.servico.itemListaServico ?? "00.00";
   const servicoDescricao =
     servicoErp?.descricao ??
     input.servico.discriminacao ??
     input.servico.itemListaServico ??
     "Servico";
 
-  // O backend do BTracker faz json.loads() nos campos compostos → enviar como STRING JSON.
-  // municipio/prestador/tomador exigem id; servicos é um DICT único (não array);
-  // iss_retido é choice (1=retido, 2=não retido); documento só dígitos.
-  const payload = {
-    numero: input.numero ? Number(input.numero) || input.numero : null,
-    serie: input.serie,
-    nro_pedido: input.nroPedido,
-    nro_item_pedido: input.nroItemPedido,
-    nro_item_servico: input.nroItemServico,
-    quantidade: 1,
-    codigo_verificacao: input.codigoVerificacao,
-    emissao: input.emissao,
-    vencimento: input.vencimento,
-    data_entrada: today(),
-    tipo_pagamento: input.tipoPagamento,
-    municipio: JSON.stringify(munObj(munNf)),
-    codigo_municipio: munNf?.codigo ?? null,
-    prestador: JSON.stringify({
+  // Upload do PDF para obter hashcodigo (liga arquivo ao registro)
+  const hashcodigo = files?.nfBytes
+    ? await uploadPdfParaHashcodigo(files.nfBytes, files.nfName ?? "nfse.pdf", jwt)
+    : null;
+
+  // ── multipart/form-data conforme captura real do BTracker ───────────────────
+  const fd = new FormData();
+  const set = (k: string, v: string | number | null | undefined) =>
+    fd.append(k, v == null ? "" : String(v));
+
+  set("id", "");
+  set("numero", input.numero ? Number(input.numero) || input.numero : "");
+  set("nroPedido", input.nroPedido);
+  set("nroItemPedido", input.nroItemPedido);
+  set("nroItemServico", input.nroItemServico);
+  set("tipoPedido", "");
+  set("tipoPagamento", input.tipoPagamento);
+  set("codigoMunicipio", munNf?.codigo ?? "");
+  set("codigoVerificacao", input.codigoVerificacao);
+  set("dataEntrada", today());
+  set("emissao", input.emissao);
+  set("vencimento", input.vencimento);
+  set("codigoRegistro", "");
+  set("discriminacao", input.servico.discriminacao);
+  set("descricaoListaServico", servicoDescricao);
+  // Obrigatórios numéricos — BTracker bloqueia se vierem vazios; default 0.
+  set("descontoIncondicionado", "0");
+  set("valorDeducoes", "0");
+  set("baseCalculo", num(input.servico.baseCalculo ?? input.servico.valorServicos));
+  set("valorServicos", num(input.servico.valorServicos));
+  set("aliquota", input.servico.aliquota != null ? num(input.servico.aliquota) : "0");
+  set("valorIss", num(input.servico.valorIss));
+  set("valorInss", num(input.retencoes.valorInss));
+  set("valorPis", num(input.retencoes.valorPis));
+  set("valorCofins", num(input.retencoes.valorCofins));
+  set("valorCsll", num(input.retencoes.valorCsll));
+  set("valorIr", num(input.retencoes.valorIr));
+  set("valorIssRetido", "0");
+  set("issRetido", input.servico.issRetido ? 1 : 2);
+  set("outrasRetencoes", num(input.retencoes.outrasRetencoes));
+  set("totalRetencoes", num(input.retencoes.totalRetencoes));
+  set("valorLiquidoNfse", num(input.valorLiquido));
+  set("outrasInformacoes", "");
+  set("justificativaVencimento", input.justificativaVencimento ?? "");
+  set("justificativaLiberacaoBloqueioSolicitacao", input.justificativaLiberacao ?? "");
+  if (hashcodigo) set("hashcodigo", hashcodigo);
+
+  // Campos compostos = string JSON (camelCase)
+  fd.append(
+    "prestador",
+    JSON.stringify({
       id: null,
-      razao_social: input.prestador.razaoSocial,
+      razaoSocial: input.prestador.razaoSocial,
       documento: digits(input.prestador.documento),
-      tipo_documento: 0,
+      tipoDocumento: 0,
       municipio: munObj(munPrest),
-      inscricao_municipal: input.prestador.inscricaoMunicipal,
+      inscricaoMunicipal: input.prestador.inscricaoMunicipal,
       cep: cepDigits(input.prestador.cep),
       logradouro: input.prestador.logradouro,
       numero: input.prestador.numero,
@@ -306,11 +369,14 @@ export async function saveNfseToBtracker(
       fone: input.prestador.fone,
       uf: input.prestador.uf,
     }),
-    tomador: JSON.stringify({
+  );
+  fd.append(
+    "tomador",
+    JSON.stringify({
       id: null,
-      razao_social: input.tomador.razaoSocial,
+      razaoSocial: input.tomador.razaoSocial,
       documento: digits(input.tomador.documento),
-      tipo_documento: 0,
+      tipoDocumento: 0,
       municipio: munObj(munTom),
       logradouro: input.tomador.logradouro,
       numero: input.tomador.numero,
@@ -318,49 +384,38 @@ export async function saveNfseToBtracker(
       bairro: input.tomador.bairro,
       uf: input.tomador.uf,
     }),
-    discriminacao: input.servico.discriminacao,
-    item_lista_servico: input.servico.itemListaServico,
-    servicos: JSON.stringify({
-      servico: {
-        id: servicoErp?.id ?? null,
-        codigo: servicoCodigo,
-        descricao: servicoDescricao,
-      },
+  );
+  fd.append(
+    "servicos",
+    JSON.stringify({
+      servico: { id: servicoErp?.id ?? null, codigo: servicoCodigo, descricao: servicoDescricao },
       quantidade: 1,
-      valor_total: num(input.servico.valorServicos),
-      valor_servicos: num(input.servico.valorServicos),
-      texto_breve: (input.servico.discriminacao ?? servicoDescricao).slice(0, 60),
+      valorTotal: num(input.servico.valorServicos),
+      valorServicos: num(input.servico.valorServicos),
+      textoBreve: (input.servico.discriminacao ?? servicoDescricao).slice(0, 60),
       nfse: null,
     }),
-    valor_servicos: num(input.servico.valorServicos),
-    // Obrigatórios numéricos — BTracker bloqueia se vierem nulos; default 0,00.
-    desconto_incondicionado: "0.00",
-    valor_deducoes: "0.00",
-    base_calculo: num(input.servico.baseCalculo ?? input.servico.valorServicos),
-    aliquota: input.servico.aliquota != null ? num(input.servico.aliquota) : "0.00",
-    valor_iss: num(input.servico.valorIss),
-    valor_iss_retido: "0.00",
-    iss_retido: input.servico.issRetido ? 1 : 2,
-    valor_pis: num(input.retencoes.valorPis),
-    valor_cofins: num(input.retencoes.valorCofins),
-    valor_csll: num(input.retencoes.valorCsll),
-    valor_ir: num(input.retencoes.valorIr),
-    valor_inss: num(input.retencoes.valorInss),
-    outras_retencoes: num(input.retencoes.outrasRetencoes),
-    total_retencoes: num(input.retencoes.totalRetencoes),
-    valor_liquido_nfse: num(input.valorLiquido),
-    ...(input.justificativaVencimento
-      ? { justificativa_vencimento: input.justificativaVencimento }
-      : {}),
-    ...(input.justificativaLiberacao
-      ? { justificativa_liberacao_bloqueio_solicitacao: input.justificativaLiberacao }
-      : {}),
-  };
+  );
+  fd.append("municipio", JSON.stringify(munObj(munNf)));
+
+  // Arquivos: NF e boleto (geralmente o mesmo PDF)
+  if (files?.nfBytes) {
+    fd.append(
+      "arquivo_data",
+      new Blob([files.nfBytes], { type: "application/pdf" }),
+      files.nfName ?? "nfse.pdf",
+    );
+  }
+  const boletoBytes = files?.boletoBytes ?? files?.nfBytes;
+  const boletoName = files?.boletoName ?? files?.nfName ?? "boleto.pdf";
+  if (boletoBytes && input.tipoPagamento === 0 /* BOLETO */) {
+    fd.append("arquivo_boleto", new Blob([boletoBytes], { type: "application/pdf" }), boletoName);
+  }
 
   const res = await fetch(`${BTRACKER_API}/nfses/`, {
     method: "POST",
-    headers: btrackerHeaders(jwt),
-    body: JSON.stringify(payload),
+    headers: { Authorization: `Bearer ${jwt}`, "time-zone": "America/Manaus" },
+    body: fd,
   });
 
   if (!res.ok) {

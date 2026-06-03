@@ -25,6 +25,8 @@ type Props = {
   fileName: string;
   initialNroPedido?: string | null;
   initialNumeroNf?: string | null;
+  documentoId?: string;
+  accessToken?: string;
   onReset: () => void;
 };
 
@@ -99,6 +101,8 @@ export function NfseReview({
   fileName,
   initialNroPedido,
   initialNumeroNf,
+  documentoId,
+  accessToken,
   onReset,
 }: Props) {
   const [openSection, setOpenSection] = useState<string | null>("geral");
@@ -139,8 +143,11 @@ export function NfseReview({
       payload.justificativaLiberacao = justLiberacao.trim() || null;
       const res = await fetch("/api/btracker/nfse", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({ input: payload, documentoId }),
       });
       const json = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(json.error ?? `Status ${res.status}`);
