@@ -32,14 +32,6 @@ type Props = {
 const TIPO_PAGAMENTO_OPTIONS = [
   { value: 0, label: "BOLETO" },
   { value: 1, label: "DEPÓSITO" },
-  { value: 2, label: "PAGO VIA ADIANTAMENTO" },
-  { value: 3, label: "PAGO PARC. ADIANTAMENTO + DEPÓSITO" },
-  { value: 4, label: "PAGO PARC. ADIANTAMENTO + BOLETO" },
-  { value: 5, label: "PAGO VIA CARTÃO CORPORATIVO" },
-  { value: 6, label: "PAGO PELO CAIXA" },
-  { value: 7, label: "DÉBITO AUTOMÁTICO" },
-  { value: 8, label: "BOLETO - PGTO PARCELADO" },
-  { value: 9, label: "DEPÓSITO - PGTO PARCELADO" },
 ];
 
 function fmt(n: number | null | undefined) {
