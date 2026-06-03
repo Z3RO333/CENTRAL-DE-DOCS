@@ -195,18 +195,22 @@ export async function getGerenteAccessEntries(
 ) {
   const entries: GerenteAccessRow[] = [];
 
-  const { data: byId, error: byIdError } = await supabaseAdmin
-    .from("documentos_acesso")
-    .select("loja_id,prestador_id,can_view_all")
-    .eq("scope", "gerente")
-    .eq("user_id", userId);
+  // userId pode vir vazio em simulação (filtragem só por email) — evita query
+  // com uuid inválido.
+  if (userId) {
+    const { data: byId, error: byIdError } = await supabaseAdmin
+      .from("documentos_acesso")
+      .select("loja_id,prestador_id,can_view_all")
+      .eq("scope", "gerente")
+      .eq("user_id", userId);
 
-  if (byIdError) {
-    throw byIdError;
-  }
+    if (byIdError) {
+      throw byIdError;
+    }
 
-  if (byId) {
-    entries.push(...(byId as GerenteAccessRow[]));
+    if (byId) {
+      entries.push(...(byId as GerenteAccessRow[]));
+    }
   }
 
   if (email) {

@@ -5,6 +5,7 @@ import { resolveDateRange, toNullableArray } from "@/lib/documentosAggregateUtil
 import {
   ApiHttpError as HttpError,
   getActorFromRequest,
+  getAuthorizedPrestadorIds,
   getGerenteAccessEntries,
   getSessionUserFromRequest,
   hasDocumentosAccess,
@@ -53,6 +54,12 @@ export async function GET(request: Request) {
       email,
       supabaseAdmin,
     );
+    // Em simulação por email (sem user_id), filtra a agregação pelos prestadores
+    // permitidos da identidade simulada.
+    const allowedPrestadores =
+      !canAccess && !actor.userId
+        ? await getAuthorizedPrestadorIds(email, supabaseAdmin)
+        : [];
     const hasGerenteAccess = gerenteEntries.length > 0;
 
     const { searchParams } = new URL(request.url);
@@ -69,11 +76,18 @@ export async function GET(request: Request) {
     );
     const { startAt, endAt } = resolveDateRange(anoFilter, mesFilter);
 
+    // Simulação por email sem prestador permitido e sem gerência → sem acesso
+    if (!canAccess && !actor.userId && allowedPrestadores.length === 0 && !hasGerenteAccess) {
+      return NextResponse.json({ lojas: [] });
+    }
+
     if (canAccess || !hasGerenteAccess) {
       const { data: aggregateData, error: aggregateError } =
         await supabaseAdmin.rpc("documentos_lojas_agg", {
-          p_user_id: canAccess ? filterUserId || null : actor.userId,
-          p_prestador_ids: toNullableArray(filterPrestadores),
+          p_user_id: canAccess ? filterUserId || null : actor.userId || null,
+          p_prestador_ids: toNullableArray(
+            filterPrestadores.length > 0 ? filterPrestadores : allowedPrestadores,
+          ),
           p_start_at: startAt,
           p_end_at: endAt,
         });
@@ -172,6 +186,10 @@ export async function GET(request: Request) {
       query = query.or(accessOr.join(","));
     } else {
       // Regra do colaborador: somente lojas em que ele proprio enviou documentos.
+      // Em simulação por email (sem user_id), não há "próprios" a resolver.
+      if (!actor.userId) {
+        return NextResponse.json({ lojas: [] });
+      }
       query = query.eq("user_id", actor.userId);
     }
 
