@@ -123,7 +123,7 @@ export default function AppShell({
           label: "NFS-e BTracker",
           icon: FileCheck2,
           isActive: pathname?.startsWith("/documentos/btracker"),
-          isVisible: canAccessDocuments,
+          isVisible: isAdmin,
         },
         {
           href: "/copilot",
