@@ -124,21 +124,25 @@ export async function hasDocumentosAccess(
   supabaseAdmin = createSupabaseAdminClient(),
 ) {
   const adminModules = ["admin", "documentos", "dashboards", "perfil"];
-  const { data, error } = await supabaseAdmin
-    .from("documentos_acesso")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("scope", "admin")
-    .in("modulo", adminModules)
-    .limit(1)
-    .maybeSingle();
 
-  if (error) {
-    throw error;
-  }
+  // userId pode vir vazio (simulação por email) → pula a query por uuid.
+  if (userId) {
+    const { data, error } = await supabaseAdmin
+      .from("documentos_acesso")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("scope", "admin")
+      .in("modulo", adminModules)
+      .limit(1)
+      .maybeSingle();
 
-  if (data) {
-    return true;
+    if (error) {
+      throw error;
+    }
+
+    if (data) {
+      return true;
+    }
   }
 
   if (!email) {
