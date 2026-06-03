@@ -276,6 +276,15 @@ export async function GET(request: Request) {
           lojaIds.add(sanitizeId(entry.loja_id));
         }
       });
+      // Também resolve o nome das lojas presentes nos documentos visíveis,
+      // senão lojas fora do gerenteEntries aparecem como UUID no filtro.
+      rows.forEach((row) => {
+        const dados = parseDados(row.dados) as Record<string, unknown> | null;
+        const lid = dados?.loja_id;
+        if (typeof lid === "string" && lid.trim()) {
+          lojaIds.add(sanitizeId(lid.trim()));
+        }
+      });
       if (lojaIds.size > 0) {
         const { data: lojasData, error: lojasError } = await supabaseAdmin
           .from("lojas")
