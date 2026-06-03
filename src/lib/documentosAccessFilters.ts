@@ -11,6 +11,9 @@ type BuildAccessOrInput = {
   filterLojas: string[];
 };
 
+// Cláusula que nunca casa → resultado vazio (sem vazar dados, sem 403 na tela).
+const NO_MATCH = "id.eq.00000000-0000-0000-0000-000000000000";
+
 export function buildDocumentosAccessOr(
   input: BuildAccessOrInput,
 ): string[] {
@@ -49,10 +52,8 @@ export function buildDocumentosAccessOr(
         : allowedPrestadores;
 
     if (filterPrestadores.length > 0 && prestadoresPermitidos.length === 0) {
-      throw new ApiHttpError(
-        403,
-        "Voce nao possui permissao para consultar prestadores.",
-      );
+      // Filtro aponta para prestador fora do escopo → lista vazia (não bloqueia a tela)
+      return [NO_MATCH];
     }
 
     if (prestadoresPermitidos.length === 1) {
@@ -105,7 +106,7 @@ export function buildDocumentosAccessOr(
       lojasAllList.length === 0 &&
       lojasLimitedList.length === 0
     ) {
-      throw new ApiHttpError(403, "Voce nao possui permissao para acessar essa loja.");
+      return [NO_MATCH];
     }
 
     const buildCondition = (lojaId: string, prestadores?: string[]) => {
@@ -138,10 +139,7 @@ export function buildDocumentosAccessOr(
     });
 
     if (filterPrestadores.length > 0 && accessOr.length === 0) {
-      throw new ApiHttpError(
-        403,
-        "Voce nao possui permissao para acessar esses documentos.",
-      );
+      return [NO_MATCH];
     }
   }
 
@@ -150,10 +148,8 @@ export function buildDocumentosAccessOr(
   }
 
   if (accessOr.length === 0) {
-    throw new ApiHttpError(
-      403,
-      "Voce nao possui permissao para acessar esses documentos.",
-    );
+    // Sem cláusula aplicável (ex: gerente sem loja casável) → lista vazia
+    return [NO_MATCH];
   }
 
   return accessOr;
