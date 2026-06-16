@@ -22,7 +22,7 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Formul\u00e1rio Central",
+  title: "Central de Documentos",
   description: "Portal interno para envio e assinatura de documentos.",
 };
 

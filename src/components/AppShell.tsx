@@ -254,7 +254,7 @@ export default function AppShell({
               </div>
               <div className={isSidebarCollapsed ? "md:hidden" : ""}>
                 <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-700">
-                  Central
+                  Central de Documentos
                 </p>
                 <p className="text-[11px] text-slate-500">
                   Fluxo de documentos
@@ -408,7 +408,7 @@ export default function AppShell({
                 height={24}
                 className="h-6 w-6 object-contain"
               />
-              <span>Formulário Central</span>
+              <span>Central de Documentos</span>
             </div>
           </header>
 

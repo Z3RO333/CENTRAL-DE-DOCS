@@ -123,7 +123,7 @@ export default function LoginPage() {
             className="h-20 w-auto object-contain drop-shadow-[0_12px_32px_rgba(14,116,144,0.25)] sm:h-24 md:h-28"
           />
           <h1 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
-            {"Formul\u00e1rio Bemol"}
+            {"Central de Documentos"}
           </h1>
           <p className="text-xs text-slate-500 sm:text-sm">
             Acesse para gerenciar documentos e assinaturas.
