@@ -255,12 +255,12 @@ const formatCompetenciaInput = (value: string) => {
   return `${digits.slice(0, 2)}/${digits.slice(2)}`;
 };
 
-// Gera opções MM/AAAA do mês atual retroativo, limitado a jan/2026.
+// Gera opções MM/AAAA do mês atual retroativo, limitado a jan/2025.
 const gerarOpcoesCompetencia = (): string[] => {
   const opts: string[] = [];
   const hoje = new Date();
-  const inicio = new Date(2026, 0, 1);
-  for (let i = 0; i <= 24; i++) {
+  const inicio = new Date(2025, 0, 1);
+  for (let i = 0; i <= 36; i++) {
     const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
     if (d < inicio) {
       break;
