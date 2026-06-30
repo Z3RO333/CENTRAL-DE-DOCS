@@ -12,10 +12,13 @@ type Payload = {
   email?: string;
   userId?: string;
   access?: GerenteAccessInput[];
+  scope?: string;
 };
 
+type AccessScope = "gerente" | "fornecedor";
+
 type GerenteAccessRow = {
-  scope: "gerente";
+  scope: AccessScope;
   user_id: string | null;
   email: string | null;
   loja_id: string;
@@ -24,6 +27,10 @@ type GerenteAccessRow = {
 };
 
 const ADMIN_MODULES = ["admin", "documentos", "dashboards", "perfil"];
+const VALID_SCOPES: AccessScope[] = ["gerente", "fornecedor"];
+
+const sanitizeScope = (value: string | null): AccessScope =>
+  VALID_SCOPES.includes(value as AccessScope) ? (value as AccessScope) : "gerente";
 
 const sanitizeId = (value: string) => value.replace(/[^a-zA-Z0-9-]/g, "");
 
@@ -113,11 +120,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const userId = sanitizeId(searchParams.get("userId")?.trim() ?? "");
     const email = searchParams.get("email")?.toLowerCase().trim() ?? "";
+    const scope = sanitizeScope(searchParams.get("scope"));
 
     let query = supabaseAdmin
       .from("documentos_acesso")
       .select("id,user_id,email,loja_id,prestador_id,can_view_all")
-      .eq("scope", "gerente")
+      .eq("scope", scope)
       .order("created_at", { ascending: false });
 
     if (userId && email) {
@@ -162,6 +170,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Payload;
     const normalizedEmail = body.email?.toLowerCase().trim() ?? "";
     const userId = body.userId?.trim() ?? "";
+    const scope = sanitizeScope(body.scope ?? null);
 
     if (!normalizedEmail && !userId) {
       return NextResponse.json(
@@ -174,7 +183,7 @@ export async function POST(request: Request) {
       const { error: deleteError } = await supabaseAdmin
         .from("documentos_acesso")
         .delete()
-        .eq("scope", "gerente")
+        .eq("scope", scope)
         .eq("user_id", userId);
       if (deleteError) {
         return NextResponse.json({ error: deleteError.message }, { status: 400 });
@@ -184,7 +193,7 @@ export async function POST(request: Request) {
       const { error: deleteError } = await supabaseAdmin
         .from("documentos_acesso")
         .delete()
-        .eq("scope", "gerente")
+        .eq("scope", scope)
         .eq("email", normalizedEmail);
       if (deleteError) {
         return NextResponse.json({ error: deleteError.message }, { status: 400 });
@@ -197,10 +206,10 @@ export async function POST(request: Request) {
       if (!lojaId) {
         return [] as GerenteAccessRow[];
       }
-      if (access.canViewAll) {
+      if (access.canViewAll || scope === "fornecedor") {
         return [
           {
-            scope: "gerente",
+            scope,
             user_id: userId || null,
             email: normalizedEmail || null,
             loja_id: lojaId,
@@ -212,7 +221,7 @@ export async function POST(request: Request) {
 
       const prestadores = normalizeIds(access.prestadorIds ?? []);
       return prestadores.map((prestadorId): GerenteAccessRow => ({
-        scope: "gerente",
+        scope,
         user_id: userId || null,
         email: normalizedEmail || null,
         loja_id: lojaId,

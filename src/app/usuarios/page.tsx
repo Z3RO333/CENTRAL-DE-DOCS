@@ -63,12 +63,17 @@ const getNameFromEmail = (email: string | null) => {
 const getDisplayName = (user: AppUser) =>
   user.name?.trim() || getNameFromEmail(user.email);
 
-const getRoleLabel = (role: "admin" | "gerente_loja" | "colaborador") => {
+const getRoleLabel = (
+  role: "admin" | "gerente_loja" | "fornecedor" | "colaborador",
+) => {
   if (role === "admin") {
     return "Administrador";
   }
   if (role === "gerente_loja") {
     return "Gerente de Loja";
+  }
+  if (role === "fornecedor") {
+    return "Fornecedor";
   }
   return "Colaborador";
 };
@@ -97,7 +102,7 @@ export default function UsuariosPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [editingRole, setEditingRole] = useState<
-    "admin" | "colaborador" | "gerente_loja"
+    "admin" | "colaborador" | "gerente_loja" | "fornecedor"
   >("colaborador");
   const [selectedLojas, setSelectedLojas] = useState<string[]>([]);
   const [lojaAccess, setLojaAccess] = useState<Record<string, LojaAccessConfig>>(
@@ -114,6 +119,13 @@ export default function UsuariosPage() {
   const [gerenteEntriesError, setGerenteEntriesError] = useState<string | null>(
     null,
   );
+  const [fornecedorEntries, setFornecedorEntries] = useState<GerenteAccessEntry[]>(
+    [],
+  );
+  const [fornecedorEntriesLoading, setFornecedorEntriesLoading] = useState(false);
+  const [fornecedorEntriesError, setFornecedorEntriesError] = useState<
+    string | null
+  >(null);
 
   const adminPermissions = useMemo(
     () => permissions.filter((permission) => ADMIN_MODULES.has(permission.module)),
@@ -136,6 +148,24 @@ export default function UsuariosPage() {
           .filter((value): value is string => Boolean(value)),
       ),
     [gerenteEntries],
+  );
+  const fornecedorIds = useMemo(
+    () =>
+      new Set(
+        fornecedorEntries
+          .map((entry) => entry.user_id)
+          .filter((value): value is string => Boolean(value)),
+      ),
+    [fornecedorEntries],
+  );
+  const fornecedorEmails = useMemo(
+    () =>
+      new Set(
+        fornecedorEntries
+          .map((entry) => entry.email?.toLowerCase())
+          .filter((value): value is string => Boolean(value)),
+      ),
+    [fornecedorEntries],
   );
 
   const isUserAdmin = useCallback(
@@ -164,6 +194,20 @@ export default function UsuariosPage() {
     [gerenteEmails, gerenteIds],
   );
 
+  const isUserFornecedor = useCallback(
+    (target: AppUser) => {
+      const normalizedEmail = target.email?.toLowerCase().trim() ?? null;
+      if (fornecedorIds.has(target.id)) {
+        return true;
+      }
+      if (!normalizedEmail) {
+        return false;
+      }
+      return fornecedorEmails.has(normalizedEmail);
+    },
+    [fornecedorEmails, fornecedorIds],
+  );
+
   const getUserRole = useCallback(
     (target: AppUser) => {
       if (isUserAdmin(target)) {
@@ -172,9 +216,12 @@ export default function UsuariosPage() {
       if (isUserGerente(target)) {
         return "gerente_loja";
       }
+      if (isUserFornecedor(target)) {
+        return "fornecedor";
+      }
       return "colaborador";
     },
-    [isUserAdmin, isUserGerente],
+    [isUserAdmin, isUserGerente, isUserFornecedor],
   );
 
   const getAccessToken = useCallback(async () => {
@@ -193,7 +240,7 @@ export default function UsuariosPage() {
   const saveUserRole = useCallback(
     async (
       target: AppUser,
-      role: "admin" | "colaborador" | "gerente_loja",
+      role: "admin" | "colaborador" | "gerente_loja" | "fornecedor",
       access: {
         lojaId: string;
         canViewAll: boolean;
@@ -257,6 +304,40 @@ export default function UsuariosPage() {
     }
   }, [getAccessToken, isAdmin]);
 
+  const fetchFornecedorEntries = useCallback(async () => {
+    if (!isAdmin) {
+      setFornecedorEntries([]);
+      setFornecedorEntriesLoading(false);
+      setFornecedorEntriesError(null);
+      return;
+    }
+    setFornecedorEntriesLoading(true);
+    setFornecedorEntriesError(null);
+    try {
+      const token = await getAccessToken();
+      const response = await fetch("/api/admin/gerentes?scope=fornecedor", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = (await response.json()) as {
+        entries?: GerenteAccessEntry[];
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Falha ao carregar fornecedores.");
+      }
+      setFornecedorEntries(payload.entries ?? []);
+    } catch (err) {
+      setFornecedorEntries([]);
+      setFornecedorEntriesError(
+        err instanceof Error ? err.message : "Falha ao carregar fornecedores.",
+      );
+    } finally {
+      setFornecedorEntriesLoading(false);
+    }
+  }, [getAccessToken, isAdmin]);
+
   const getGerenteEntriesForUser = useCallback(
     (target: AppUser) => {
       const normalizedEmail = target.email?.toLowerCase().trim() ?? null;
@@ -269,6 +350,20 @@ export default function UsuariosPage() {
       });
     },
     [gerenteEntries],
+  );
+
+  const getFornecedorEntriesForUser = useCallback(
+    (target: AppUser) => {
+      const normalizedEmail = target.email?.toLowerCase().trim() ?? null;
+      return fornecedorEntries.filter((entry) => {
+        const sameId = entry.user_id && entry.user_id === target.id;
+        const sameEmail =
+          normalizedEmail &&
+          entry.email?.toLowerCase().trim() === normalizedEmail;
+        return sameId || sameEmail;
+      });
+    },
+    [fornecedorEntries],
   );
 
   const buildLojaAccessFromEntries = useCallback(
@@ -425,8 +520,16 @@ export default function UsuariosPage() {
     if (!authLoading && !accessLoading && isAdmin) {
       void fetchUsers();
       void fetchGerenteEntries();
+      void fetchFornecedorEntries();
     }
-  }, [authLoading, accessLoading, isAdmin, fetchUsers, fetchGerenteEntries]);
+  }, [
+    authLoading,
+    accessLoading,
+    isAdmin,
+    fetchUsers,
+    fetchGerenteEntries,
+    fetchFornecedorEntries,
+  ]);
 
   const filteredUsers = useMemo(() => {
     if (!searchTerm.trim()) {
@@ -468,24 +571,37 @@ export default function UsuariosPage() {
   const openEditor = useCallback(
     (target: AppUser) => {
       const admin = isUserAdmin(target);
-      const gerente = isUserGerente(target);
-      const gerenteEntriesForUser = gerente
+      const gerente = !admin && isUserGerente(target);
+      const fornecedor = !admin && !gerente && isUserFornecedor(target);
+      const entriesForUser = gerente
         ? getGerenteEntriesForUser(target)
-        : [];
-      const gerenteConfig = buildLojaAccessFromEntries(gerenteEntriesForUser);
+        : fornecedor
+          ? getFornecedorEntriesForUser(target)
+          : [];
+      const lojaConfig = buildLojaAccessFromEntries(entriesForUser);
       setEditingUser(target);
-      setEditingRole(admin ? "admin" : gerente ? "gerente_loja" : "colaborador");
-      setSelectedLojas(gerenteConfig.selected);
-      setLojaAccess(gerenteConfig.access);
+      setEditingRole(
+        admin
+          ? "admin"
+          : gerente
+            ? "gerente_loja"
+            : fornecedor
+              ? "fornecedor"
+              : "colaborador",
+      );
+      setSelectedLojas(lojaConfig.selected);
+      setLojaAccess(lojaConfig.access);
       setLojaSearchTerm("");
-      setExpandedLojaIds(new Set(gerenteConfig.selected.slice(0, 3)));
+      setExpandedLojaIds(new Set(lojaConfig.selected.slice(0, 3)));
       setFeedback(null);
     },
     [
       buildLojaAccessFromEntries,
       getGerenteEntriesForUser,
+      getFornecedorEntriesForUser,
       isUserAdmin,
       isUserGerente,
+      isUserFornecedor,
     ],
   );
 
@@ -585,15 +701,25 @@ export default function UsuariosPage() {
                 prestadorIds: config.prestadorIds,
               };
             })
-          : [];
+          : editingRole === "fornecedor"
+            ? selectedLojas.map((lojaId) => ({
+                lojaId,
+                canViewAll: true,
+                prestadorIds: [],
+              }))
+            : [];
 
-      if (editingRole === "gerente_loja" && accessList.length === 0) {
-        throw new Error("Selecione ao menos uma loja para o gerente.");
+      if (
+        (editingRole === "gerente_loja" || editingRole === "fornecedor") &&
+        accessList.length === 0
+      ) {
+        throw new Error("Selecione ao menos uma loja.");
       }
 
       await saveUserRole(editingUser, editingRole, accessList);
       await refreshPermissions();
       await fetchGerenteEntries();
+      await fetchFornecedorEntries();
       closeEditor();
       setFeedback({ kind: "success", message: "Funcao atualizada com sucesso." });
     } catch (err) {
@@ -609,6 +735,7 @@ export default function UsuariosPage() {
     editingUser,
     editingRole,
     fetchGerenteEntries,
+    fetchFornecedorEntries,
     lojaAccess,
     closeEditor,
     refreshPermissions,
@@ -617,7 +744,11 @@ export default function UsuariosPage() {
   ]);
 
   const combinedError =
-    usersError || permissionsError || gerenteEntriesError || prestadoresError;
+    usersError ||
+    permissionsError ||
+    gerenteEntriesError ||
+    fornecedorEntriesError ||
+    prestadoresError;
 
   if (authLoading || accessLoading) {
     return (
@@ -726,7 +857,10 @@ export default function UsuariosPage() {
       </section>
 
       <section className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200">
-        {usersLoading || permissionsLoading || gerenteEntriesLoading ? (
+        {usersLoading ||
+        permissionsLoading ||
+        gerenteEntriesLoading ||
+        fornecedorEntriesLoading ? (
           <div className="px-5 py-6 text-center text-sm text-slate-500">
             Carregando usuarios...
           </div>
@@ -873,9 +1007,10 @@ export default function UsuariosPage() {
                     const value = event.target.value as
                       | "admin"
                       | "colaborador"
-                      | "gerente_loja";
+                      | "gerente_loja"
+                      | "fornecedor";
                     setEditingRole(value);
-                    if (value !== "gerente_loja") {
+                    if (value !== "gerente_loja" && value !== "fornecedor") {
                       limparLojasSelecionadas();
                     }
                   }}
@@ -884,14 +1019,16 @@ export default function UsuariosPage() {
                   <option value="admin">Administrador</option>
                   <option value="colaborador">Colaborador</option>
                   <option value="gerente_loja">Gerente de Loja</option>
+                  <option value="fornecedor">Fornecedor</option>
                 </select>
               </label>
               <p className="mt-2 text-[11px] text-slate-500">
-                Gerentes veem apenas os documentos das lojas autorizadas e, se
-                configurado, apenas dos prestadores selecionados.
+                {editingRole === "fornecedor"
+                  ? "Fornecedores veem todos os documentos das lojas/locais autorizados (ex: CD), independente de quem enviou."
+                  : "Gerentes veem apenas os documentos das lojas autorizadas e, se configurado, apenas dos prestadores selecionados."}
               </p>
 
-              {editingRole === "gerente_loja" && (
+              {(editingRole === "gerente_loja" || editingRole === "fornecedor") && (
                 <div className="mt-5 space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -1010,66 +1147,75 @@ export default function UsuariosPage() {
 
                             {isExpanded && (
                               <div className="space-y-3 p-3">
-                                <label className="flex items-center gap-2">
-                                  <input
-                                    type="checkbox"
-                                    checked={config.canViewAll}
-                                    onChange={(event) =>
-                                      toggleLojaViewAll(
-                                        lojaId,
-                                        event.target.checked,
-                                      )
-                                    }
-                                    className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                                  />
-                                  Ver todos os prestadores
-                                </label>
+                                {editingRole === "fornecedor" ? (
+                                  <p className="rounded-lg bg-sky-50 px-3 py-2 text-[11px] text-sky-700">
+                                    Acesso total aos documentos desta loja,
+                                    independente do prestador que enviou.
+                                  </p>
+                                ) : (
+                                  <>
+                                    <label className="flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={config.canViewAll}
+                                        onChange={(event) =>
+                                          toggleLojaViewAll(
+                                            lojaId,
+                                            event.target.checked,
+                                          )
+                                        }
+                                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                      />
+                                      Ver todos os prestadores
+                                    </label>
 
-                                {!config.canViewAll && (
-                                  <div className="space-y-2">
-                                    {prestadoresLoading ? (
-                                      <span className="text-[11px] text-slate-500">
-                                        Carregando prestadores...
-                                      </span>
-                                    ) : prestadores.length === 0 ? (
-                                      <span className="text-[11px] text-slate-500">
-                                        Nenhum prestador cadastrado.
-                                      </span>
-                                    ) : (
-                                      <div className="max-h-52 overflow-y-auto rounded-xl bg-slate-50 p-2">
-                                        <div className="grid gap-2 sm:grid-cols-2">
-                                          {prestadores.map((prestador) => {
-                                            const checked =
-                                              config.prestadorIds.includes(
-                                                prestador.id,
-                                              );
-                                            return (
-                                              <label
-                                                key={prestador.id}
-                                                className="flex min-w-0 items-center gap-2 text-[11px] text-slate-600"
-                                              >
-                                                <input
-                                                  type="checkbox"
-                                                  checked={checked}
-                                                  onChange={(event) =>
-                                                    togglePrestadorForLoja(
-                                                      lojaId,
-                                                      prestador.id,
-                                                      event.target.checked,
-                                                    )
-                                                  }
-                                                  className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                                                />
-                                                <span className="truncate">
-                                                  {prestador.nome}
-                                                </span>
-                                              </label>
-                                            );
-                                          })}
-                                        </div>
+                                    {!config.canViewAll && (
+                                      <div className="space-y-2">
+                                        {prestadoresLoading ? (
+                                          <span className="text-[11px] text-slate-500">
+                                            Carregando prestadores...
+                                          </span>
+                                        ) : prestadores.length === 0 ? (
+                                          <span className="text-[11px] text-slate-500">
+                                            Nenhum prestador cadastrado.
+                                          </span>
+                                        ) : (
+                                          <div className="max-h-52 overflow-y-auto rounded-xl bg-slate-50 p-2">
+                                            <div className="grid gap-2 sm:grid-cols-2">
+                                              {prestadores.map((prestador) => {
+                                                const checked =
+                                                  config.prestadorIds.includes(
+                                                    prestador.id,
+                                                  );
+                                                return (
+                                                  <label
+                                                    key={prestador.id}
+                                                    className="flex min-w-0 items-center gap-2 text-[11px] text-slate-600"
+                                                  >
+                                                    <input
+                                                      type="checkbox"
+                                                      checked={checked}
+                                                      onChange={(event) =>
+                                                        togglePrestadorForLoja(
+                                                          lojaId,
+                                                          prestador.id,
+                                                          event.target.checked,
+                                                        )
+                                                      }
+                                                      className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                                    />
+                                                    <span className="truncate">
+                                                      {prestador.nome}
+                                                    </span>
+                                                  </label>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        )}
                                       </div>
                                     )}
-                                  </div>
+                                  </>
                                 )}
                               </div>
                             )}

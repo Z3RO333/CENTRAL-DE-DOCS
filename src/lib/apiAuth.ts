@@ -192,6 +192,12 @@ export async function getAuthorizedPrestadorIds(
     .map((item) => item.id);
 }
 
+// Escopos cujo acesso é "loja-scoped" (vê documentos de lojas específicas,
+// estrutura loja_id/prestador_id/can_view_all): gerente E fornecedor.
+// Fornecedor sempre usa can_view_all=true (independe de prestador) — a mesma
+// estrutura é reaproveitada para não duplicar a lógica de filtragem.
+const LOJA_SCOPED_SCOPES = ["gerente", "fornecedor"] as const;
+
 export async function getGerenteAccessEntries(
   userId: string,
   email: string | null,
@@ -205,7 +211,7 @@ export async function getGerenteAccessEntries(
     const { data: byId, error: byIdError } = await supabaseAdmin
       .from("documentos_acesso")
       .select("loja_id,prestador_id,can_view_all")
-      .eq("scope", "gerente")
+      .in("scope", LOJA_SCOPED_SCOPES)
       .eq("user_id", userId);
 
     if (byIdError) {
@@ -221,7 +227,7 @@ export async function getGerenteAccessEntries(
     const { data: byEmail, error: byEmailError } = await supabaseAdmin
       .from("documentos_acesso")
       .select("loja_id,prestador_id,can_view_all")
-      .eq("scope", "gerente")
+      .in("scope", LOJA_SCOPED_SCOPES)
       .eq("email", email);
 
     if (byEmailError) {

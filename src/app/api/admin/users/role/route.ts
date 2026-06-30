@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 
-type AccessRole = "admin" | "gerente_loja" | "colaborador";
+type AccessRole = "admin" | "gerente_loja" | "fornecedor" | "colaborador";
 
 type GerenteAccessInput = {
   lojaId: string;
@@ -33,7 +33,7 @@ type Identity = {
 };
 
 type GerenteInsertRow = {
-  scope: "gerente";
+  scope: "gerente" | "fornecedor";
   user_id: string | null;
   email: string | null;
   loja_id: string;
@@ -144,7 +144,7 @@ async function getExistingRows(
 async function deleteByScope(
   supabaseAdmin: ReturnType<typeof createSupabaseAdminClient>,
   identity: Identity,
-  scope: "admin" | "gerente",
+  scope: "admin" | "gerente" | "fornecedor",
 ) {
   if (identity.userId) {
     const byId = await supabaseAdmin
@@ -212,7 +212,10 @@ export async function POST(request: Request) {
     const userId = sanitizeId(body.userId?.trim() ?? "");
     const email = sanitizeEmail(body.email?.trim() ?? "");
 
-    if (!role || !["admin", "gerente_loja", "colaborador"].includes(role)) {
+    if (
+      !role ||
+      !["admin", "gerente_loja", "fornecedor", "colaborador"].includes(role)
+    ) {
       return NextResponse.json({ error: "Funcao invalida." }, { status: 400 });
     }
 
@@ -229,6 +232,7 @@ export async function POST(request: Request) {
     try {
       if (role === "admin") {
         await deleteByScope(supabaseAdmin, identity, "gerente");
+        await deleteByScope(supabaseAdmin, identity, "fornecedor");
 
         const hasAdmin = existingRows.some(
           (row) =>
@@ -256,6 +260,7 @@ export async function POST(request: Request) {
       if (role === "colaborador") {
         await deleteByScope(supabaseAdmin, identity, "admin");
         await deleteByScope(supabaseAdmin, identity, "gerente");
+        await deleteByScope(supabaseAdmin, identity, "fornecedor");
       }
 
       if (role === "gerente_loja") {
@@ -306,6 +311,7 @@ export async function POST(request: Request) {
 
         await deleteByScope(supabaseAdmin, identity, "admin");
         await deleteByScope(supabaseAdmin, identity, "gerente");
+        await deleteByScope(supabaseAdmin, identity, "fornecedor");
 
         const { error: gerenteInsertError } = await supabaseAdmin
           .from("documentos_acesso")
@@ -315,10 +321,53 @@ export async function POST(request: Request) {
           throw gerenteInsertError;
         }
       }
+
+      if (role === "fornecedor") {
+        const access = body.access ?? [];
+        if (access.length === 0) {
+          throw new Error("Selecione ao menos uma loja para o fornecedor.");
+        }
+
+        // Fornecedor sempre tem acesso total à loja (independe de prestador) —
+        // sem essa granularidade, diferente do gerente.
+        const fornecedorRows = access.flatMap<GerenteInsertRow>((entry) => {
+          const lojaId = sanitizeId(entry.lojaId ?? "");
+          if (!lojaId) {
+            return [];
+          }
+          return [
+            {
+              scope: "fornecedor",
+              user_id: userId || null,
+              email: email || null,
+              loja_id: lojaId,
+              prestador_id: null,
+              can_view_all: true,
+            },
+          ];
+        });
+
+        if (fornecedorRows.length === 0) {
+          throw new Error("Nao foi possivel montar as permissoes de fornecedor.");
+        }
+
+        await deleteByScope(supabaseAdmin, identity, "admin");
+        await deleteByScope(supabaseAdmin, identity, "gerente");
+        await deleteByScope(supabaseAdmin, identity, "fornecedor");
+
+        const { error: fornecedorInsertError } = await supabaseAdmin
+          .from("documentos_acesso")
+          .insert(fornecedorRows);
+
+        if (fornecedorInsertError) {
+          throw fornecedorInsertError;
+        }
+      }
     } catch (updateError) {
       try {
         await deleteByScope(supabaseAdmin, identity, "admin");
         await deleteByScope(supabaseAdmin, identity, "gerente");
+        await deleteByScope(supabaseAdmin, identity, "fornecedor");
         await restoreRows(supabaseAdmin, existingRows);
       } catch (rollbackError) {
         console.error("Falha no rollback de atualizacao de funcao:", rollbackError);

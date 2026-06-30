@@ -8,12 +8,13 @@ import { useSimulacao, type Simulacao } from "@/components/SimulacaoProvider";
 type Identidade = {
   email: string;
   label: string;
-  role: "gerente_loja" | "prestador" | "colaborador";
+  role: "gerente_loja" | "fornecedor" | "prestador" | "colaborador";
   detalhe?: string;
 };
 
 const ROLE_LABEL: Record<string, string> = {
   gerente_loja: "Gerente",
+  fornecedor: "Fornecedor",
   prestador: "Prestador",
   colaborador: "Colaborador",
 };
@@ -71,6 +72,7 @@ export function SimulacaoControl({ canStart }: { canStart: boolean }) {
       i.email.toLowerCase().includes(busca.toLowerCase()),
   );
   const gerentes = filtradas.filter((i) => i.role === "gerente_loja");
+  const fornecedores = filtradas.filter((i) => i.role === "fornecedor");
   const prestadores = filtradas.filter((i) => i.role === "prestador");
 
   return (
@@ -137,10 +139,15 @@ export function SimulacaoControl({ canStart }: { canStart: boolean }) {
                   {gerentes.length > 0 && (
                     <Grupo titulo="Gerentes" itens={gerentes} onPick={aplicar} atual={simulacao?.email} />
                   )}
+                  {fornecedores.length > 0 && (
+                    <Grupo titulo="Fornecedores" itens={fornecedores} onPick={aplicar} atual={simulacao?.email} />
+                  )}
                   {prestadores.length > 0 && (
                     <Grupo titulo="Prestadores" itens={prestadores} onPick={aplicar} atual={simulacao?.email} />
                   )}
-                  {gerentes.length === 0 && prestadores.length === 0 && (
+                  {gerentes.length === 0 &&
+                    fornecedores.length === 0 &&
+                    prestadores.length === 0 && (
                     <p className="px-2 py-6 text-center text-xs text-slate-400">
                       Nenhuma identidade encontrada.
                     </p>

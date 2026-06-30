@@ -9,7 +9,11 @@ import {
   useState,
 } from "react";
 
-export type SimulacaoRole = "gerente_loja" | "prestador" | "colaborador";
+export type SimulacaoRole =
+  | "gerente_loja"
+  | "fornecedor"
+  | "prestador"
+  | "colaborador";
 
 export type Simulacao = {
   email: string;

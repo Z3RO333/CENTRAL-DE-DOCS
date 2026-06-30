@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 type Identidade = {
   email: string;
   label: string;
-  role: "gerente_loja" | "prestador" | "colaborador";
+  role: "gerente_loja" | "fornecedor" | "prestador" | "colaborador";
   detalhe?: string;
 };
 
@@ -30,16 +30,21 @@ export async function GET(request: Request) {
 
     const identidades: Identidade[] = [];
 
-    // ── Gerentes (scope=gerente em documentos_acesso) ─────────────────────────
-    const { data: gerentes } = await supabaseAdmin
-      .from("documentos_acesso")
-      .select("email, loja_id, can_view_all")
-      .eq("scope", "gerente");
+    // ── Gerentes e Fornecedores (loja-scoped em documentos_acesso) ────────────
+    const carregarPorEscopo = async (
+      scope: "gerente" | "fornecedor",
+      role: "gerente_loja" | "fornecedor",
+      rotulo: string,
+    ) => {
+      const { data: rows } = await supabaseAdmin
+        .from("documentos_acesso")
+        .select("email, loja_id, can_view_all")
+        .eq("scope", scope);
 
-    if (gerentes) {
-      // nomes das lojas para rótulo
+      if (!rows) return;
+
       const lojaIds = Array.from(
-        new Set(gerentes.map((g) => g.loja_id).filter(Boolean) as string[]),
+        new Set(rows.map((g) => g.loja_id).filter(Boolean) as string[]),
       );
       const lojaNome = new Map<string, string>();
       if (lojaIds.length) {
@@ -50,7 +55,7 @@ export async function GET(request: Request) {
         lojas?.forEach((l) => lojaNome.set(l.id as string, (l.nome as string) ?? ""));
       }
       const porEmail = new Map<string, string[]>();
-      gerentes.forEach((g) => {
+      rows.forEach((g) => {
         const e = (g.email as string | null)?.toLowerCase().trim();
         if (!e) return;
         const nome = g.loja_id ? lojaNome.get(g.loja_id as string) : null;
@@ -62,11 +67,14 @@ export async function GET(request: Request) {
         identidades.push({
           email: e,
           label: e,
-          role: "gerente_loja",
-          detalhe: lojas.length ? `Gerente · ${lojas.join(", ")}` : "Gerente",
+          role,
+          detalhe: lojas.length ? `${rotulo} · ${lojas.join(", ")}` : rotulo,
         });
       });
-    }
+    };
+
+    await carregarPorEscopo("gerente", "gerente_loja", "Gerente");
+    await carregarPorEscopo("fornecedor", "fornecedor", "Fornecedor");
 
     // ── Prestadores (usuários vinculados) ─────────────────────────────────────
     const { data: prestadores } = await supabaseAdmin

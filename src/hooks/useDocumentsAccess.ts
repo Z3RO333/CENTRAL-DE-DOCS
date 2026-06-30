@@ -9,7 +9,7 @@ type ModuleKey = "documentos" | "dashboards" | "perfil";
 
 type ModulesAccess = Record<ModuleKey, boolean>;
 
-type AccessRole = "admin" | "colaborador" | "gerente_loja";
+type AccessRole = "admin" | "colaborador" | "gerente_loja" | "fornecedor";
 
 type UseDocumentsAccessResult = {
   hasAccess: boolean;
@@ -96,14 +96,15 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
           .eq(column, value);
       };
 
-      const selectGerenteAccess = async (
+      const selectScopedAccess = async (
+        scope: "gerente" | "fornecedor",
         column: "user_id" | "email",
         value: string,
       ) => {
         return supabase
           .from("documentos_acesso")
           .select("id")
-          .eq("scope", "gerente")
+          .eq("scope", scope)
           .eq(column, value);
       };
 
@@ -190,26 +191,40 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         applyRecords(emailData ?? null);
       }
 
-      let isGerenteLoja = false;
-      if (!resolvedIsAdmin) {
-        const gerenteById = userId
-          ? await selectGerenteAccess("user_id", userId)
+      const checkScopedAccess = async (scope: "gerente" | "fornecedor") => {
+        const byId = userId
+          ? await selectScopedAccess(scope, "user_id", userId)
           : { data: [] as { id: string }[], error: null };
-        if (gerenteById.error?.message?.toLowerCase().includes("scope")) {
-          isGerenteLoja = false;
-        } else if (gerenteById.error) {
-          console.error("Erro ao verificar gerente por ID:", gerenteById.error);
-        } else if ((gerenteById.data ?? []).length > 0) {
-          isGerenteLoja = true;
-        } else if (normalizedEmail) {
-          const gerenteByEmail = await selectGerenteAccess("email", normalizedEmail);
-          if (gerenteByEmail.error?.message?.toLowerCase().includes("scope")) {
-            isGerenteLoja = false;
-          } else if (gerenteByEmail.error) {
-            console.error("Erro ao verificar gerente por e-mail:", gerenteByEmail.error);
-          } else if ((gerenteByEmail.data ?? []).length > 0) {
-            isGerenteLoja = true;
-          }
+        if (byId.error?.message?.toLowerCase().includes("scope")) {
+          return false;
+        }
+        if (byId.error) {
+          console.error(`Erro ao verificar ${scope} por ID:`, byId.error);
+          return false;
+        }
+        if ((byId.data ?? []).length > 0) {
+          return true;
+        }
+        if (!normalizedEmail) {
+          return false;
+        }
+        const byEmail = await selectScopedAccess(scope, "email", normalizedEmail);
+        if (byEmail.error?.message?.toLowerCase().includes("scope")) {
+          return false;
+        }
+        if (byEmail.error) {
+          console.error(`Erro ao verificar ${scope} por e-mail:`, byEmail.error);
+          return false;
+        }
+        return (byEmail.data ?? []).length > 0;
+      };
+
+      let isGerenteLoja = false;
+      let isFornecedor = false;
+      if (!resolvedIsAdmin) {
+        isGerenteLoja = await checkScopedAccess("gerente");
+        if (!isGerenteLoja) {
+          isFornecedor = await checkScopedAccess("fornecedor");
         }
       }
 
@@ -217,7 +232,7 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
         baseModules.documentos = true;
         baseModules.dashboards = true;
         baseModules.perfil = true;
-      } else if (isGerenteLoja || hasAnyModulePermission || sessionActive) {
+      } else if (isGerenteLoja || isFornecedor || hasAnyModulePermission || sessionActive) {
         // Colaborador autenticado deve manter acesso ao fluxo de formularios/documentos.
         baseModules.documentos = true;
       }
@@ -225,6 +240,7 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
       const resolvedHasAccess =
         resolvedIsAdmin ||
         isGerenteLoja ||
+        isFornecedor ||
         Object.values(baseModules).some(Boolean);
 
       if (isMountedRef.current) {
@@ -234,6 +250,8 @@ export function useDocumentsAccess(): UseDocumentsAccessResult {
           setRole("admin");
         } else if (isGerenteLoja) {
           setRole("gerente_loja");
+        } else if (isFornecedor) {
+          setRole("fornecedor");
         } else {
           setRole("colaborador");
         }
