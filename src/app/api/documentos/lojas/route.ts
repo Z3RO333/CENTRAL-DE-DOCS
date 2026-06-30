@@ -130,6 +130,7 @@ export async function GET(request: Request) {
     let query = supabaseAdmin
       .from("formularios")
       .select("created_at,dados,user_id,prestador_id", { count: "exact" })
+      .neq("tipo", "orcamentos_internos")
       .order("created_at", { ascending: false });
 
     if (canAccess) {

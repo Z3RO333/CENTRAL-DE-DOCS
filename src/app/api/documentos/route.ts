@@ -161,6 +161,7 @@ export async function GET(request: Request) {
         "id,tipo,status,arquivo_path,arquivo_assinado_path,created_at,dados,assinado_por,user_id,prestador_id",
         { count: "exact" },
       )
+      .neq("tipo", "orcamentos_internos")
       .order("created_at", { ascending: false });
 
     if (userFilter) {

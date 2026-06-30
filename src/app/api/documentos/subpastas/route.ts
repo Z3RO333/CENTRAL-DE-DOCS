@@ -223,6 +223,7 @@ export async function GET(request: Request) {
       .from("formularios")
       .select("created_at,tipo,dados,user_id,prestador_id", { count: "exact" })
       .eq("dados->>loja_id", lojaId)
+      .neq("tipo", "orcamentos_internos")
       .order("created_at", { ascending: false });
 
     if (filterUserId) {

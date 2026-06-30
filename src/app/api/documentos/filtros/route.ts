@@ -42,6 +42,17 @@ type FilterOptionsAggRow = {
 
 type PeriodoRow = Pick<FormularioRow, "created_at" | "dados">;
 
+const ORCAMENTO_INTERNO_STATUS = new Set([
+  "rascunho",
+  "aguardando_aprovacao",
+  "em_analise_gestor",
+  "ajuste_solicitado",
+  "reenviado",
+  "aprovado_assinado",
+  "rejeitado",
+  "cancelado",
+]);
+
 const parseDados = (raw: FormularioRow["dados"]) => safeParseDados(raw);
 
 function addAnoFromPeriodo(row: PeriodoRow, anos: Set<string>) {
@@ -114,6 +125,7 @@ export async function GET(request: Request) {
       let anosQuery = supabaseAdmin
         .from("formularios")
         .select("created_at,dados", { count: "exact" })
+        .neq("tipo", "orcamentos_internos")
         .order("created_at", { ascending: false });
       if (filterUserId) {
         anosQuery = anosQuery.eq("user_id", filterUserId);
@@ -185,7 +197,9 @@ export async function GET(request: Request) {
 
       return NextResponse.json({
         anos: Array.from(anos).sort((a, b) => Number(b) - Number(a)),
-        status: aggregate.status ?? [],
+        status: (aggregate.status ?? []).filter(
+          (status) => !ORCAMENTO_INTERNO_STATUS.has(status),
+        ),
         tipoLaudo: (aggregate.tipo_laudo ?? []).map(fixMojibakeText),
         lojas: ((lojasAll as LojaOption[]) ?? []).map(normalizeLojaOption),
         prestadores: ((prestadoresAll as PrestadorOption[]) ?? []).map(
@@ -197,6 +211,7 @@ export async function GET(request: Request) {
     let query = supabaseAdmin
       .from("formularios")
       .select("created_at,status,dados,user_id,prestador_id", { count: "exact" })
+      .neq("tipo", "orcamentos_internos")
       .order("created_at", { ascending: false });
 
     if (filterUserId) {

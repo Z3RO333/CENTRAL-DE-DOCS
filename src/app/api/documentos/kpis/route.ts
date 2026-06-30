@@ -53,6 +53,7 @@ export async function GET(request: Request) {
       .select("id,tipo,status,created_at,dados,prestador_id,user_id", {
         count: "exact",
       })
+      .neq("tipo", "orcamentos_internos")
       .order("created_at", { ascending: false });
 
     if (!canAccess) {

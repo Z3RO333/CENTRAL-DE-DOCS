@@ -20,6 +20,7 @@ import {
   CircleAlert,
   MailWarning,
   FileCheck2,
+  ClipboardSignature,
   ChevronLeft,
   ChevronRight,
   X,
@@ -94,7 +95,15 @@ export default function AppShell({
             !pathname?.startsWith("/documentos/por-loja") &&
             !pathname?.startsWith("/documentos/pendencias") &&
             !pathname?.startsWith("/documentos/cobrancas") &&
-            !pathname?.startsWith("/documentos/btracker"),
+            !pathname?.startsWith("/documentos/btracker") &&
+            !pathname?.startsWith("/documentos/orcamentos-internos"),
+          isVisible: canAccessDocuments,
+        },
+        {
+          href: "/documentos/orcamentos-internos",
+          label: "Orçamentos internos",
+          icon: ClipboardSignature,
+          isActive: pathname?.startsWith("/documentos/orcamentos-internos"),
           isVisible: canAccessDocuments,
         },
         {
@@ -592,6 +601,5 @@ export default function AppShell({
     </div>
   );
 }
-
 
 

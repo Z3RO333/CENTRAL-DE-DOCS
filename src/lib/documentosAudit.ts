@@ -40,7 +40,7 @@ export function isDocumentoAuditUnavailable(error: unknown) {
 export async function logDocumentoAuditEvent(input: {
   supabaseAdmin?: ReturnType<typeof createSupabaseAdminClient>;
   documentoId: string;
-  eventType: DocumentoAuditEventType;
+  eventType: DocumentoAuditEventType | string;
   actorId?: string | null;
   actorEmail?: string | null;
   metadata?: Record<string, unknown>;

@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock,
+  ClipboardSignature,
   Eye,
   FileBadge,
   FilePlus2,
@@ -98,6 +99,14 @@ const MODULES: ModuleCard[] = [
     icon: BriefcaseBusiness,
     accent: "bg-emerald-50 text-emerald-700 border-emerald-200",
     cta: "Enviar retenção",
+  },
+  {
+    title: "Orçamentos Internos",
+    description: "Envie orçamentos para análise e assinatura dos gestores.",
+    href: "/documentos/orcamentos-internos",
+    icon: ClipboardSignature,
+    accent: "bg-cyan-50 text-cyan-700 border-cyan-200",
+    cta: "Abrir orçamentos",
   },
   {
     title: "Documentos por Loja",
