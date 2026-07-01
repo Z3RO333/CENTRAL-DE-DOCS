@@ -2863,6 +2863,16 @@ export default function DocumentosPage() {
           </div>
         </>
       )}
+          <DocumentosPagination
+            totalResultados={totalResultados}
+            page={page}
+            pageSize={pageSize}
+            totalPages={totalPages}
+            canPrevPage={canPrevPage}
+            canNextPage={canNextPage}
+            onPrevPage={() => setPage((prev) => Math.max(prev - 1, 1))}
+            onNextPage={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+          />
       </div>
     </div>
   );
