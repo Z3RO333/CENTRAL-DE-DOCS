@@ -14,6 +14,12 @@ type GestorOption = {
   role: "admin" | "gerente";
 };
 
+const GESTORES_APROVADORES_PERMITIDOS = new Set([
+  "jacenira@bemol.com.br",
+  "walterrodrigues@bemol.com.br",
+  "danieldamasceno@bemol.com.br",
+]);
+
 export async function GET(request: Request) {
   try {
     const supabaseAdmin = createSupabaseAdminClient();
@@ -65,12 +71,14 @@ export async function GET(request: Request) {
       });
     }
 
-    const gestores = Array.from(byEmail.values()).sort((a, b) => {
-      if (a.role !== b.role) {
-        return a.role === "admin" ? -1 : 1;
-      }
-      return (a.name ?? a.email).localeCompare(b.name ?? b.email);
-    });
+    const gestores = Array.from(byEmail.values())
+      .filter((gestor) => GESTORES_APROVADORES_PERMITIDOS.has(gestor.email))
+      .sort((a, b) => {
+        if (a.role !== b.role) {
+          return a.role === "admin" ? -1 : 1;
+        }
+        return (a.name ?? a.email).localeCompare(b.name ?? b.email);
+      });
 
     return NextResponse.json({ gestores });
   } catch (err) {

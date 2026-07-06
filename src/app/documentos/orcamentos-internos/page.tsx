@@ -27,8 +27,6 @@ import {
   type OrcamentoInternoStatus,
 } from "@/lib/orcamentosInternosShared";
 
-type LojaOption = { id: string; nome: string; codigo: string | null };
-type PrestadorOption = { id: string; nome: string; tipo_servico?: string | null };
 type GestorOption = {
   id: string | null;
   email: string;
@@ -100,38 +98,6 @@ type DetailPayload = {
   error?: string;
 };
 
-type FormState = {
-  lojaId: string;
-  areaSolicitante: string;
-  prestadorId: string;
-  prestadorNome: string;
-  numeroOrcamento: string;
-  descricao: string;
-  valorTotal: string;
-  dataValidade: string;
-  numeroReferencia: string;
-  gestorId: string;
-  gestorEmail: string;
-  gestorNome: string;
-  observacoes: string;
-};
-
-const EMPTY_FORM: FormState = {
-  lojaId: "",
-  areaSolicitante: "",
-  prestadorId: "",
-  prestadorNome: "",
-  numeroOrcamento: "",
-  descricao: "",
-  valorTotal: "",
-  dataValidade: "",
-  numeroReferencia: "",
-  gestorId: "",
-  gestorEmail: "",
-  gestorNome: "",
-  observacoes: "",
-};
-
 const STATUS_BADGE: Record<OrcamentoInternoStatus, string> = {
   rascunho: "bg-slate-100 text-slate-700 ring-slate-200",
   aguardando_aprovacao: "bg-amber-50 text-amber-700 ring-amber-200",
@@ -159,22 +125,6 @@ function formatDateTime(value: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "--";
   return date.toLocaleString("pt-BR");
-}
-
-function formatMoney(value: number | null) {
-  if (typeof value !== "number") return "--";
-  return value.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-}
-
-function getDiasParaValidade(value: string | null) {
-  if (!value) return null;
-  const today = new Date();
-  const target = new Date(`${value}T23:59:59`);
-  if (Number.isNaN(target.getTime())) return null;
-  return Math.ceil((target.getTime() - today.getTime()) / 86400000);
 }
 
 function humanizeEvent(value: string) {
@@ -247,12 +197,9 @@ export default function OrcamentosInternosPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [files, setFiles] = useState<File[]>([]);
   const [principalIndex, setPrincipalIndex] = useState(0);
   const [submitting, setSubmitting] = useState<"draft" | "submit" | null>(null);
-  const [lojas, setLojas] = useState<LojaOption[]>([]);
-  const [prestadores, setPrestadores] = useState<PrestadorOption[]>([]);
   const [gestores, setGestores] = useState<GestorOption[]>([]);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailPayload | null>(null);
@@ -260,12 +207,8 @@ export default function OrcamentosInternosPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [justificativa, setJustificativa] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
-  const [lojaFilter, setLojaFilter] = useState("todos");
-  const [prestadorFilter, setPrestadorFilter] = useState("todos");
   const [gestorFilter, setGestorFilter] = useState("todos");
   const [colaboradorFilter, setColaboradorFilter] = useState("todos");
-  const [valorMin, setValorMin] = useState("");
-  const [valorMax, setValorMax] = useState("");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [reassignEmail, setReassignEmail] = useState("");
@@ -285,22 +228,10 @@ export default function OrcamentosInternosPage() {
     try {
       const token = await getToken();
       const headers = { Authorization: `Bearer ${token}` };
-      const [lojasRes, gestoresRes, prestadoresRes] = await Promise.all([
-        fetch("/api/lojas", { headers }),
-        fetch("/api/orcamentos-internos/gestores", { headers }),
-        fetch("/api/prestadores?assignedOnly=true", { headers }),
-      ]);
-      if (lojasRes.ok) {
-        const payload = (await lojasRes.json()) as { lojas?: LojaOption[] };
-        setLojas(payload.lojas ?? []);
-      }
+      const gestoresRes = await fetch("/api/orcamentos-internos/gestores", { headers });
       if (gestoresRes.ok) {
         const payload = (await gestoresRes.json()) as { gestores?: GestorOption[] };
         setGestores(payload.gestores ?? []);
-      }
-      if (prestadoresRes.ok) {
-        const payload = (await prestadoresRes.json()) as { prestadores?: PrestadorOption[] };
-        setPrestadores(payload.prestadores ?? []);
       }
     } catch (err) {
       console.error("Erro ao carregar opções de orçamento:", err);
@@ -315,12 +246,8 @@ export default function OrcamentosInternosPage() {
       const token = await getToken();
       const params = new URLSearchParams({ tab, limit: "50", offset: "0" });
       if (statusFilter !== "todos") params.set("status", statusFilter);
-      if (lojaFilter !== "todos") params.set("lojaId", lojaFilter);
-      if (prestadorFilter !== "todos") params.set("prestadorId", prestadorFilter);
       if (gestorFilter !== "todos") params.set("gestor", gestorFilter);
       if (colaboradorFilter !== "todos") params.set("colaborador", colaboradorFilter);
-      if (valorMin) params.set("valorMin", valorMin);
-      if (valorMax) params.set("valorMax", valorMax);
       if (dataInicio) params.set("dataInicio", dataInicio);
       if (dataFim) params.set("dataFim", dataFim);
       const response = await fetch(`/api/orcamentos-internos?${params}`, {
@@ -339,19 +266,7 @@ export default function OrcamentosInternosPage() {
     } finally {
       setLoading(false);
     }
-  }, [
-    colaboradorFilter,
-    dataFim,
-    dataInicio,
-    gestorFilter,
-    lojaFilter,
-    prestadorFilter,
-    statusFilter,
-    tab,
-    user,
-    valorMax,
-    valorMin,
-  ]);
+  }, [colaboradorFilter, dataFim, dataInicio, gestorFilter, statusFilter, tab, user]);
 
   useEffect(() => {
     if (user) {
@@ -413,29 +328,6 @@ export default function OrcamentosInternosPage() {
     void loadDetail(id);
   };
 
-  const handleChange = (name: keyof FormState, value: string) => {
-    setForm((current) => ({ ...current, [name]: value }));
-  };
-
-  const handleGestorChange = (email: string) => {
-    const gestor = gestores.find((item) => item.email === email);
-    setForm((current) => ({
-      ...current,
-      gestorEmail: email,
-      gestorId: gestor?.id ?? "",
-      gestorNome: gestor?.name ?? "",
-    }));
-  };
-
-  const handlePrestadorChange = (id: string) => {
-    const prestador = prestadores.find((item) => item.id === id);
-    setForm((current) => ({
-      ...current,
-      prestadorId: id,
-      prestadorNome: prestador?.nome ?? current.prestadorNome,
-    }));
-  };
-
   const uploadSelectedFiles = async () => {
     if (!user) throw new Error("Sessão expirada.");
     if (files.length === 0) {
@@ -477,7 +369,6 @@ export default function OrcamentosInternosPage() {
         },
         body: JSON.stringify({
           submit,
-          ...form,
           arquivos,
         }),
       });
@@ -489,7 +380,6 @@ export default function OrcamentosInternosPage() {
         throw new Error(payload.error ?? "Não foi possível salvar o orçamento.");
       }
       setSuccess(submit ? "Orçamento enviado para aprovação." : "Rascunho salvo.");
-      setForm(EMPTY_FORM);
       setFiles([]);
       setPrincipalIndex(0);
       setOrcamentos((current) => [payload.orcamento!, ...current]);
@@ -718,129 +608,9 @@ export default function OrcamentosInternosPage() {
             <p className="mt-1 text-sm font-semibold text-slate-900">
               Cadastro pelo auxiliar administrativo
             </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Unidade ou loja
-              <select
-                required
-                value={form.lojaId}
-                onChange={(event) => handleChange("lojaId", event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              >
-                <option value="">Selecione</option>
-                {lojas.map((loja) => (
-                  <option key={loja.id} value={loja.id}>
-                    {loja.codigo ? `${loja.codigo} - ${loja.nome}` : loja.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Área solicitante
-              <input
-                required
-                value={form.areaSolicitante}
-                onChange={(event) => handleChange("areaSolicitante", event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Prestador cadastrado
-              <select
-                value={form.prestadorId}
-                onChange={(event) => handlePrestadorChange(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              >
-                <option value="">Informar manualmente</option>
-                {prestadores.map((prestador) => (
-                  <option key={prestador.id} value={prestador.id}>
-                    {prestador.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Prestador
-              <input
-                required
-                value={form.prestadorNome}
-                onChange={(event) => handleChange("prestadorNome", event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Número do orçamento
-              <input
-                required
-                value={form.numeroOrcamento}
-                onChange={(event) => handleChange("numeroOrcamento", event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Valor total
-              <input
-                required
-                inputMode="decimal"
-                value={form.valorTotal}
-                onChange={(event) => handleChange("valorTotal", event.target.value)}
-                placeholder="0,00"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Validade
-              <input
-                required
-                type="date"
-                value={form.dataValidade}
-                onChange={(event) => handleChange("dataValidade", event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Ordem, nota ou solicitação
-              <input
-                value={form.numeroReferencia}
-                onChange={(event) => handleChange("numeroReferencia", event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              />
-            </label>
-            <label className="sm:col-span-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Gestor responsável
-              <select
-                required
-                value={form.gestorEmail}
-                onChange={(event) => handleGestorChange(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              >
-                <option value="">Selecione</option>
-                {gestores.map((gestor) => (
-                  <option key={gestor.email} value={gestor.email}>
-                    {gestor.name ? `${gestor.name} (${gestor.email})` : gestor.email}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="sm:col-span-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Descrição do serviço
-              <textarea
-                required
-                value={form.descricao}
-                onChange={(event) => handleChange("descricao", event.target.value)}
-                className="mt-1 min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              />
-            </label>
-            <label className="sm:col-span-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Observações
-              <textarea
-                value={form.observacoes}
-                onChange={(event) => handleChange("observacoes", event.target.value)}
-                className="mt-1 min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              />
-            </label>
+            <p className="mt-1 text-xs text-slate-500">
+              Ao enviar, o orçamento fica disponível para qualquer aprovador da fila.
+            </p>
           </div>
 
           <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
@@ -951,21 +721,6 @@ export default function OrcamentosInternosPage() {
               </select>
             </label>
             <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Loja
-              <select
-                value={lojaFilter}
-                onChange={(event) => setLojaFilter(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs normal-case tracking-normal text-slate-800"
-              >
-                <option value="todos">Todas</option>
-                {lojas.map((loja) => (
-                  <option key={loja.id} value={loja.id}>
-                    {loja.codigo ? `${loja.codigo} - ${loja.nome}` : loja.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               Gestor
               <select
                 value={gestorFilter}
@@ -976,21 +731,6 @@ export default function OrcamentosInternosPage() {
                 {gestores.map((gestor) => (
                   <option key={gestor.email} value={gestor.email}>
                     {gestor.name ?? gestor.email}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Prestador
-              <select
-                value={prestadorFilter}
-                onChange={(event) => setPrestadorFilter(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs normal-case tracking-normal text-slate-800"
-              >
-                <option value="todos">Todos</option>
-                {prestadores.map((prestador) => (
-                  <option key={prestador.id} value={prestador.id}>
-                    {prestador.nome}
                   </option>
                 ))}
               </select>
@@ -1026,18 +766,6 @@ export default function OrcamentosInternosPage() {
               className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs"
               aria-label="Data final"
             />
-            <input
-              value={valorMin}
-              onChange={(event) => setValorMin(event.target.value)}
-              placeholder="Valor mínimo"
-              className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs"
-            />
-            <input
-              value={valorMax}
-              onChange={(event) => setValorMax(event.target.value)}
-              placeholder="Valor máximo"
-              className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs"
-            />
           </div>
 
           <div className="mt-4 overflow-hidden rounded-xl border border-slate-100">
@@ -1063,10 +791,6 @@ export default function OrcamentosInternosPage() {
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
                       <th className="px-4 py-3">Orçamento</th>
-                      <th className="px-4 py-3">Loja</th>
-                      <th className="px-4 py-3">Prestador</th>
-                      <th className="px-4 py-3">Valor</th>
-                      <th className="px-4 py-3">Validade</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3">Gestor</th>
                       <th className="px-4 py-3 text-right">Ações</th>
@@ -1074,12 +798,6 @@ export default function OrcamentosInternosPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {orcamentos.map((orcamento) => {
-                      const dias = getDiasParaValidade(orcamento.data_validade);
-                      const validadeCritica =
-                        dias !== null &&
-                        dias >= 0 &&
-                        dias <= 7 &&
-                        orcamento.status !== "aprovado_assinado";
                       return (
                         <tr key={orcamento.id} className="align-top">
                           <td className="px-4 py-3">
@@ -1089,29 +807,6 @@ export default function OrcamentosInternosPage() {
                             <p className="mt-1 line-clamp-2 text-xs text-slate-500">
                               {orcamento.descricao}
                             </p>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate-600">
-                            {orcamento.loja_nome ?? "--"}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate-600">
-                            {orcamento.prestador_nome || "--"}
-                          </td>
-                          <td className="px-4 py-3 text-xs font-semibold text-slate-800">
-                            {formatMoney(orcamento.valor_total)}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate-600">
-                            <span
-                              className={
-                                validadeCritica
-                                  ? "inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 font-semibold text-amber-700"
-                                  : ""
-                              }
-                            >
-                              {validadeCritica ? <TriangleAlert className="h-3 w-3" /> : null}
-                              {orcamento.data_validade
-                                ? new Date(`${orcamento.data_validade}T00:00:00`).toLocaleDateString("pt-BR")
-                                : "--"}
-                            </span>
                           </td>
                           <td className="px-4 py-3">
                             <span
@@ -1202,11 +897,6 @@ export default function OrcamentosInternosPage() {
                     {[
                       ["Status", STATUS_LABEL[selectedDetail.status]],
                       ["Solicitante", selectedDetail.solicitante_email ?? selectedDetail.solicitante_id],
-                      ["Loja", selectedDetail.loja_nome ?? "--"],
-                      ["Área", selectedDetail.area_solicitante],
-                      ["Prestador", selectedDetail.prestador_nome],
-                      ["Valor", formatMoney(selectedDetail.valor_total)],
-                      ["Validade", selectedDetail.data_validade ? new Date(`${selectedDetail.data_validade}T00:00:00`).toLocaleDateString("pt-BR") : "--"],
                       ["Gestor", selectedDetail.gestor_nome || selectedDetail.gestor_email || "--"],
                       ["Enviado em", formatDateTime(selectedDetail.enviado_em)],
                       ["Aprovado em", formatDateTime(selectedDetail.aprovado_em)],
@@ -1218,14 +908,6 @@ export default function OrcamentosInternosPage() {
                         <p className="mt-1 text-sm font-medium text-slate-900">{value}</p>
                       </div>
                     ))}
-                    <div className="sm:col-span-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        Descrição
-                      </p>
-                      <p className="mt-1 whitespace-pre-line text-sm leading-6 text-slate-700">
-                        {selectedDetail.descricao}
-                      </p>
-                    </div>
                     {selectedDetail.ultima_justificativa ? (
                       <div className="sm:col-span-2 rounded-xl bg-orange-50 px-3 py-2 text-sm text-orange-800">
                         {selectedDetail.ultima_justificativa}
@@ -1435,8 +1117,8 @@ export default function OrcamentosInternosPage() {
                           const arquivos = await uploadSelectedFiles();
                           await patchAction(
                             selectedDetail.id,
-                            { action: "reenviar", ...form, arquivos },
-                            "Orçamento reenviado ao gestor.",
+                            { action: "reenviar", arquivos },
+                            "Orçamento reenviado para aprovação.",
                           );
                           setFiles([]);
                         } finally {

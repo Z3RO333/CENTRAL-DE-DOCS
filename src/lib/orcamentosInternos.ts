@@ -173,14 +173,6 @@ export function validateOrcamentoInput(
   }
 
   const required: Array<[unknown, string]> = [
-    [input.lojaId, "Informe a unidade ou loja."],
-    [input.areaSolicitante, "Informe a área solicitante."],
-    [input.prestadorNome || input.prestadorId, "Informe o prestador."],
-    [input.numeroOrcamento, "Informe o número do orçamento."],
-    [input.descricao, "Informe a descrição do serviço."],
-    [input.valorTotal, "Informe o valor total."],
-    [input.dataValidade, "Informe a data de validade."],
-    [input.gestorEmail || input.gestorId, "Informe o gestor aprovador."],
     [principal?.path, "Anexe o orçamento principal em PDF."],
   ];
 
@@ -191,11 +183,6 @@ export function validateOrcamentoInput(
   });
   if (missing) {
     throw new HttpError(400, missing[1]);
-  }
-
-  const valor = parseValorTotal(input.valorTotal);
-  if (valor === null || valor < 0) {
-    throw new HttpError(400, "Informe um valor total válido.");
   }
 
   if (!principal?.name?.toLowerCase().endsWith(".pdf")) {
@@ -228,9 +215,23 @@ export async function assertInternalActor(input: {
   return { isFornecedorExterno: false, gerenteEntries };
 }
 
+export async function getAprovadorEmails(
+  supabaseAdmin: ReturnType<typeof createSupabaseAdminClient>,
+) {
+  const { data, error } = await supabaseAdmin
+    .from("orcamentos_internos_aprovadores")
+    .select("email");
+  if (error) throw error;
+  const emails = (data ?? [])
+    .map((row) => normalizeEmail(row.email as string | null))
+    .filter((email): email is string => Boolean(email));
+  return new Set(emails);
+}
+
 export function canViewOrcamento(
   row: OrcamentoInternoRow,
   actor: Actor,
+  aprovadores: Set<string>,
 ) {
   const actorEmail = normalizeEmail(actor.email);
   const gestorEmail = normalizeEmail(row.gestor_email);
@@ -238,12 +239,17 @@ export function canViewOrcamento(
     actor.isAdmin ||
     row.solicitante_id === actor.userId ||
     row.gestor_id === actor.userId ||
-    (actorEmail !== null && actorEmail === gestorEmail)
+    (actorEmail !== null && actorEmail === gestorEmail) ||
+    (actorEmail !== null && aprovadores.has(actorEmail))
   );
 }
 
-export function assertCanViewOrcamento(row: OrcamentoInternoRow, actor: Actor) {
-  if (!canViewOrcamento(row, actor)) {
+export function assertCanViewOrcamento(
+  row: OrcamentoInternoRow,
+  actor: Actor,
+  aprovadores: Set<string>,
+) {
+  if (!canViewOrcamento(row, actor, aprovadores)) {
     throw new HttpError(404, "Orçamento interno não encontrado.");
   }
 }
@@ -263,17 +269,23 @@ export function assertCanEditAsSolicitante(
   }
 }
 
-export function assertCanDecide(row: OrcamentoInternoRow, actor: Actor) {
+export function assertCanDecide(
+  row: OrcamentoInternoRow,
+  actor: Actor,
+  aprovadores: Set<string>,
+) {
   const actorEmail = normalizeEmail(actor.realEmail);
   const gestorEmail = normalizeEmail(row.gestor_email);
+  const isAprovador = actorEmail !== null && aprovadores.has(actorEmail);
   if (
     !actor.realIsAdmin &&
     row.gestor_id !== actor.realUserId &&
-    (!actorEmail || actorEmail !== gestorEmail)
+    (!actorEmail || actorEmail !== gestorEmail) &&
+    !isAprovador
   ) {
     throw new HttpError(
       403,
-      "Somente o gestor atribuído ou administrador pode decidir este orçamento.",
+      "Somente um aprovador ou administrador pode decidir este orçamento.",
     );
   }
   if (!DECISAO_STATUS.has(row.status)) {

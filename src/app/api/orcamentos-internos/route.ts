@@ -8,6 +8,7 @@ import {
   TIPO_ORCAMENTO_INTERNO,
   assertInternalActor,
   getArquivoPrincipal,
+  getAprovadorEmails,
   logOrcamentoEvent,
   normalizeEmail,
   normalizeText,
@@ -51,6 +52,10 @@ export async function GET(request: Request) {
     const supabaseAdmin = createSupabaseAdminClient();
     const actor = await getActorFromRequest(request, supabaseAdmin);
     await assertInternalActor({ actor, supabaseAdmin });
+    const aprovadores = await getAprovadorEmails(supabaseAdmin);
+    const isAprovador = Boolean(
+      actor.email && aprovadores.has(normalizeEmail(actor.email) ?? ""),
+    );
 
     const { searchParams } = new URL(request.url);
     const tab = searchParams.get("tab") ?? "meus";
@@ -75,7 +80,7 @@ export async function GET(request: Request) {
       .select("*", { count: "exact" })
       .order("updated_at", { ascending: false });
 
-    if (!actor.isAdmin) {
+    if (!actor.isAdmin && !isAprovador) {
       const ors: string[] = [];
       if (actor.userId) {
         ors.push(`solicitante_id.eq.${actor.userId}`);
@@ -97,16 +102,19 @@ export async function GET(request: Request) {
         query = query.eq("solicitante_id", actor.userId);
       }
     } else if (tab === "aprovacao") {
-      const ors: string[] = [];
-      if (actor.userId) ors.push(`gestor_id.eq.${actor.userId}`);
-      if (actor.email) ors.push(`gestor_email.eq.${actor.email}`);
-      query = query
-        .in("status", [
-          "aguardando_aprovacao",
-          "em_analise_gestor",
-          "reenviado",
-        ])
-        .or(ors.length > 0 ? ors.join(",") : "id.eq.00000000-0000-0000-0000-000000000000");
+      query = query.in("status", [
+        "aguardando_aprovacao",
+        "em_analise_gestor",
+        "reenviado",
+      ]);
+      if (!actor.isAdmin && !isAprovador) {
+        const ors: string[] = [];
+        if (actor.userId) ors.push(`gestor_id.eq.${actor.userId}`);
+        if (actor.email) ors.push(`gestor_email.eq.${actor.email}`);
+        query = query.or(
+          ors.length > 0 ? ors.join(",") : "id.eq.00000000-0000-0000-0000-000000000000",
+        );
+      }
     } else if (tab === "todos" && !actor.isAdmin) {
       throw new HttpError(403, "A visão geral é restrita a administradores.");
     }
@@ -198,9 +206,6 @@ export async function POST(request: Request) {
 
     const gestorEmail = normalizeEmail(body.gestorEmail);
     const gestorId = normalizeText(body.gestorId) || null;
-    if (submit && !gestorEmail && !gestorId) {
-      throw new HttpError(400, "Informe o gestor responsável.");
-    }
 
     const status = submit ? "aguardando_aprovacao" : "rascunho";
     const dados = {
@@ -295,8 +300,7 @@ export async function POST(request: Request) {
       actorEmail: actor.realEmail,
       to: status,
       metadata: {
-        notification: submit ? "gestor" : null,
-        gestor_email: gestorEmail,
+        notification: submit ? "aprovadores" : null,
       },
     });
 
@@ -309,15 +313,7 @@ export async function POST(request: Request) {
         actorEmail: actor.realEmail,
         from: "rascunho",
         to: status,
-        metadata: { gestor_email: gestorEmail, notification: "gestor" },
-      });
-      await logOrcamentoEvent({
-        supabaseAdmin,
-        documentoId: id,
-        eventType: "aprovador_atribuido",
-        actorId: actor.realUserId,
-        actorEmail: actor.realEmail,
-        metadata: { gestor_id: gestorId, gestor_email: gestorEmail },
+        metadata: { notification: "aprovadores" },
       });
     }
 

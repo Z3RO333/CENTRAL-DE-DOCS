@@ -11,6 +11,7 @@ import {
   assertCanViewOrcamento,
   assertInternalActor,
   getArquivoPrincipal,
+  getAprovadorEmails,
   logOrcamentoEvent,
   normalizeEmail,
   normalizeText,
@@ -116,9 +117,10 @@ export async function GET(
     const supabaseAdmin = createSupabaseAdminClient();
     const actor = await getActorFromRequest(request, supabaseAdmin);
     await assertInternalActor({ actor, supabaseAdmin });
+    const aprovadores = await getAprovadorEmails(supabaseAdmin);
 
     const orcamento = await getOrcamentoOrThrow(id, supabaseAdmin);
-    assertCanViewOrcamento(orcamento, actor);
+    assertCanViewOrcamento(orcamento, actor, aprovadores);
 
     const [versoesResult, timelineResult] = await Promise.all([
       supabaseAdmin
@@ -137,9 +139,11 @@ export async function GET(
     if (versoesResult.error) throw versoesResult.error;
     if (timelineResult.error) throw timelineResult.error;
 
+    const actorRealEmail = normalizeEmail(actor.realEmail);
     const isGestor =
       orcamento.gestor_id === actor.realUserId ||
-      normalizeEmail(orcamento.gestor_email) === normalizeEmail(actor.realEmail);
+      (actorRealEmail !== null && actorRealEmail === normalizeEmail(orcamento.gestor_email)) ||
+      (actorRealEmail !== null && aprovadores.has(actorRealEmail));
     if (isGestor) {
       await logOrcamentoEvent({
         supabaseAdmin,
@@ -175,10 +179,7 @@ export async function GET(
           }),
         ),
       isAdmin: actor.isAdmin,
-      canDecide:
-        actor.realIsAdmin ||
-        orcamento.gestor_id === actor.realUserId ||
-        normalizeEmail(orcamento.gestor_email) === normalizeEmail(actor.realEmail),
+      canDecide: actor.realIsAdmin || isGestor,
     });
   } catch (err) {
     console.error("Erro ao carregar orçamento interno:", err);
@@ -202,6 +203,7 @@ export async function PATCH(
     const supabaseAdmin = createSupabaseAdminClient();
     const actor = await getActorFromRequest(request, supabaseAdmin);
     await assertInternalActor({ actor, supabaseAdmin });
+    const aprovadores = await getAprovadorEmails(supabaseAdmin);
 
     const body = (await request.json()) as OrcamentoInternoInput & {
       action?: OrcamentoInternoAction;
@@ -214,7 +216,7 @@ export async function PATCH(
     }
 
     const current = await getOrcamentoOrThrow(id, supabaseAdmin);
-    assertCanViewOrcamento(current, actor);
+    assertCanViewOrcamento(current, actor, aprovadores);
     const from = current.status;
 
     if (action === "salvar_rascunho" || action === "corrigir_metadados") {
@@ -448,7 +450,7 @@ export async function PATCH(
     }
 
     if (action === "solicitar_ajuste") {
-      assertCanDecide(current, actor);
+      assertCanDecide(current, actor, aprovadores);
       const justificativa = normalizeText(body.justificativa);
       if (!justificativa) {
         throw new HttpError(400, "Informe a justificativa do ajuste.");
@@ -480,7 +482,7 @@ export async function PATCH(
     }
 
     if (action === "rejeitar") {
-      assertCanDecide(current, actor);
+      assertCanDecide(current, actor, aprovadores);
       const justificativa = normalizeText(body.justificativa);
       if (!justificativa) {
         throw new HttpError(400, "Informe a justificativa da rejeição.");
@@ -513,7 +515,7 @@ export async function PATCH(
     }
 
     if (action === "devolver_sem_decisao") {
-      assertCanDecide(current, actor);
+      assertCanDecide(current, actor, aprovadores);
       const nextStatus: OrcamentoInternoStatus = "aguardando_aprovacao";
       const { data, error } = await supabaseAdmin
         .from("orcamentos_internos")
@@ -536,7 +538,7 @@ export async function PATCH(
     }
 
     if (action === "aprovar_assinar") {
-      assertCanDecide(current, actor);
+      assertCanDecide(current, actor, aprovadores);
       const signedPath = normalizeText(body.signedFile?.path);
       if (!signedPath) {
         throw new HttpError(400, "Informe o arquivo assinado.");
@@ -666,8 +668,9 @@ export async function POST(
     const supabaseAdmin = createSupabaseAdminClient();
     const actor = await getActorFromRequest(request, supabaseAdmin);
     await assertInternalActor({ actor, supabaseAdmin });
+    const aprovadores = await getAprovadorEmails(supabaseAdmin);
     const current = await getOrcamentoOrThrow(id, supabaseAdmin);
-    assertCanViewOrcamento(current, actor);
+    assertCanViewOrcamento(current, actor, aprovadores);
 
     await logOrcamentoEvent({
       supabaseAdmin,
