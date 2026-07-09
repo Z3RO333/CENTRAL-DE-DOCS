@@ -14,15 +14,7 @@ import { DocumentDetailsDrawer } from "./_components/DocumentDetailsDrawer";
 import { DocumentosEmptyState } from "./_components/DocumentosEmptyState";
 import { DocumentosFilters } from "./_components/DocumentosFilters";
 import { DocumentosPagination } from "./_components/DocumentosPagination";
-import {
-  TIPO_LABEL,
-  getDescricaoContrato,
-  getDataAssinatura,
-  getDataVencimento,
-  formatDateBR,
-  SEMAFORO_BADGE,
-  getSemaforoVencimento,
-} from "./_lib/documentosShared";
+import { TIPO_LABEL } from "./_lib/documentosShared";
 import { getCompetenciaFromDados } from "@/lib/competencia";
 import { fixMojibakeText } from "@/lib/textEncoding";
 
@@ -1673,10 +1665,12 @@ export default function DocumentosPage() {
 
       return [
         { value: "todos", label: "Todos os tipos" },
-        ...Object.entries(TIPO_LABEL).map(([value, label]) => ({
-          value,
-          label,
-        })),
+        ...Object.entries(TIPO_LABEL)
+          .filter(([value]) => value !== "contratos")
+          .map(([value, label]) => ({
+            value,
+            label,
+          })),
         ...extras.map((tipo) => ({
           value: tipo,
           label: getTipoDescricao(tipo),
@@ -2412,19 +2406,6 @@ export default function DocumentosPage() {
                   const edicaoInfo = getEdicaoInfo(registro);
                   const tipoLaudo = getTipoLaudo(registro);
                   const observacoes = getObservacoes(registro);
-                  const isContrato = registro.tipo === "contratos";
-                  const descricaoContrato = isContrato
-                    ? getDescricaoContrato(registro)
-                    : null;
-                  const dataAssinaturaContrato = isContrato
-                    ? formatDateBR(getDataAssinatura(registro))
-                    : null;
-                  const dataVencimentoContrato = isContrato
-                    ? getDataVencimento(registro)
-                    : null;
-                  const semaforoContrato = isContrato
-                    ? getSemaforoVencimento(dataVencimentoContrato)
-                    : null;
                   const numeroNf = getNumeroNf(registro);
                   const numeroPedido = getNumeroPedido(registro);
                   const cnpjDocumento = getCnpjDocumento(registro);
@@ -2542,53 +2523,27 @@ export default function DocumentosPage() {
                         {getTipoDescricao(registro.tipo)}
                       </td>
                       <td className="hidden px-4 py-3 text-xs leading-5 text-slate-500 lg:table-cell">
-                        {isContrato ? (
-                          <>
-                            {descricaoContrato && (
-                              <p className="line-clamp-2">{descricaoContrato}</p>
-                            )}
-                            {dataAssinaturaContrato && (
-                              <p className="mt-0.5 text-slate-400">
-                                Assinado em {dataAssinaturaContrato}
-                              </p>
-                            )}
-                            {!descricaoContrato && !dataAssinaturaContrato && "-"}
-                          </>
-                        ) : registro.tipo === TIPO_ASSINAVEL && tipoLaudo ? (
-                          tipoLaudo
-                        ) : (
-                          "-"
-                        )}
+                        {registro.tipo === TIPO_ASSINAVEL && tipoLaudo
+                          ? tipoLaudo
+                          : "-"}
                       </td>
                       <td className="hidden px-4 py-3 text-xs leading-5 text-slate-500 xl:table-cell">
-                        {isContrato
-                          ? dataVencimentoContrato
-                            ? `Vence em ${formatDateBR(dataVencimentoContrato)}`
-                            : "Sem data de vencimento"
-                          : registro.tipo === TIPO_ASSINAVEL && observacoes
-                            ? observacoes
-                            : "-"}
+                        {registro.tipo === TIPO_ASSINAVEL && observacoes
+                          ? observacoes
+                          : "-"}
                       </td>
                       <td className="px-4 py-3">
-                        {isContrato && semaforoContrato ? (
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${SEMAFORO_BADGE[semaforoContrato.status]}`}
-                          >
-                            {semaforoContrato.label}
-                          </span>
-                        ) : (
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                              registro.status === "assinado"
-                                ? "bg-emerald-50 text-emerald-700"
-                                : registro.status === "revisado"
-                                  ? "bg-sky-50 text-sky-700"
-                                : "bg-amber-50 text-amber-700"
-                            }`}
-                          >
-                            {formatStatusLabel(registro.status)}
-                          </span>
-                        )}
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                            registro.status === "assinado"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : registro.status === "revisado"
+                                ? "bg-sky-50 text-sky-700"
+                              : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {formatStatusLabel(registro.status)}
+                        </span>
                       </td>
                       <td className="hidden px-4 py-3 text-xs text-slate-500 md:table-cell">
                         <span className="font-medium">{getDataLabel(registro)}</span>
@@ -2651,19 +2606,6 @@ export default function DocumentosPage() {
             const edicaoInfo = getEdicaoInfo(registro);
             const tipoLaudo = getTipoLaudo(registro);
             const observacoes = getObservacoes(registro);
-            const isContrato = registro.tipo === "contratos";
-            const descricaoContrato = isContrato
-              ? getDescricaoContrato(registro)
-              : null;
-            const dataAssinaturaContrato = isContrato
-              ? formatDateBR(getDataAssinatura(registro))
-              : null;
-            const dataVencimentoContrato = isContrato
-              ? getDataVencimento(registro)
-              : null;
-            const semaforoContrato = isContrato
-              ? getSemaforoVencimento(dataVencimentoContrato)
-              : null;
             const numeroNf = getNumeroNf(registro);
             const numeroPedido = getNumeroPedido(registro);
             const cnpjDocumento = getCnpjDocumento(registro);
@@ -2784,20 +2726,7 @@ export default function DocumentosPage() {
                     </p>
                     <p>{getTipoDescricao(registro.tipo)}</p>
                   </div>
-                  {isContrato && (descricaoContrato || dataAssinaturaContrato) && (
-                    <div>
-                      <p className="text-xs font-semibold text-slate-500">
-                        Descrição do contrato
-                      </p>
-                      {descricaoContrato && <p>{descricaoContrato}</p>}
-                      {dataAssinaturaContrato && (
-                        <p className="text-slate-400">
-                          Assinado em {dataAssinaturaContrato}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {!isContrato && registro.tipo === TIPO_ASSINAVEL && tipoLaudo && (
+                  {registro.tipo === TIPO_ASSINAVEL && tipoLaudo && (
                     <div>
                       <p className="text-xs font-semibold text-slate-500">
                         Tipo de laudo
@@ -2805,19 +2734,7 @@ export default function DocumentosPage() {
                       <p>{tipoLaudo}</p>
                     </div>
                   )}
-                  {isContrato && (
-                    <div>
-                      <p className="text-xs font-semibold text-slate-500">
-                        Vencimento
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {dataVencimentoContrato
-                          ? `Vence em ${formatDateBR(dataVencimentoContrato)}`
-                          : "Sem data de vencimento"}
-                      </p>
-                    </div>
-                  )}
-                  {!isContrato && registro.tipo === TIPO_ASSINAVEL && observacoes && (
+                  {registro.tipo === TIPO_ASSINAVEL && observacoes && (
                     <div>
                       <p className="text-xs font-semibold text-slate-500">
                         Observações
@@ -2826,25 +2743,17 @@ export default function DocumentosPage() {
                     </div>
                   )}
                   <div className="flex flex-wrap items-center gap-2">
-                    {isContrato && semaforoContrato ? (
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${SEMAFORO_BADGE[semaforoContrato.status]}`}
-                      >
-                        {semaforoContrato.label}
-                      </span>
-                    ) : (
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                          registro.status === "assinado"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : registro.status === "revisado"
-                              ? "bg-sky-50 text-sky-700"
-                            : "bg-amber-50 text-amber-700"
-                        }`}
-                      >
-                        {formatStatusLabel(registro.status)}
-                      </span>
-                    )}
+                    <span
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                        registro.status === "assinado"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : registro.status === "revisado"
+                            ? "bg-sky-50 text-sky-700"
+                          : "bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {formatStatusLabel(registro.status)}
+                    </span>
                     <span className="text-[11px] text-slate-500">
                       {registro.tipo === "notas_fiscais"
                         ? getDataLabel(registro)

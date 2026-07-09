@@ -164,6 +164,10 @@ export async function GET(request: Request) {
       .neq("tipo", "orcamentos_internos")
       .order("created_at", { ascending: false });
 
+    if (tipoFilter !== "contratos") {
+      query = query.neq("tipo", "contratos");
+    }
+
     if (userFilter) {
       query = query.eq("user_id", userFilter);
     }
