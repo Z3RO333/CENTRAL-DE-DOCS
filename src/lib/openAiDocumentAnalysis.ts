@@ -17,6 +17,8 @@ export type DocumentoAnaliseIa = {
   numero_pedido: string | null;
   valor_total: number | null;
   descricao: string | null;
+  data_assinatura: string | null;
+  data_vencimento: string | null;
   itens: Array<{
     descricao: string;
     competencia: string | null;
@@ -54,6 +56,8 @@ const ANALISE_SCHEMA = {
     "numero_pedido",
     "valor_total",
     "descricao",
+    "data_assinatura",
+    "data_vencimento",
     "itens",
     "alertas",
     "confianca_geral",
@@ -94,6 +98,12 @@ const ANALISE_SCHEMA = {
     numero_pedido: { anyOf: [{ type: "string" }, { type: "null" }] },
     valor_total: { anyOf: [{ type: "number" }, { type: "null" }] },
     descricao: { anyOf: [{ type: "string" }, { type: "null" }] },
+    data_assinatura: {
+      anyOf: [{ type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, { type: "null" }],
+    },
+    data_vencimento: {
+      anyOf: [{ type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, { type: "null" }],
+    },
     itens: {
       type: "array",
       items: {
@@ -331,7 +341,7 @@ export async function analisarDocumentoComOpenAi(
         {
           role: "system",
           content:
-            "Voce analisa documentos administrativos brasileiros, incluindo laudos tecnicos, checklists de manutencao, notas fiscais e contratos. Extraia apenas dados presentes ou fortemente inferiveis no arquivo. Se houver mais de uma loja, competencia ou item, liste todos separadamente. Retorne somente JSON valido, sem markdown. Use competencias sempre como MM/AAAA. Se houver divergencia com os dados atuais, coloque em alertas. Para 'observacoes': extraia o texto literal da secao de observacoes ou comentarios finais do documento (ex: anotacoes do tecnico, parecer final). Para 'recomendacoes': extraia como lista de acoes especificas recomendadas ou itens que precisam de atencao identificados no documento — por exemplo, itens marcados como nao conformes em checklists, irregularidades encontradas, servicos sugeridos ou qualquer indicacao de que uma ordem de servico ou acao corretiva seja necessaria. Se nao houver recomendacoes, retorne array vazio.",
+            "Voce analisa documentos administrativos brasileiros, incluindo laudos tecnicos, checklists de manutencao, notas fiscais e contratos. Extraia apenas dados presentes ou fortemente inferiveis no arquivo. Se houver mais de uma loja, competencia ou item, liste todos separadamente. Retorne somente JSON valido, sem markdown. Use competencias sempre como MM/AAAA. Se houver divergencia com os dados atuais, coloque em alertas. Para 'observacoes': extraia o texto literal da secao de observacoes ou comentarios finais do documento (ex: anotacoes do tecnico, parecer final). Para 'recomendacoes': extraia como lista de acoes especificas recomendadas ou itens que precisam de atencao identificados no documento — por exemplo, itens marcados como nao conformes em checklists, irregularidades encontradas, servicos sugeridos ou qualquer indicacao de que uma ordem de servico ou acao corretiva seja necessaria. Se nao houver recomendacoes, retorne array vazio. Para documentos do tipo 'contratos': em 'data_assinatura', extraia a data em que o contrato foi assinado/firmado (ultima assinatura, ou data de celebracao do contrato); em 'data_vencimento', extraia a data de termino de vigencia do contrato (pode estar explicita como data, ou calculavel a partir de uma clausula de prazo/vigencia somada a data de inicio/assinatura). Ambas sempre no formato AAAA-MM-DD. Se o contrato tiver renovacao automatica sem data fixa de termino, deixe null e mencione isso em alertas. Se nao encontrar essas datas, retorne null.",
         },
         {
           role: "user",
@@ -354,8 +364,7 @@ export async function analisarDocumentoComOpenAi(
         },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 1600,
-      temperature: 0.1,
+      max_completion_tokens: 4000,
     }),
   });
 

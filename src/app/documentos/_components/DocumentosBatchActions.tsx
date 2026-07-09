@@ -77,7 +77,9 @@ export function DocumentosBatchActions({
             disabled={registrosFiltradosCount === 0}
             className="rounded-full border border-slate-200 px-4 py-1.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {registrosFiltradosCount === 0 ? "Nenhum registro" : "Selecionar todos"}
+            {registrosFiltradosCount === 0
+              ? "Nenhum registro na página"
+              : "Selecionar página atual"}
           </button>
           <button
             type="button"

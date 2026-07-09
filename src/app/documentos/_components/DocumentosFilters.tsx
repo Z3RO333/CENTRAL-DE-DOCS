@@ -32,6 +32,7 @@ type DocumentosFiltersProps = {
   identificacaoFilter: string;
   tipoFilter: string;
   tipoLaudoFilter: string;
+  statusFilter: string;
   userFilter: string;
   lojaFilter: string;
   prestadorFilter: string;
@@ -40,6 +41,7 @@ type DocumentosFiltersProps = {
   somenteAssinados: boolean;
   somenteDisponiveisLote: boolean;
   tipoOptions: FilterOption[];
+  statusOptions: FilterOption[];
   tipoLaudoOptions: string[];
   colaboradorOptions: FilterOption[];
   lojaOptions: FilterOption[];
@@ -53,6 +55,7 @@ type DocumentosFiltersProps = {
   onIdentificacaoFilterChange: (value: string) => void;
   onTipoFilterChange: (value: string) => void;
   onTipoLaudoFilterChange: (value: string) => void;
+  onStatusFilterChange: (value: string) => void;
   onUserFilterChange: (value: string) => void;
   onLojaFilterChange: (value: string) => void;
   onPrestadorFilterChange: (value: string) => void;
@@ -73,6 +76,7 @@ export function DocumentosFilters({
   identificacaoFilter,
   tipoFilter,
   tipoLaudoFilter,
+  statusFilter,
   userFilter,
   lojaFilter,
   prestadorFilter,
@@ -81,6 +85,7 @@ export function DocumentosFilters({
   somenteAssinados,
   somenteDisponiveisLote,
   tipoOptions,
+  statusOptions,
   tipoLaudoOptions,
   colaboradorOptions,
   lojaOptions,
@@ -94,6 +99,7 @@ export function DocumentosFilters({
   onIdentificacaoFilterChange,
   onTipoFilterChange,
   onTipoLaudoFilterChange,
+  onStatusFilterChange,
   onUserFilterChange,
   onLojaFilterChange,
   onPrestadorFilterChange,
@@ -125,8 +131,20 @@ export function DocumentosFilters({
     { value: "assinados", label: "Assinados" },
     { value: "notas_fiscais", label: "Notas Fiscais" },
     { value: "laudos", label: "Laudos" },
-    { value: "este_mes", label: "Este mes" },
+    { value: "este_mes", label: "Este mês" },
   ];
+
+  const now = new Date();
+  const currentYear = String(now.getFullYear());
+  const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+  const isQuickFilterActive = (filter: QuickFilter) => {
+    if (filter === "todos") return activeFilterCount === 0;
+    if (filter === "pendentes") return statusFilter === "pendente";
+    if (filter === "assinados") return statusFilter === "assinado";
+    if (filter === "notas_fiscais") return tipoFilter === "notas_fiscais";
+    if (filter === "laudos") return tipoFilter === "registro_laudos";
+    return anoFilter === currentYear && mesFilter === currentMonth;
+  };
 
   return (
     <>
@@ -215,7 +233,12 @@ export function DocumentosFilters({
               key={filter.value}
               type="button"
               onClick={() => onQuickFilter(filter.value)}
-              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700"
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                isQuickFilterActive(filter.value)
+                  ? "border-sky-200 bg-sky-50 text-sky-700"
+                  : "border-slate-200 bg-slate-50 text-slate-600 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700"
+              }`}
+              aria-pressed={isQuickFilterActive(filter.value)}
             >
               {filter.label}
             </button>
@@ -265,6 +288,24 @@ export function DocumentosFilters({
                     className={inputClassName}
                   >
                     {tipoOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="text-xs font-semibold text-slate-600">
+                  Status
+                  <select
+                    value={statusFilter}
+                    onChange={(event) =>
+                      onStatusFilterChange(event.target.value)
+                    }
+                    disabled={filterOptionsLoading}
+                    className={inputClassName}
+                  >
+                    {statusOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>

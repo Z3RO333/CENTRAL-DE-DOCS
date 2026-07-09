@@ -8,6 +8,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { useLojas } from "@/hooks/useLojas";
+import { DocumentActions } from "./_components/DocumentActions";
 import { DocumentosBatchActions } from "./_components/DocumentosBatchActions";
 import { DocumentDetailsDrawer } from "./_components/DocumentDetailsDrawer";
 import { DocumentosEmptyState } from "./_components/DocumentosEmptyState";
@@ -262,6 +263,59 @@ const getTipoLaudo = (registro: FormularioRecord) =>
 
 const getObservacoes = (registro: FormularioRecord) =>
   getCampoTexto(registro.dados, ["observacoes"]);
+
+const getDescricaoContrato = (registro: FormularioRecord) =>
+  getCampoTexto(registro.dados, ["descricao", "objeto"]);
+
+const getDataAssinatura = (registro: FormularioRecord) =>
+  getCampoTexto(registro.dados, ["data_assinatura"]);
+
+const getDataVencimento = (registro: FormularioRecord) =>
+  getCampoTexto(registro.dados, ["data_vencimento"]);
+
+const formatDateBR = (value: string | null) => {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("pt-BR");
+};
+
+type SemaforoStatus = "verde" | "amarelo" | "vermelho" | "indefinido";
+
+const SEMAFORO_BADGE: Record<SemaforoStatus, string> = {
+  verde: "bg-emerald-50 text-emerald-700",
+  amarelo: "bg-amber-50 text-amber-700",
+  vermelho: "bg-red-50 text-red-700",
+  indefinido: "bg-slate-100 text-slate-500",
+};
+
+const getSemaforoVencimento = (
+  dataVencimento: string | null,
+): { status: SemaforoStatus; label: string } => {
+  if (!dataVencimento) {
+    return { status: "indefinido", label: "Sem data" };
+  }
+  const vencimento = new Date(`${dataVencimento}T00:00:00`);
+  if (Number.isNaN(vencimento.getTime())) {
+    return { status: "indefinido", label: "Sem data" };
+  }
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const dias = Math.ceil((vencimento.getTime() - hoje.getTime()) / 86400000);
+  if (dias < 0) {
+    return { status: "vermelho", label: `Vencido há ${Math.abs(dias)}d` };
+  }
+  if (dias <= 14) {
+    return {
+      status: "vermelho",
+      label: dias === 0 ? "Vence hoje" : `Vence em ${dias}d`,
+    };
+  }
+  if (dias <= 60) {
+    return { status: "amarelo", label: `Vence em ${dias}d` };
+  }
+  return { status: "verde", label: "Em dia" };
+};
 
 const getPageCount = (registro: FormularioRecord) => {
   const raw = registro.dados?.page_count;
@@ -2205,7 +2259,7 @@ export default function DocumentosPage() {
           { label: "Pendentes", value: resumoStatus.pendentes, detail: "nesta pagina" },
           { label: "Em analise", value: resumoStatus.emAnalise, detail: "nesta pagina" },
           { label: "Assinados", value: resumoStatus.assinados, detail: "nesta pagina" },
-          { label: "Este mes", value: resumoStatus.esteMes, detail: "nesta pagina" },
+          { label: "Este mês", value: resumoStatus.esteMes, detail: "nesta pagina" },
         ].map((item) => (
           <div
             key={item.label}
@@ -2232,6 +2286,7 @@ export default function DocumentosPage() {
             identificacaoFilter={identificacaoFilter}
             tipoFilter={tipoFilter}
             tipoLaudoFilter={tipoLaudoFilter}
+            statusFilter={statusFilter}
             userFilter={userFilter}
             lojaFilter={lojaFilter}
             prestadorFilter={prestadorFilter}
@@ -2240,6 +2295,13 @@ export default function DocumentosPage() {
             somenteAssinados={somenteAssinados}
             somenteDisponiveisLote={somenteDisponiveisLote}
             tipoOptions={tipoOptions}
+            statusOptions={statusOptions.map((status) => ({
+              value: status,
+              label:
+                status === "todos"
+                  ? "Todos os status"
+                  : formatStatusLabel(status),
+            }))}
             tipoLaudoOptions={tipoLaudoOptions}
             colaboradorOptions={colaboradorOptions}
             lojaOptions={lojaOptions}
@@ -2253,6 +2315,7 @@ export default function DocumentosPage() {
             onIdentificacaoFilterChange={setIdentificacaoFilter}
             onTipoFilterChange={setTipoFilter}
             onTipoLaudoFilterChange={setTipoLaudoFilter}
+            onStatusFilterChange={setStatusFilter}
             onUserFilterChange={setUserFilter}
             onLojaFilterChange={setLojaFilter}
             onPrestadorFilterChange={setPrestadorFilter}
@@ -2354,7 +2417,7 @@ export default function DocumentosPage() {
                         }
                         disabled={registrosFiltrados.length === 0}
                         className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
-                        aria-label="Selecionar todos"
+                        aria-label="Selecionar página atual"
                       />
                     </th>
                   )}
@@ -2391,6 +2454,19 @@ export default function DocumentosPage() {
                   const edicaoInfo = getEdicaoInfo(registro);
                   const tipoLaudo = getTipoLaudo(registro);
                   const observacoes = getObservacoes(registro);
+                  const isContrato = registro.tipo === "contratos";
+                  const descricaoContrato = isContrato
+                    ? getDescricaoContrato(registro)
+                    : null;
+                  const dataAssinaturaContrato = isContrato
+                    ? formatDateBR(getDataAssinatura(registro))
+                    : null;
+                  const dataVencimentoContrato = isContrato
+                    ? getDataVencimento(registro)
+                    : null;
+                  const semaforoContrato = isContrato
+                    ? getSemaforoVencimento(dataVencimentoContrato)
+                    : null;
                   const numeroNf = getNumeroNf(registro);
                   const numeroPedido = getNumeroPedido(registro);
                   const cnpjDocumento = getCnpjDocumento(registro);
@@ -2508,27 +2584,53 @@ export default function DocumentosPage() {
                         {getTipoDescricao(registro.tipo)}
                       </td>
                       <td className="hidden px-4 py-3 text-xs leading-5 text-slate-500 lg:table-cell">
-                        {registro.tipo === TIPO_ASSINAVEL && tipoLaudo
-                          ? tipoLaudo
-                          : "-"}
+                        {isContrato ? (
+                          <>
+                            {descricaoContrato && (
+                              <p className="line-clamp-2">{descricaoContrato}</p>
+                            )}
+                            {dataAssinaturaContrato && (
+                              <p className="mt-0.5 text-slate-400">
+                                Assinado em {dataAssinaturaContrato}
+                              </p>
+                            )}
+                            {!descricaoContrato && !dataAssinaturaContrato && "-"}
+                          </>
+                        ) : registro.tipo === TIPO_ASSINAVEL && tipoLaudo ? (
+                          tipoLaudo
+                        ) : (
+                          "-"
+                        )}
                       </td>
                       <td className="hidden px-4 py-3 text-xs leading-5 text-slate-500 xl:table-cell">
-                        {registro.tipo === TIPO_ASSINAVEL && observacoes
-                          ? observacoes
-                          : "-"}
+                        {isContrato
+                          ? dataVencimentoContrato
+                            ? `Vence em ${formatDateBR(dataVencimentoContrato)}`
+                            : "Sem data de vencimento"
+                          : registro.tipo === TIPO_ASSINAVEL && observacoes
+                            ? observacoes
+                            : "-"}
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                            registro.status === "assinado"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : registro.status === "revisado"
-                                ? "bg-sky-50 text-sky-700"
-                              : "bg-amber-50 text-amber-700"
-                          }`}
-                        >
-                          {formatStatusLabel(registro.status)}
-                        </span>
+                        {isContrato && semaforoContrato ? (
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${SEMAFORO_BADGE[semaforoContrato.status]}`}
+                          >
+                            {semaforoContrato.label}
+                          </span>
+                        ) : (
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                              registro.status === "assinado"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : registro.status === "revisado"
+                                  ? "bg-sky-50 text-sky-700"
+                                : "bg-amber-50 text-amber-700"
+                            }`}
+                          >
+                            {formatStatusLabel(registro.status)}
+                          </span>
+                        )}
                       </td>
                       <td className="hidden px-4 py-3 text-xs text-slate-500 md:table-cell">
                         <span className="font-medium">{getDataLabel(registro)}</span>
@@ -2542,69 +2644,27 @@ export default function DocumentosPage() {
                         className="sticky right-0 z-10 w-[180px] min-w-[180px] whitespace-nowrap border-l border-slate-100 bg-white px-4 py-3"
                         onClick={(event) => event.stopPropagation()}
                       >
-                        <div className="flex flex-col items-end gap-2 text-[11px]">
-                          <button
-                            type="button"
-                            onClick={() => void abrirDocumento(registro)}
-                            disabled={opening || downloading}
-                            className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                          >
-                            {opening ? "Abrindo..." : "Ver PDF"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void baixarDocumento(registro)}
-                            disabled={opening || downloading}
-                            className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                          >
-                            {downloading ? "Baixando..." : "Baixar PDF"}
-                          </button>
-                          {canManageDocuments &&
+                        <DocumentActions
+                          registro={registro}
+                          canManageDocuments={canManageDocuments}
+                          canReview={
                             registro.tipo !== TIPO_ASSINAVEL &&
                             registro.status !== "revisado" &&
-                            registro.status !== "assinado" && (
-                            <button
-                              type="button"
-                              onClick={() => void marcarComoRevisado(registro)}
-                              disabled={reviewingId === registro.id}
-                              className="min-w-[88px] rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {reviewingId === registro.id
-                                ? "Salvando..."
-                                : "Confirmar revisão"}
-                            </button>
-                          )}
-                          {canManageDocuments && (
-                            <button
-                              type="button"
-                              onClick={() => abrirEdicao(registro)}
-                              className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                            >
-                              Editar
-                            </button>
-                          )}
-                          {canManageDocuments && (
-                            <button
-                              type="button"
-                              onClick={() => void removerDocumento(registro)}
-                              disabled={deletingId === registro.id}
-                              className="min-w-[88px] rounded-full border border-red-200 px-3 py-1 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {deletingId === registro.id
-                                ? "Removendo..."
-                                : "Remover"}
-                            </button>
-                          )}
-                          {canManageDocuments && isSelecionavel && (
-                            <button
-                              type="button"
-                              onClick={() => router.push(`/documentos/${registro.id}`)}
-                              className="min-w-[88px] rounded-full bg-sky-500 px-3 py-1 text-white transition hover:bg-sky-400"
-                            >
-                              Assinar
-                            </button>
-                          )}
-                        </div>
+                            registro.status !== "assinado"
+                          }
+                          canSign={isSelecionavel}
+                          opening={opening}
+                          downloading={downloading}
+                          deleting={deletingId === registro.id}
+                          reviewing={reviewingId === registro.id}
+                          containerClassName="flex flex-col items-end gap-2 text-[11px]"
+                          onOpen={abrirDocumento}
+                          onDownload={baixarDocumento}
+                          onReview={marcarComoRevisado}
+                          onEdit={abrirEdicao}
+                          onRemove={removerDocumento}
+                          onSign={(item) => router.push(`/documentos/${item.id}`)}
+                        />
                       </td>
                     </tr>
                   );
@@ -2633,6 +2693,19 @@ export default function DocumentosPage() {
             const edicaoInfo = getEdicaoInfo(registro);
             const tipoLaudo = getTipoLaudo(registro);
             const observacoes = getObservacoes(registro);
+            const isContrato = registro.tipo === "contratos";
+            const descricaoContrato = isContrato
+              ? getDescricaoContrato(registro)
+              : null;
+            const dataAssinaturaContrato = isContrato
+              ? formatDateBR(getDataAssinatura(registro))
+              : null;
+            const dataVencimentoContrato = isContrato
+              ? getDataVencimento(registro)
+              : null;
+            const semaforoContrato = isContrato
+              ? getSemaforoVencimento(dataVencimentoContrato)
+              : null;
             const numeroNf = getNumeroNf(registro);
             const numeroPedido = getNumeroPedido(registro);
             const cnpjDocumento = getCnpjDocumento(registro);
@@ -2753,7 +2826,20 @@ export default function DocumentosPage() {
                     </p>
                     <p>{getTipoDescricao(registro.tipo)}</p>
                   </div>
-                  {registro.tipo === TIPO_ASSINAVEL && tipoLaudo && (
+                  {isContrato && (descricaoContrato || dataAssinaturaContrato) && (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500">
+                        Descrição do contrato
+                      </p>
+                      {descricaoContrato && <p>{descricaoContrato}</p>}
+                      {dataAssinaturaContrato && (
+                        <p className="text-slate-400">
+                          Assinado em {dataAssinaturaContrato}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {!isContrato && registro.tipo === TIPO_ASSINAVEL && tipoLaudo && (
                     <div>
                       <p className="text-xs font-semibold text-slate-500">
                         Tipo de laudo
@@ -2761,7 +2847,19 @@ export default function DocumentosPage() {
                       <p>{tipoLaudo}</p>
                     </div>
                   )}
-                  {registro.tipo === TIPO_ASSINAVEL && observacoes && (
+                  {isContrato && (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500">
+                        Vencimento
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {dataVencimentoContrato
+                          ? `Vence em ${formatDateBR(dataVencimentoContrato)}`
+                          : "Sem data de vencimento"}
+                      </p>
+                    </div>
+                  )}
+                  {!isContrato && registro.tipo === TIPO_ASSINAVEL && observacoes && (
                     <div>
                       <p className="text-xs font-semibold text-slate-500">
                         Observações
@@ -2770,17 +2868,25 @@ export default function DocumentosPage() {
                     </div>
                   )}
                   <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                        registro.status === "assinado"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : registro.status === "revisado"
-                            ? "bg-sky-50 text-sky-700"
-                          : "bg-amber-50 text-amber-700"
-                      }`}
-                    >
-                      {formatStatusLabel(registro.status)}
-                    </span>
+                    {isContrato && semaforoContrato ? (
+                      <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${SEMAFORO_BADGE[semaforoContrato.status]}`}
+                      >
+                        {semaforoContrato.label}
+                      </span>
+                    ) : (
+                      <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                          registro.status === "assinado"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : registro.status === "revisado"
+                              ? "bg-sky-50 text-sky-700"
+                            : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {formatStatusLabel(registro.status)}
+                      </span>
+                    )}
                     <span className="text-[11px] text-slate-500">
                       {registro.tipo === "notas_fiscais"
                         ? getDataLabel(registro)
@@ -2793,70 +2899,27 @@ export default function DocumentosPage() {
                     )}
                   </div>
                 </div>
-                <div
-                  className="mt-4 flex flex-wrap gap-2 text-[11px]"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <button
-                    type="button"
-                    onClick={() => void abrirDocumento(registro)}
-                    disabled={opening || downloading}
-                    className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    {opening ? "Abrindo..." : "Ver PDF"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void baixarDocumento(registro)}
-                    disabled={opening || downloading}
-                    className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    {downloading ? "Baixando..." : "Baixar PDF"}
-                  </button>
-                  {canManageDocuments &&
+                <DocumentActions
+                  registro={registro}
+                  canManageDocuments={canManageDocuments}
+                  canReview={
                     registro.tipo !== TIPO_ASSINAVEL &&
                     registro.status !== "revisado" &&
-                    registro.status !== "assinado" && (
-                    <button
-                      type="button"
-                      onClick={() => void marcarComoRevisado(registro)}
-                      disabled={reviewingId === registro.id}
-                      className="min-w-[88px] rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {reviewingId === registro.id
-                        ? "Salvando..."
-                        : "Confirmar revisão"}
-                    </button>
-                  )}
-                  {canManageDocuments && (
-                    <button
-                      type="button"
-                      onClick={() => abrirEdicao(registro)}
-                      className="min-w-[88px] rounded-full border border-slate-200 px-3 py-1 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                    >
-                      Editar
-                    </button>
-                  )}
-                  {canManageDocuments && (
-                    <button
-                      type="button"
-                      onClick={() => void removerDocumento(registro)}
-                      disabled={deletingId === registro.id}
-                      className="min-w-[88px] rounded-full border border-red-200 px-3 py-1 text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {deletingId === registro.id ? "Removendo..." : "Remover"}
-                    </button>
-                  )}
-                  {canManageDocuments && isSelecionavel && (
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/documentos/${registro.id}`)}
-                      className="min-w-[88px] rounded-full bg-sky-500 px-3 py-1 text-white transition hover:bg-sky-400"
-                    >
-                      Assinar
-                    </button>
-                  )}
-                </div>
+                    registro.status !== "assinado"
+                  }
+                  canSign={isSelecionavel}
+                  opening={opening}
+                  downloading={downloading}
+                  deleting={deletingId === registro.id}
+                  reviewing={reviewingId === registro.id}
+                  containerClassName="mt-4 flex flex-wrap gap-2 text-[11px]"
+                  onOpen={abrirDocumento}
+                  onDownload={baixarDocumento}
+                  onReview={marcarComoRevisado}
+                  onEdit={abrirEdicao}
+                  onRemove={removerDocumento}
+                  onSign={(item) => router.push(`/documentos/${item.id}`)}
+                />
               </div>
             );
             })}

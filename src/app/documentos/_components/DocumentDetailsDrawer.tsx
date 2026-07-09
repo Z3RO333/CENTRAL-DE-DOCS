@@ -53,6 +53,8 @@ type DocumentoAnaliseResultado = {
   numero_pedido?: string | null;
   valor_total?: number | null;
   descricao?: string | null;
+  data_assinatura?: string | null;
+  data_vencimento?: string | null;
   itens?: Array<{
     descricao?: string;
     competencia?: string | null;
@@ -225,6 +227,12 @@ const buildUpdatesFromAnalise = (resultado: DocumentoAnaliseResultado) => {
   if (valor) updates.valor = valor;
   if (resultado.descricao?.trim()) updates.descricao = resultado.descricao.trim();
   if (resultado.prestador?.trim()) updates.prestador = resultado.prestador.trim();
+  if (resultado.data_assinatura?.trim()) {
+    updates.data_assinatura = resultado.data_assinatura.trim();
+  }
+  if (resultado.data_vencimento?.trim()) {
+    updates.data_vencimento = resultado.data_vencimento.trim();
+  }
 
   return updates;
 };
