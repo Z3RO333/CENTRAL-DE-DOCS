@@ -21,6 +21,7 @@ import {
   MailWarning,
   FileCheck2,
   ClipboardSignature,
+  FileSignature,
   ChevronLeft,
   ChevronRight,
   X,
@@ -96,8 +97,16 @@ export default function AppShell({
             !pathname?.startsWith("/documentos/pendencias") &&
             !pathname?.startsWith("/documentos/cobrancas") &&
             !pathname?.startsWith("/documentos/btracker") &&
-            !pathname?.startsWith("/documentos/orcamentos-internos"),
+            !pathname?.startsWith("/documentos/orcamentos-internos") &&
+            !pathname?.startsWith("/documentos/contratos"),
           isVisible: canAccessDocuments,
+        },
+        {
+          href: "/documentos/contratos",
+          label: "Contratos",
+          icon: FileSignature,
+          isActive: pathname?.startsWith("/documentos/contratos"),
+          isVisible: isAdmin && !documentsAccessLoading,
         },
         {
           href: "/documentos/orcamentos-internos",

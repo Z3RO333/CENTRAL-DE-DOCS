@@ -53,6 +53,9 @@ const EDIT_FIELDS_BY_TIPO: Record<string, EditField[]> = {
   contratos: [
     { name: "prestador", label: "Prestador" },
     { name: "numero_contrato", label: "Número do contrato" },
+    { name: "descricao", label: "Descrição do contrato", type: "textarea" },
+    { name: "data_assinatura", label: "Data de assinatura", type: "date" },
+    { name: "data_vencimento", label: "Data de vencimento", type: "date" },
     { name: "objeto", label: "Objeto do contrato", type: "textarea" },
     { name: "data_inicio", label: "Data de início", type: "date" },
     { name: "data_fim", label: "Data de término", type: "date" },
@@ -248,6 +251,59 @@ export const getTipoLaudo = (registro: FormularioRecord) =>
 
 export const getObservacoes = (registro: FormularioRecord) =>
   getCampoTexto(registro.dados, ["observacoes"]);
+
+export const getDescricaoContrato = (registro: FormularioRecord) =>
+  getCampoTexto(registro.dados, ["descricao", "objeto"]);
+
+export const getDataAssinatura = (registro: FormularioRecord) =>
+  getCampoTexto(registro.dados, ["data_assinatura"]);
+
+export const getDataVencimento = (registro: FormularioRecord) =>
+  getCampoTexto(registro.dados, ["data_vencimento"]);
+
+export const formatDateBR = (value: string | null) => {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("pt-BR");
+};
+
+export type SemaforoStatus = "verde" | "amarelo" | "vermelho" | "indefinido";
+
+export const SEMAFORO_BADGE: Record<SemaforoStatus, string> = {
+  verde: "bg-emerald-50 text-emerald-700",
+  amarelo: "bg-amber-50 text-amber-700",
+  vermelho: "bg-red-50 text-red-700",
+  indefinido: "bg-slate-100 text-slate-500",
+};
+
+export const getSemaforoVencimento = (
+  dataVencimento: string | null,
+): { status: SemaforoStatus; label: string } => {
+  if (!dataVencimento) {
+    return { status: "indefinido", label: "Sem data" };
+  }
+  const vencimento = new Date(`${dataVencimento}T00:00:00`);
+  if (Number.isNaN(vencimento.getTime())) {
+    return { status: "indefinido", label: "Sem data" };
+  }
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const dias = Math.ceil((vencimento.getTime() - hoje.getTime()) / 86400000);
+  if (dias < 0) {
+    return { status: "vermelho", label: `Vencido há ${Math.abs(dias)}d` };
+  }
+  if (dias <= 14) {
+    return {
+      status: "vermelho",
+      label: dias === 0 ? "Vence hoje" : `Vence em ${dias}d`,
+    };
+  }
+  if (dias <= 60) {
+    return { status: "amarelo", label: `Vence em ${dias}d` };
+  }
+  return { status: "verde", label: "Em dia" };
+};
 
 export const getPageCount = (registro: FormularioRecord) => {
   const raw = registro.dados?.page_count;
