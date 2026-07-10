@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  FilePlus2,
   FileSignature,
   LoaderCircle,
   PenLine,
@@ -91,6 +92,14 @@ export default function ContratosPage() {
     null,
   );
 
+  const [novoContratoOpen, setNovoContratoOpen] = useState(false);
+  const [novoContratoFile, setNovoContratoFile] = useState<File | null>(null);
+  const [novoContratoPrestador, setNovoContratoPrestador] = useState("");
+  const [novoContratoSaving, setNovoContratoSaving] = useState(false);
+  const [novoContratoError, setNovoContratoError] = useState<string | null>(
+    null,
+  );
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.replace("/login");
@@ -144,6 +153,51 @@ export default function ContratosPage() {
   useEffect(() => {
     if (user) void carregarContratos();
   }, [carregarContratos, user]);
+
+  const salvarNovoContrato = async () => {
+    if (!user) return;
+    if (!novoContratoFile) {
+      setNovoContratoError("Anexe o PDF do contrato.");
+      return;
+    }
+    if (!novoContratoPrestador.trim()) {
+      setNovoContratoError("Informe o prestador.");
+      return;
+    }
+    try {
+      setNovoContratoSaving(true);
+      setNovoContratoError(null);
+      const ext = novoContratoFile.name.split(".").pop() ?? "pdf";
+      const filePath = `${user.id}/contratos/${Date.now()}-0.${ext}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("formularios")
+        .upload(filePath, novoContratoFile);
+      if (uploadError || !uploadData) {
+        throw uploadError ?? new Error("Erro ao enviar o PDF.");
+      }
+      const { error: insertError } = await supabase.from("formularios").insert({
+        user_id: user.id,
+        tipo: TIPO_CONTRATOS,
+        status: "em_analise",
+        arquivo_path: uploadData.path ?? filePath,
+        prestador_id: null,
+        dados: { prestador: novoContratoPrestador.trim() },
+      });
+      if (insertError) {
+        throw insertError;
+      }
+      setNovoContratoOpen(false);
+      setNovoContratoFile(null);
+      setNovoContratoPrestador("");
+      await carregarContratos();
+    } catch (err) {
+      setNovoContratoError(
+        err instanceof Error ? err.message : "Não foi possível salvar o contrato.",
+      );
+    } finally {
+      setNovoContratoSaving(false);
+    }
+  };
 
   const abrirDocumento = async (registro: FormularioRecord) => {
     const path = getPathParaVisualizacao(registro);
@@ -328,14 +382,27 @@ export default function ContratosPage() {
             Contratos cadastrados, com descrição, assinatura e vencimento.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void carregarContratos()}
-          className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setNovoContratoError(null);
+              setNovoContratoOpen(true);
+            }}
+            className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-500"
+          >
+            <FilePlus2 className="h-4 w-4" />
+            Novo contrato
+          </button>
+          <button
+            type="button"
+            onClick={() => void carregarContratos()}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Atualizar
+          </button>
+        </div>
       </header>
 
       {error && (
@@ -468,6 +535,83 @@ export default function ContratosPage() {
           );
         }}
       />
+
+      {novoContratoOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          onClick={() => {
+            if (!novoContratoSaving) setNovoContratoOpen(false);
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center gap-2">
+              <FilePlus2 className="h-4 w-4 text-slate-500" />
+              <h2 className="text-sm font-semibold text-slate-900">
+                Novo contrato
+              </h2>
+            </div>
+            {novoContratoError && (
+              <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                {novoContratoError}
+              </div>
+            )}
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Prestador
+                <input
+                  type="text"
+                  value={novoContratoPrestador}
+                  onChange={(event) => setNovoContratoPrestador(event.target.value)}
+                  placeholder="Nome do prestador"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
+                />
+              </label>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                PDF do contrato
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(event) =>
+                    setNovoContratoFile(event.target.files?.[0] ?? null)
+                  }
+                  className="mt-2 block w-full cursor-pointer text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-sky-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"
+                />
+                {novoContratoFile && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    {novoContratoFile.name}
+                  </p>
+                )}
+              </label>
+              <p className="text-xs text-slate-400">
+                Depois de salvar, use &quot;Analisar com IA&quot; nos detalhes do
+                contrato pra preencher tipo de serviço, descrição e datas
+                automaticamente, ou edite na mão.
+              </p>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={novoContratoSaving}
+                onClick={() => setNovoContratoOpen(false)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={novoContratoSaving}
+                onClick={() => void salvarNovoContrato()}
+                className="rounded-lg bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-60"
+              >
+                {novoContratoSaving ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editDialog && (
         <div
