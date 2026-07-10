@@ -17,6 +17,7 @@ export type DocumentoAnaliseIa = {
   numero_pedido: string | null;
   valor_total: number | null;
   descricao: string | null;
+  tipo_servico: string | null;
   data_assinatura: string | null;
   data_vencimento: string | null;
   itens: Array<{
@@ -56,6 +57,7 @@ const ANALISE_SCHEMA = {
     "numero_pedido",
     "valor_total",
     "descricao",
+    "tipo_servico",
     "data_assinatura",
     "data_vencimento",
     "itens",
@@ -98,6 +100,7 @@ const ANALISE_SCHEMA = {
     numero_pedido: { anyOf: [{ type: "string" }, { type: "null" }] },
     valor_total: { anyOf: [{ type: "number" }, { type: "null" }] },
     descricao: { anyOf: [{ type: "string" }, { type: "null" }] },
+    tipo_servico: { anyOf: [{ type: "string" }, { type: "null" }] },
     data_assinatura: {
       anyOf: [{ type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, { type: "null" }],
     },
@@ -341,7 +344,7 @@ export async function analisarDocumentoComOpenAi(
         {
           role: "system",
           content:
-            "Voce analisa documentos administrativos brasileiros, incluindo laudos tecnicos, checklists de manutencao, notas fiscais e contratos. Extraia apenas dados presentes ou fortemente inferiveis no arquivo. Se houver mais de uma loja, competencia ou item, liste todos separadamente. Retorne somente JSON valido, sem markdown. Use competencias sempre como MM/AAAA. Se houver divergencia com os dados atuais, coloque em alertas. Para 'observacoes': extraia o texto literal da secao de observacoes ou comentarios finais do documento (ex: anotacoes do tecnico, parecer final). Para 'recomendacoes': extraia como lista de acoes especificas recomendadas ou itens que precisam de atencao identificados no documento — por exemplo, itens marcados como nao conformes em checklists, irregularidades encontradas, servicos sugeridos ou qualquer indicacao de que uma ordem de servico ou acao corretiva seja necessaria. Se nao houver recomendacoes, retorne array vazio. Para documentos do tipo 'contratos': em 'data_assinatura', extraia a data em que o contrato foi assinado/firmado (ultima assinatura, ou data de celebracao do contrato); em 'data_vencimento', extraia a data de termino de vigencia do contrato (pode estar explicita como data, ou calculavel a partir de uma clausula de prazo/vigencia somada a data de inicio/assinatura). Ambas sempre no formato AAAA-MM-DD. Se o contrato tiver renovacao automatica sem data fixa de termino, deixe null e mencione isso em alertas. Se nao encontrar essas datas, retorne null.",
+            "Voce analisa documentos administrativos brasileiros, incluindo laudos tecnicos, checklists de manutencao, notas fiscais e contratos. Extraia apenas dados presentes ou fortemente inferiveis no arquivo. Se houver mais de uma loja, competencia ou item, liste todos separadamente. Retorne somente JSON valido, sem markdown. Use competencias sempre como MM/AAAA. Se houver divergencia com os dados atuais, coloque em alertas. Para 'observacoes': extraia o texto literal da secao de observacoes ou comentarios finais do documento (ex: anotacoes do tecnico, parecer final). Para 'recomendacoes': extraia como lista de acoes especificas recomendadas ou itens que precisam de atencao identificados no documento — por exemplo, itens marcados como nao conformes em checklists, irregularidades encontradas, servicos sugeridos ou qualquer indicacao de que uma ordem de servico ou acao corretiva seja necessaria. Se nao houver recomendacoes, retorne array vazio. Para documentos do tipo 'contratos': em 'data_assinatura', extraia a data em que o contrato foi assinado/firmado (ultima assinatura, ou data de celebracao do contrato); em 'data_vencimento', extraia a data de termino de vigencia do contrato (pode estar explicita como data, ou calculavel a partir de uma clausula de prazo/vigencia somada a data de inicio/assinatura). Ambas sempre no formato AAAA-MM-DD. Se o contrato tiver renovacao automatica sem data fixa de termino, deixe null e mencione isso em alertas. Se nao encontrar essas datas, retorne null. Em 'tipo_servico', para contratos, classifique o objeto do contrato numa categoria curta (2 a 4 palavras, ex: 'Gestao de Residuos', 'Manutencao de Incendio', 'Manutencao Hidraulica', 'Seguranca Patrimonial', 'Limpeza e Conservacao'), nao repita a descricao completa.",
         },
         {
           role: "user",

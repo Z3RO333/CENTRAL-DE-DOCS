@@ -53,6 +53,7 @@ const EDIT_FIELDS_BY_TIPO: Record<string, EditField[]> = {
   contratos: [
     { name: "prestador", label: "Prestador" },
     { name: "numero_contrato", label: "Número do contrato" },
+    { name: "tipo_servico", label: "Tipo de serviço" },
     { name: "descricao", label: "Descrição do contrato", type: "textarea" },
     { name: "data_assinatura", label: "Data de assinatura", type: "date" },
     { name: "data_vencimento", label: "Data de vencimento", type: "date" },
@@ -254,6 +255,9 @@ export const getObservacoes = (registro: FormularioRecord) =>
 
 export const getDescricaoContrato = (registro: FormularioRecord) =>
   getCampoTexto(registro.dados, ["descricao", "objeto"]);
+
+export const getTipoServicoContrato = (registro: FormularioRecord) =>
+  getCampoTexto(registro.dados, ["tipo_servico"]);
 
 export const getDataAssinatura = (registro: FormularioRecord) =>
   getCampoTexto(registro.dados, ["data_assinatura"]);

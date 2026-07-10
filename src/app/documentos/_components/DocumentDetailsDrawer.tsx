@@ -53,6 +53,7 @@ type DocumentoAnaliseResultado = {
   numero_pedido?: string | null;
   valor_total?: number | null;
   descricao?: string | null;
+  tipo_servico?: string | null;
   data_assinatura?: string | null;
   data_vencimento?: string | null;
   itens?: Array<{
@@ -232,6 +233,9 @@ const buildUpdatesFromAnalise = (resultado: DocumentoAnaliseResultado) => {
   }
   if (resultado.data_vencimento?.trim()) {
     updates.data_vencimento = resultado.data_vencimento.trim();
+  }
+  if (resultado.tipo_servico?.trim()) {
+    updates.tipo_servico = resultado.tipo_servico.trim();
   }
 
   return updates;

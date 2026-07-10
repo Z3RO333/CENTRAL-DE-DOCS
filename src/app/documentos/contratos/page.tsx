@@ -23,7 +23,7 @@ import {
   getSignedFileUrl,
   resolveSignedPdfPath,
   normalizeRegistroStatus,
-  getDescricaoContrato,
+  getTipoServicoContrato,
   getDataAssinatura,
   getDataVencimento,
   formatDateBR,
@@ -365,6 +365,7 @@ export default function ContratosPage() {
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Contrato</th>
+                  <th className="px-4 py-3">Tipo de serviço</th>
                   <th className="px-4 py-3">Assinatura</th>
                   <th className="px-4 py-3">Vencimento</th>
                   <th className="px-4 py-3">Status</th>
@@ -377,7 +378,7 @@ export default function ContratosPage() {
                   const identificacao =
                     getIdentificacaoValor(registro) ??
                     `${identificacaoConfig.label} não informado`;
-                  const descricao = getDescricaoContrato(registro);
+                  const tipoServico = getTipoServicoContrato(registro);
                   const dataAssinatura = formatDateBR(getDataAssinatura(registro));
                   const dataVencimento = getDataVencimento(registro);
                   const semaforo = getSemaforoVencimento(dataVencimento);
@@ -397,11 +398,9 @@ export default function ContratosPage() {
                     >
                       <td className="px-4 py-3">
                         <p className="font-semibold text-slate-900">{identificacao}</p>
-                        {descricao && (
-                          <p className="mt-1 line-clamp-2 text-xs text-slate-500">
-                            {descricao}
-                          </p>
-                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-600">
+                        {tipoServico ?? "-"}
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-600">
                         {dataAssinatura ?? "-"}
