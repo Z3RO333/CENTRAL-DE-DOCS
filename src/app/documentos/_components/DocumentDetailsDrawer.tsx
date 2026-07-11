@@ -51,8 +51,10 @@ type DocumentoAnaliseResultado = {
   prestador?: string | null;
   numero_nf?: string | null;
   numero_pedido?: string | null;
+  numero_contrato?: string | null;
   valor_total?: number | null;
   descricao?: string | null;
+  objeto?: string | null;
   tipo_servico?: string | null;
   data_assinatura?: string | null;
   data_vencimento?: string | null;
@@ -236,6 +238,12 @@ const buildUpdatesFromAnalise = (resultado: DocumentoAnaliseResultado) => {
   }
   if (resultado.tipo_servico?.trim()) {
     updates.tipo_servico = resultado.tipo_servico.trim();
+  }
+  if (resultado.numero_contrato?.trim()) {
+    updates.numero_contrato = resultado.numero_contrato.trim();
+  }
+  if (resultado.objeto?.trim()) {
+    updates.objeto = resultado.objeto.trim();
   }
 
   return updates;

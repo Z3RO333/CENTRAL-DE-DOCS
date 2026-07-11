@@ -96,6 +96,7 @@ export async function POST(
       mimeType,
       bytes: await fileBlob.arrayBuffer(),
       dadosAtuais: safeParseDados(row.dados),
+      tipoDocumento: row.tipo,
     });
 
     const { data: analise, error: insertError } = await supabaseAdmin
