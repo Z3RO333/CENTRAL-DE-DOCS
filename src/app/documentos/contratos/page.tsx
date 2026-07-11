@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ChevronDown,
+  ChevronRight,
   FilePlus2,
   FileSignature,
+  FilePlus,
   LoaderCircle,
   PenLine,
   RefreshCw,
@@ -40,6 +43,11 @@ type PdfAction = { id: string; type: "open" | "download" } | null;
 type EditDialogState = {
   registro: FormularioRecord;
   values: Record<string, string>;
+};
+
+type NovoAditivoState = {
+  contratoId: string;
+  prestador: string;
 };
 
 const getPathParaVisualizacao = (registro: FormularioRecord) =>
@@ -79,26 +87,30 @@ export default function ContratosPage() {
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
-    null,
-  );
-  const [selectedRegistro, setSelectedRegistro] =
-    useState<FormularioRecord | null>(null);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  const [selectedRegistro, setSelectedRegistro] = useState<FormularioRecord | null>(null);
 
   const [editDialog, setEditDialog] = useState<EditDialogState | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const [confirmRemove, setConfirmRemove] = useState<FormularioRecord | null>(
-    null,
-  );
+  const [confirmRemove, setConfirmRemove] = useState<FormularioRecord | null>(null);
 
+  // Novo contrato
   const [novoContratoOpen, setNovoContratoOpen] = useState(false);
   const [novoContratoFile, setNovoContratoFile] = useState<File | null>(null);
   const [novoContratoPrestador, setNovoContratoPrestador] = useState("");
   const [novoContratoSaving, setNovoContratoSaving] = useState(false);
-  const [novoContratoError, setNovoContratoError] = useState<string | null>(
-    null,
-  );
+  const [novoContratoError, setNovoContratoError] = useState<string | null>(null);
+
+  // Novo aditivo
+  const [novoAditivo, setNovoAditivo] = useState<NovoAditivoState | null>(null);
+  const [novoAditivoFile, setNovoAditivoFile] = useState<File | null>(null);
+  const [novoAditivoNumero, setNovoAditivoNumero] = useState("");
+  const [novoAditivoSaving, setNovoAditivoSaving] = useState(false);
+  const [novoAditivoError, setNovoAditivoError] = useState<string | null>(null);
+
+  // Contratos expandidos (mostrando aditivos)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -126,7 +138,7 @@ export default function ContratosPage() {
       const token = await getAccessToken();
       const params = new URLSearchParams({
         tipo: TIPO_CONTRATOS,
-        limit: "200",
+        limit: "500",
         offset: "0",
       });
       const response = await fetch(`/api/documentos?${params}`, {
@@ -153,6 +165,18 @@ export default function ContratosPage() {
   useEffect(() => {
     if (user) void carregarContratos();
   }, [carregarContratos, user]);
+
+  // Separa contratos raiz de aditivos
+  const rootContratos = registros.filter((r) => !r.dados?.contrato_pai_id);
+  const aditivosMap = new Map<string, FormularioRecord[]>();
+  registros.forEach((r) => {
+    const pai = r.dados?.contrato_pai_id as string | undefined;
+    if (pai) {
+      const arr = aditivosMap.get(pai) ?? [];
+      arr.push(r);
+      aditivosMap.set(pai, arr);
+    }
+  });
 
   const salvarNovoContrato = async () => {
     if (!user) return;
@@ -196,6 +220,58 @@ export default function ContratosPage() {
       );
     } finally {
       setNovoContratoSaving(false);
+    }
+  };
+
+  const salvarNovoAditivo = async () => {
+    if (!user || !novoAditivo) return;
+    if (!novoAditivoFile) {
+      setNovoAditivoError("Anexe o PDF do aditivo.");
+      return;
+    }
+    if (!novoAditivoNumero.trim()) {
+      setNovoAditivoError("Informe o número/nome do aditivo.");
+      return;
+    }
+    try {
+      setNovoAditivoSaving(true);
+      setNovoAditivoError(null);
+      const ext = novoAditivoFile.name.split(".").pop() ?? "pdf";
+      const filePath = `${user.id}/contratos/${Date.now()}-aditivo.${ext}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("formularios")
+        .upload(filePath, novoAditivoFile);
+      if (uploadError || !uploadData) {
+        throw uploadError ?? new Error("Erro ao enviar o PDF.");
+      }
+      const { error: insertError } = await supabase.from("formularios").insert({
+        user_id: user.id,
+        tipo: TIPO_CONTRATOS,
+        status: "em_analise",
+        arquivo_path: uploadData.path ?? filePath,
+        prestador_id: null,
+        dados: {
+          prestador: novoAditivo.prestador,
+          contrato_pai_id: novoAditivo.contratoId,
+          is_aditivo: true,
+          numero_aditivo: novoAditivoNumero.trim(),
+        },
+      });
+      if (insertError) {
+        throw insertError;
+      }
+      // Auto-expande o contrato pai
+      setExpanded((prev) => new Set([...prev, novoAditivo.contratoId]));
+      setNovoAditivo(null);
+      setNovoAditivoFile(null);
+      setNovoAditivoNumero("");
+      await carregarContratos();
+    } catch (err) {
+      setNovoAditivoError(
+        err instanceof Error ? err.message : "Não foi possível salvar o aditivo.",
+      );
+    } finally {
+      setNovoAditivoSaving(false);
     }
   };
 
@@ -361,6 +437,30 @@ export default function ContratosPage() {
     );
   }
 
+  const renderActions = (registro: FormularioRecord) => {
+    const opening = pdfAction?.id === registro.id && pdfAction.type === "open";
+    const downloading = pdfAction?.id === registro.id && pdfAction.type === "download";
+    return (
+      <DocumentActions
+        registro={registro}
+        canManageDocuments={canManageDocuments}
+        canReview={registro.status !== "revisado" && registro.status !== "assinado"}
+        canSign={false}
+        opening={opening}
+        downloading={downloading}
+        deleting={deletingId === registro.id}
+        reviewing={reviewingId === registro.id}
+        containerClassName="flex flex-wrap justify-end gap-2 text-[11px]"
+        onOpen={abrirDocumento}
+        onDownload={baixarDocumento}
+        onReview={marcarComoRevisado}
+        onEdit={abrirEdicao}
+        onRemove={(r) => setConfirmRemove(r)}
+        onSign={() => {}}
+      />
+    );
+  };
+
   return (
     <div className="flex flex-1 flex-col gap-6 py-4">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -413,7 +513,7 @@ export default function ContratosPage() {
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-100">
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-          <span className="font-semibold">{registros.length} contrato(s)</span>
+          <span className="font-semibold">{rootContratos.length} contrato(s)</span>
           {loading && (
             <span className="inline-flex items-center gap-1">
               <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
@@ -422,7 +522,7 @@ export default function ContratosPage() {
           )}
         </div>
 
-        {!loading && registros.length === 0 ? (
+        {!loading && rootContratos.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-slate-500">
             Nenhum contrato encontrado.
           </p>
@@ -431,6 +531,7 @@ export default function ContratosPage() {
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
+                  <th className="w-8 px-2 py-3" />
                   <th className="px-4 py-3">Contrato</th>
                   <th className="px-4 py-3">Tipo de serviço</th>
                   <th className="px-4 py-3">Assinatura</th>
@@ -440,7 +541,7 @@ export default function ContratosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {registros.map((registro) => {
+                {rootContratos.map((registro) => {
                   const identificacaoConfig = getIdentificacaoConfig(registro.tipo);
                   const identificacao =
                     getIdentificacaoValor(registro) ??
@@ -449,62 +550,155 @@ export default function ContratosPage() {
                   const dataAssinatura = formatDateBR(getDataAssinatura(registro));
                   const dataVencimento = getDataVencimento(registro);
                   const semaforo = getSemaforoVencimento(dataVencimento);
-                  const opening =
-                    pdfAction?.id === registro.id && pdfAction.type === "open";
-                  const downloading =
-                    pdfAction?.id === registro.id && pdfAction.type === "download";
+                  const aditivos = aditivosMap.get(registro.id) ?? [];
+                  const isExpanded = expanded.has(registro.id);
 
                   return (
-                    <tr
-                      key={registro.id}
-                      className="cursor-pointer align-top hover:bg-slate-50"
-                      onClick={() => {
-                        setSelectedRegistro(registro);
-                        setSelectedDocumentId(registro.id);
-                      }}
-                    >
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-slate-900">{identificacao}</p>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-600">
-                        {tipoServico ?? "-"}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-600">
-                        {dataAssinatura ?? "-"}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-600">
-                        {dataVencimento ? formatDateBR(dataVencimento) : "-"}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${SEMAFORO_BADGE[semaforo.status]}`}
+                    <>
+                      <tr
+                        key={registro.id}
+                        className="cursor-pointer align-top hover:bg-slate-50"
+                        onClick={() => {
+                          setSelectedRegistro(registro);
+                          setSelectedDocumentId(registro.id);
+                        }}
+                      >
+                        {/* Toggle aditivos */}
+                        <td
+                          className="px-2 py-3 text-slate-400"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpanded((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(registro.id)) next.delete(registro.id);
+                              else next.add(registro.id);
+                              return next;
+                            });
+                          }}
                         >
-                          {semaforo.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <DocumentActions
-                          registro={registro}
-                          canManageDocuments={canManageDocuments}
-                          canReview={
-                            registro.status !== "revisado" &&
-                            registro.status !== "assinado"
-                          }
-                          canSign={false}
-                          opening={opening}
-                          downloading={downloading}
-                          deleting={deletingId === registro.id}
-                          reviewing={reviewingId === registro.id}
-                          containerClassName="flex flex-wrap justify-end gap-2 text-[11px]"
-                          onOpen={abrirDocumento}
-                          onDownload={baixarDocumento}
-                          onReview={marcarComoRevisado}
-                          onEdit={abrirEdicao}
-                          onRemove={(r) => setConfirmRemove(r)}
-                          onSign={() => {}}
-                        />
-                      </td>
-                    </tr>
+                          {aditivos.length > 0 ? (
+                            <button
+                              type="button"
+                              title={isExpanded ? "Recolher aditivos" : "Ver aditivos"}
+                              className="flex items-center gap-1 rounded px-1 py-0.5 text-[10px] text-slate-500 hover:bg-slate-100"
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              ) : (
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              )}
+                              {aditivos.length}
+                            </button>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-slate-900">{identificacao}</p>
+                          {aditivos.length > 0 && !isExpanded && (
+                            <p className="mt-0.5 text-[10px] text-slate-400">
+                              {aditivos.length} aditivo(s)
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          {tipoServico ?? "-"}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          {dataAssinatura ?? "-"}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          {dataVencimento ? formatDateBR(dataVencimento) : "-"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${SEMAFORO_BADGE[semaforo.status]}`}
+                          >
+                            {semaforo.label}
+                          </span>
+                        </td>
+                        <td
+                          className="px-4 py-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            {canManageDocuments && (
+                              <button
+                                type="button"
+                                title="Adicionar aditivo"
+                                onClick={() => {
+                                  setNovoAditivoError(null);
+                                  setNovoAditivoFile(null);
+                                  setNovoAditivoNumero("");
+                                  setNovoAditivo({
+                                    contratoId: registro.id,
+                                    prestador: String(registro.dados?.prestador ?? ""),
+                                  });
+                                  setExpanded((prev) => new Set([...prev, registro.id]));
+                                }}
+                                className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700 hover:bg-sky-100"
+                              >
+                                <FilePlus className="h-3 w-3" />
+                                Aditivo
+                              </button>
+                            )}
+                            {renderActions(registro)}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Aditivos sub-linhas */}
+                      {isExpanded &&
+                        aditivos.map((aditivo) => {
+                          const aditivoLabel =
+                            String(aditivo.dados?.numero_aditivo ?? "") ||
+                            getIdentificacaoValor(aditivo) ||
+                            "Aditivo";
+                          const aditivoAssinatura = formatDateBR(getDataAssinatura(aditivo));
+                          const aditivoVencimento = getDataVencimento(aditivo);
+                          const aditivoSemaforo = getSemaforoVencimento(aditivoVencimento);
+                          return (
+                            <tr
+                              key={aditivo.id}
+                              className="cursor-pointer bg-slate-50/60 align-top hover:bg-slate-100/60"
+                              onClick={() => {
+                                setSelectedRegistro(aditivo);
+                                setSelectedDocumentId(aditivo.id);
+                              }}
+                            >
+                              <td className="px-2 py-2" />
+                              <td className="py-2 pl-8 pr-4">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-slate-300">└</span>
+                                  <span className="text-xs font-medium text-slate-700">
+                                    {aditivoLabel}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-2 text-xs text-slate-500">
+                                {getTipoServicoContrato(aditivo) ?? "-"}
+                              </td>
+                              <td className="px-4 py-2 text-xs text-slate-500">
+                                {aditivoAssinatura ?? "-"}
+                              </td>
+                              <td className="px-4 py-2 text-xs text-slate-500">
+                                {aditivoVencimento ? formatDateBR(aditivoVencimento) : "-"}
+                              </td>
+                              <td className="px-4 py-2">
+                                <span
+                                  className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${SEMAFORO_BADGE[aditivoSemaforo.status]}`}
+                                >
+                                  {aditivoSemaforo.label}
+                                </span>
+                              </td>
+                              <td
+                                className="px-4 py-2"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {renderActions(aditivo)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </>
                   );
                 })}
               </tbody>
@@ -536,6 +730,7 @@ export default function ContratosPage() {
         }}
       />
 
+      {/* Modal Novo Contrato */}
       {novoContratoOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
@@ -613,6 +808,85 @@ export default function ContratosPage() {
         </div>
       )}
 
+      {/* Modal Novo Aditivo */}
+      {novoAditivo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          onClick={() => {
+            if (!novoAditivoSaving) setNovoAditivo(null);
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center gap-2">
+              <FilePlus className="h-4 w-4 text-sky-600" />
+              <h2 className="text-sm font-semibold text-slate-900">
+                Adicionar aditivo
+              </h2>
+              {novoAditivo.prestador && (
+                <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                  {novoAditivo.prestador}
+                </span>
+              )}
+            </div>
+            {novoAditivoError && (
+              <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                {novoAditivoError}
+              </div>
+            )}
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Identificação do aditivo
+                <input
+                  type="text"
+                  value={novoAditivoNumero}
+                  onChange={(event) => setNovoAditivoNumero(event.target.value)}
+                  placeholder="Ex: 1º Aditivo, 6º Aditivo, Aditivo 2015…"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
+                />
+              </label>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                PDF do aditivo
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(event) =>
+                    setNovoAditivoFile(event.target.files?.[0] ?? null)
+                  }
+                  className="mt-2 block w-full cursor-pointer text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-sky-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"
+                />
+                {novoAditivoFile && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    {novoAditivoFile.name}
+                  </p>
+                )}
+              </label>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={novoAditivoSaving}
+                onClick={() => setNovoAditivo(null)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={novoAditivoSaving}
+                onClick={() => void salvarNovoAditivo()}
+                className="rounded-lg bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-60"
+              >
+                {novoAditivoSaving ? "Salvando..." : "Salvar aditivo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar */}
       {editDialog && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
@@ -625,7 +899,7 @@ export default function ContratosPage() {
             <div className="mb-4 flex items-center gap-2">
               <PenLine className="h-4 w-4 text-slate-500" />
               <h2 className="text-sm font-semibold text-slate-900">
-                Editar contrato
+                Editar {editDialog.registro.dados?.is_aditivo ? "aditivo" : "contrato"}
               </h2>
             </div>
             <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
@@ -697,6 +971,7 @@ export default function ContratosPage() {
         </div>
       )}
 
+      {/* Modal Confirmar Remoção */}
       {confirmRemove && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
@@ -708,11 +983,16 @@ export default function ContratosPage() {
           >
             <div className="mb-3 flex items-center gap-2 text-red-600">
               <Trash2 className="h-4 w-4" />
-              <h2 className="text-sm font-semibold">Remover contrato</h2>
+              <h2 className="text-sm font-semibold">
+                Remover {confirmRemove.dados?.is_aditivo ? "aditivo" : "contrato"}
+              </h2>
             </div>
             <p className="text-sm text-slate-600">
-              Tem certeza que deseja remover este contrato? Essa ação não pode ser
-              desfeita.
+              {confirmRemove.dados?.is_aditivo
+                ? "Tem certeza que deseja remover este aditivo? Essa ação não pode ser desfeita."
+                : aditivosMap.has(confirmRemove.id)
+                  ? `Este contrato possui ${aditivosMap.get(confirmRemove.id)!.length} aditivo(s) vinculado(s). Remover o contrato não remove os aditivos automaticamente. Deseja continuar?`
+                  : "Tem certeza que deseja remover este contrato? Essa ação não pode ser desfeita."}
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
