@@ -189,7 +189,9 @@ export async function GET(request: Request) {
           ? query.in("prestador_id", conservacaoIds)
           : query.eq("prestador_id", "00000000-0000-0000-0000-000000000000");
     } else if (conservacaoIds.length > 0) {
-      query = query.not("prestador_id", "in", `(${conservacaoIds.join(",")})`);
+      query = query.or(
+        `prestador_id.is.null,prestador_id.not.in.(${conservacaoIds.join(",")})`,
+      );
     }
 
     if (userFilter) {
