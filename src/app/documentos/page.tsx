@@ -14,7 +14,11 @@ import { DocumentDetailsDrawer } from "./_components/DocumentDetailsDrawer";
 import { DocumentosEmptyState } from "./_components/DocumentosEmptyState";
 import { DocumentosFilters } from "./_components/DocumentosFilters";
 import { DocumentosPagination } from "./_components/DocumentosPagination";
-import { TIPO_LABEL } from "./_lib/documentosShared";
+import {
+  TIPO_LABEL,
+  getValorOrcamento,
+  formatCurrencyBRL,
+} from "./_lib/documentosShared";
 import { getCompetenciaFromDados } from "@/lib/competencia";
 import { fixMojibakeText } from "@/lib/textEncoding";
 
@@ -2376,6 +2380,9 @@ export default function DocumentosPage() {
                   <th className="w-[240px] px-4 py-3 text-left">Documento</th>
                   <th className="w-[300px] px-4 py-3 text-left">Identificação</th>
                   <th className="w-[140px] px-4 py-3 text-left">Tipo</th>
+                  <th className="hidden w-[110px] px-4 py-3 text-right lg:table-cell">
+                    Valor
+                  </th>
                   <th className="hidden w-[150px] px-4 py-3 text-left lg:table-cell">
                     Tipo de laudo
                   </th>
@@ -2410,6 +2417,10 @@ export default function DocumentosPage() {
                   const numeroPedido = getNumeroPedido(registro);
                   const cnpjDocumento = getCnpjDocumento(registro);
                   const lojaNome = getLojaNome(registro);
+                  const valorOrcamento =
+                    registro.tipo === "orcamentos"
+                      ? formatCurrencyBRL(getValorOrcamento(registro.dados))
+                      : null;
                   const prestadorNome = getPrestadorNome(registro);
                   const responsavel = getResponsavel(registro);
                   const enviadoPor = registro.user_id
@@ -2522,6 +2533,9 @@ export default function DocumentosPage() {
                       <td className="px-4 py-3 text-sm text-slate-600">
                         {getTipoDescricao(registro.tipo)}
                       </td>
+                      <td className="hidden px-4 py-3 text-right text-xs text-slate-600 lg:table-cell">
+                        {valorOrcamento ?? "-"}
+                      </td>
                       <td className="hidden px-4 py-3 text-xs leading-5 text-slate-500 lg:table-cell">
                         {registro.tipo === TIPO_ASSINAVEL && tipoLaudo
                           ? tipoLaudo
@@ -2610,6 +2624,10 @@ export default function DocumentosPage() {
             const numeroPedido = getNumeroPedido(registro);
             const cnpjDocumento = getCnpjDocumento(registro);
             const lojaNome = getLojaNome(registro);
+            const valorOrcamento =
+              registro.tipo === "orcamentos"
+                ? formatCurrencyBRL(getValorOrcamento(registro.dados))
+                : null;
             const prestadorNome = getPrestadorNome(registro);
             const responsavel = getResponsavel(registro);
             const enviadoPor = registro.user_id
@@ -2710,6 +2728,11 @@ export default function DocumentosPage() {
                       {cnpjDocumento && (
                         <span className="rounded-full bg-slate-100 px-2 py-0.5">
                           CNPJ: {cnpjDocumento}
+                        </span>
+                      )}
+                      {valorOrcamento && (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                          Valor: {valorOrcamento}
                         </span>
                       )}
                     </div>
