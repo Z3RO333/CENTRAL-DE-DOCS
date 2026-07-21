@@ -168,6 +168,30 @@ export async function GET(request: Request) {
       query = query.neq("tipo", "contratos");
     }
 
+    const categoriaPrestadorFilter = searchParams.get("categoriaPrestador");
+    const {
+      data: prestadoresConservacao,
+      error: prestadoresConservacaoError,
+    } = await supabaseAdmin
+      .from("prestadores")
+      .select("id")
+      .eq("categoria", "conservacao");
+    if (prestadoresConservacaoError) {
+      throw prestadoresConservacaoError;
+    }
+    const conservacaoIds = ((prestadoresConservacao ?? []) as { id: string }[]).map(
+      (item) => item.id,
+    );
+
+    if (categoriaPrestadorFilter === "conservacao") {
+      query =
+        conservacaoIds.length > 0
+          ? query.in("prestador_id", conservacaoIds)
+          : query.eq("prestador_id", "00000000-0000-0000-0000-000000000000");
+    } else if (conservacaoIds.length > 0) {
+      query = query.not("prestador_id", "in", `(${conservacaoIds.join(",")})`);
+    }
+
     if (userFilter) {
       query = query.eq("user_id", userFilter);
     }
