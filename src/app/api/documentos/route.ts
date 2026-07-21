@@ -177,6 +177,10 @@ export async function GET(request: Request) {
       query = query.neq("tipo", "contratos");
     }
 
+    if (tipoFilter !== "notas_fiscais_conservacao") {
+      query = query.neq("tipo", "notas_fiscais_conservacao");
+    }
+
     const {
       data: prestadoresConservacao,
       error: prestadoresConservacaoError,
