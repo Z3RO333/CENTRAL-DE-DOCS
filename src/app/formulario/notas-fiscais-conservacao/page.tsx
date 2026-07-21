@@ -107,6 +107,13 @@ export default function NotasFiscaisConservacaoPage() {
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
+        const cleanupPath = uploadData.path ?? path;
+        const { error: removeError } = await supabase.storage
+          .from("formularios")
+          .remove([cleanupPath]);
+        if (removeError) {
+          console.error("Erro ao limpar arquivo apos falha no cadastro:", removeError);
+        }
         throw new Error(payload.error ?? "Não foi possível cadastrar a nota fiscal.");
       }
 
