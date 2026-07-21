@@ -78,3 +78,70 @@ export async function PATCH(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const supabaseAdmin = createSupabaseAdminClient();
+    const actor = await getActorFromRequest(request, supabaseAdmin);
+
+    const isAprovador = await isAprovadorInterno(actor.email, supabaseAdmin);
+    if (!actor.isAdmin && !isAprovador) {
+      throw new HttpError(403, "Acesso restrito.");
+    }
+
+    const { searchParams } = new URL(request.url);
+    const motivo = normalizeText(searchParams.get("motivo"));
+    if (!motivo) {
+      throw new HttpError(400, "Informe o motivo da exclusão.");
+    }
+
+    const { data: nota, error: notaError } = await supabaseAdmin
+      .from("notas_fiscais_conservacao")
+      .select("id,numero_nf,prestador_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (notaError) {
+      throw notaError;
+    }
+    if (!nota) {
+      throw new HttpError(404, "Nota fiscal não encontrada.");
+    }
+
+    await logDocumentoAuditEvent({
+      supabaseAdmin,
+      documentoId: id,
+      eventType: "nota_conservacao_excluida",
+      actorId: actor.realUserId,
+      actorEmail: actor.realEmail,
+      metadata: {
+        motivo,
+        numero_nf: nota.numero_nf,
+        prestador_id: nota.prestador_id,
+      },
+    });
+
+    const { error: deleteError } = await supabaseAdmin
+      .from("formularios")
+      .delete()
+      .eq("id", id);
+    if (deleteError) {
+      throw deleteError;
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Erro ao remover nota fiscal de conservação:", err);
+    if (err instanceof HttpError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Não foi possível remover a nota fiscal.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
