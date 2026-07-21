@@ -6,7 +6,11 @@ import {
   getAuthorizedPrestadorIds,
 } from "@/lib/apiAuth";
 import { logDocumentoAuditEvent } from "@/lib/documentosAudit";
-import { normalizeText, parseValorTotal } from "@/lib/orcamentosInternos";
+import {
+  isAprovadorInterno,
+  normalizeText,
+  parseValorTotal,
+} from "@/lib/orcamentosInternos";
 import { parseCompetencia } from "@/lib/competencia";
 
 export type NotaFiscalConservacaoRow = {
@@ -37,6 +41,102 @@ type NotaFiscalConservacaoInput = {
   observacoes?: string;
   arquivo?: { path?: string; name?: string; type?: string; size?: number };
 };
+
+export async function GET(request: Request) {
+  try {
+    const supabaseAdmin = createSupabaseAdminClient();
+    const actor = await getActorFromRequest(request, supabaseAdmin);
+
+    const isAprovador = await isAprovadorInterno(actor.email, supabaseAdmin);
+    if (!actor.isAdmin && !isAprovador) {
+      throw new HttpError(403, "Acesso restrito.");
+    }
+
+    const { searchParams } = new URL(request.url);
+    const prestadorId = normalizeText(searchParams.get("prestadorId"));
+    const lojaId = normalizeText(searchParams.get("lojaId"));
+    const competencia = normalizeText(searchParams.get("competencia"));
+    const status = normalizeText(searchParams.get("status"));
+    const numeroNf = normalizeText(searchParams.get("numeroNf"));
+
+    let query = supabaseAdmin
+      .from("notas_fiscais_conservacao")
+      .select("*", { count: "exact" })
+      .order("created_at", { ascending: false });
+
+    if (prestadorId) {
+      query = query.eq("prestador_id", prestadorId);
+    }
+    if (lojaId) {
+      query = query.eq("loja_id", lojaId);
+    }
+    if (competencia) {
+      query = query.eq("competencia", competencia);
+    }
+    if (status) {
+      query = query.eq("status", status);
+    }
+    if (numeroNf) {
+      query = query.ilike("numero_nf", `%${numeroNf}%`);
+    }
+
+    const { data, error, count } = await query;
+    if (error) {
+      throw error;
+    }
+
+    const notas = (data ?? []) as NotaFiscalConservacaoRow[];
+
+    const prestadorIds = Array.from(new Set(notas.map((nota) => nota.prestador_id)));
+    const lojaIds = Array.from(new Set(notas.map((nota) => nota.loja_id)));
+    const notaIds = notas.map((nota) => nota.id);
+
+    const [{ data: prestadoresData }, { data: lojasData }, { data: formulariosData }] =
+      await Promise.all([
+        prestadorIds.length > 0
+          ? supabaseAdmin.from("prestadores").select("id,nome").in("id", prestadorIds)
+          : Promise.resolve({ data: [] as { id: string; nome: string }[] }),
+        lojaIds.length > 0
+          ? supabaseAdmin.from("lojas").select("id,nome,codigo").in("id", lojaIds)
+          : Promise.resolve({ data: [] as { id: string; nome: string; codigo: string | null }[] }),
+        notaIds.length > 0
+          ? supabaseAdmin.from("formularios").select("id,arquivo_path").in("id", notaIds)
+          : Promise.resolve({ data: [] as { id: string; arquivo_path: string }[] }),
+      ]);
+
+    const prestadorNomeById = new Map(
+      (prestadoresData ?? []).map((item) => [item.id as string, item.nome as string]),
+    );
+    const lojaNomeById = new Map(
+      (lojasData ?? []).map((item) => [
+        item.id as string,
+        item.codigo ? `${item.nome} - ${item.codigo}` : (item.nome as string),
+      ]),
+    );
+    const arquivoPathById = new Map(
+      (formulariosData ?? []).map((item) => [item.id as string, item.arquivo_path as string]),
+    );
+
+    const notasComDetalhes = notas.map((nota) => ({
+      ...nota,
+      prestador_nome: prestadorNomeById.get(nota.prestador_id) ?? "—",
+      loja_nome: lojaNomeById.get(nota.loja_id) ?? "—",
+      arquivo_path: arquivoPathById.get(nota.id) ?? "",
+    }));
+
+    return NextResponse.json({ notas: notasComDetalhes, total: count ?? notas.length });
+  } catch (err) {
+    console.error("Erro ao listar notas fiscais de conservação:", err);
+    if (err instanceof HttpError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Não foi possível listar as notas fiscais.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   try {

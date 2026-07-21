@@ -228,6 +228,18 @@ export async function getAprovadorEmails(
   return new Set(emails);
 }
 
+export async function isAprovadorInterno(
+  email: string | null,
+  supabaseAdmin: ReturnType<typeof createSupabaseAdminClient>,
+) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) {
+    return false;
+  }
+  const aprovadores = await getAprovadorEmails(supabaseAdmin);
+  return aprovadores.has(normalized);
+}
+
 export function canViewOrcamento(
   row: OrcamentoInternoRow,
   actor: Actor,
