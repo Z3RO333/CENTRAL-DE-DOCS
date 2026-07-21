@@ -9,6 +9,7 @@ import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { useIsAprovadorInterno } from "@/hooks/useIsAprovadorInterno";
 import { DocumentActions } from "../_components/DocumentActions";
 import { DocumentDetailsDrawer } from "../_components/DocumentDetailsDrawer";
+import { ConservacaoSubNav } from "./_components/ConservacaoSubNav";
 import {
   type FormularioRecord,
   type EditField,
@@ -353,6 +354,8 @@ export default function ConservacaoPage() {
           </button>
         </div>
       </header>
+
+      <ConservacaoSubNav active="documentos" />
 
       {error && (
         <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
