@@ -27,6 +27,7 @@ export default function PrestadoresPage() {
     nome: "",
     tipoServico: "",
     cnpj: "",
+    categoria: "outro",
     usuarios: "",
   });
   const [prestadorFeedback, setPrestadorFeedback] = useState<{
@@ -502,6 +503,7 @@ const getDocumentoNome = (registro: {
         nome: prestadorForm.nome.trim(),
         tipo_servico: prestadorForm.tipoServico.trim(),
         cnpj: prestadorForm.cnpj.trim(),
+        categoria: prestadorForm.categoria,
         usuarios: usuariosList,
       });
       setPrestadorFeedback({
@@ -514,6 +516,7 @@ const getDocumentoNome = (registro: {
         nome: "",
         tipoServico: "",
         cnpj: "",
+        categoria: "outro",
         usuarios: "",
       });
       setIsCreatePrestadorOpen(false);
@@ -720,6 +723,43 @@ const getDocumentoNome = (registro: {
           err instanceof Error
             ? err.message
             : "Não foi possível atualizar o prestador.",
+        success: null,
+      });
+    }
+  };
+
+  const handleCategoriaChange = async (prestadorId: string, categoria: string) => {
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        throw sessionError;
+      }
+      const token = data.session?.access_token;
+      if (!token) {
+        throw new Error("Sessão expirada. Faça login novamente.");
+      }
+
+      const response = await fetch("/api/prestadores", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ id: prestadorId, categoria }),
+      });
+
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Não foi possível atualizar a categoria.");
+      }
+
+      await refreshPrestadores();
+    } catch (err) {
+      setPrestadorFeedback({
+        error:
+          err instanceof Error
+            ? err.message
+            : "Não foi possível atualizar a categoria.",
         success: null,
       });
     }
@@ -1248,6 +1288,22 @@ const getDocumentoNome = (registro: {
                       <span className="font-semibold text-slate-700">CNPJ:</span>{" "}
                       {selectedPrestador.cnpj}
                     </p>
+                    <label className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-700">Categoria:</span>
+                      <select
+                        value={selectedPrestador.categoria}
+                        onChange={(event) =>
+                          void handleCategoriaChange(
+                            selectedPrestador.id,
+                            event.target.value,
+                          )
+                        }
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                      >
+                        <option value="outro">Outro</option>
+                        <option value="conservacao">Conservação/Limpeza</option>
+                      </select>
+                    </label>
                   </div>
                   <button
                     type="button"
@@ -1502,6 +1558,22 @@ const getDocumentoNome = (registro: {
                     placeholder="Ex.: Laudos técnicos"
                     required
                   />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Categoria
+                  <select
+                    value={prestadorForm.categoria}
+                    onChange={(event) =>
+                      handlePrestadorFieldChange("categoria", event.target.value)
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                  >
+                    <option value="outro">Outro</option>
+                    <option value="conservacao">Conservação/Limpeza</option>
+                  </select>
+                  <span className="text-[11px] font-normal text-slate-500">
+                    Prestadores de conservação ficam separados na aba "Conservação".
+                  </span>
                 </label>
                 <label className="text-xs font-semibold text-slate-600">
                   CNPJ do prestador
