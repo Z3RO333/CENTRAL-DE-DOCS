@@ -59,8 +59,8 @@ const downloadSignedUrlAsBlob = async (signedUrl: string, fileName: string) => {
 export default function ConservacaoPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
-  const { isAdmin, loading: accessLoading } = useDocumentsAccess();
-  const canAccess = isAdmin;
+  const { isAdmin, role, loading: accessLoading } = useDocumentsAccess();
+  const canAccess = isAdmin || role === "gerente_loja";
   const canManageDocuments = isAdmin;
 
   const [registros, setRegistros] = useState<FormularioRecord[]>([]);

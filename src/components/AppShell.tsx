@@ -115,7 +115,7 @@ export default function AppShell({
           label: "Conservação",
           icon: Sparkles,
           isActive: pathname?.startsWith("/documentos/conservacao"),
-          isVisible: isAdmin && !documentsAccessLoading,
+          isVisible: (isAdmin || role === "gerente_loja") && !documentsAccessLoading,
         },
         {
           href: "/documentos/orcamentos-internos",
