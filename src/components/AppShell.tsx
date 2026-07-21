@@ -22,6 +22,7 @@ import {
   FileCheck2,
   ClipboardSignature,
   FileSignature,
+  Sparkles,
   ChevronLeft,
   ChevronRight,
   X,
@@ -98,7 +99,8 @@ export default function AppShell({
             !pathname?.startsWith("/documentos/cobrancas") &&
             !pathname?.startsWith("/documentos/btracker") &&
             !pathname?.startsWith("/documentos/orcamentos-internos") &&
-            !pathname?.startsWith("/documentos/contratos"),
+            !pathname?.startsWith("/documentos/contratos") &&
+            !pathname?.startsWith("/documentos/conservacao"),
           isVisible: canAccessDocuments,
         },
         {
@@ -106,6 +108,13 @@ export default function AppShell({
           label: "Contratos",
           icon: FileSignature,
           isActive: pathname?.startsWith("/documentos/contratos"),
+          isVisible: isAdmin && !documentsAccessLoading,
+        },
+        {
+          href: "/documentos/conservacao",
+          label: "Conservação",
+          icon: Sparkles,
+          isActive: pathname?.startsWith("/documentos/conservacao"),
           isVisible: isAdmin && !documentsAccessLoading,
         },
         {
