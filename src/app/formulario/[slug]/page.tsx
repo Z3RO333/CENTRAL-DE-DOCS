@@ -691,6 +691,18 @@ export default function FormularioPage() {
         return;
       }
 
+      if (config.slug === "notas-fiscais") {
+        const prestadorSelecionado = prestadoresDisponiveis.find(
+          (item) => item.id === selectedPrestadorId,
+        );
+        if (prestadorSelecionado?.categoria === "conservacao") {
+          setError(
+            "Este prestador é uma empresa de conservação. Cadastre esta nota em /formulario/notas-fiscais-conservacao.",
+          );
+          return;
+        }
+      }
+
       if (
         config.slug === "retencao-trabalhista" ||
         config.slug === "notas-fiscais" ||
