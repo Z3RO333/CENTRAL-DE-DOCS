@@ -186,7 +186,15 @@ export default function NotasFiscaisConservacaoManagementPage() {
         throw new Error(payload.error ?? "Não foi possível atualizar a nota fiscal.");
       }
       setNotas((prev) =>
-        prev.map((item) => (item.id === nota.id ? payload.nota! : item)),
+        prev.map((item) =>
+          item.id === nota.id
+            ? {
+                ...item,
+                status: payload.nota!.status,
+                motivo_status: payload.nota!.motivo_status,
+              }
+            : item,
+        ),
       );
     } catch (err) {
       setError(
