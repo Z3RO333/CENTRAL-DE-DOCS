@@ -9,6 +9,7 @@ export type Prestador = {
   nome: string;
   cnpj: string;
   tipo_servico: string;
+  categoria: string;
   usuarios: string[];
   created_at: string;
 };
@@ -17,6 +18,7 @@ export type CreatePrestadorInput = {
   nome: string;
   cnpj: string;
   tipo_servico: string;
+  categoria?: string;
   usuarios: string[];
 };
 

@@ -12,6 +12,7 @@ type PrestadorRow = {
   nome: string;
   cnpj: string;
   tipo_servico: string;
+  categoria: string;
   usuarios: string[] | null;
   created_at: string;
   created_by: string | null;
@@ -33,6 +34,7 @@ function normalizePrestador(item: PrestadorRow) {
     nome: fixMojibakeText(item.nome),
     cnpj: item.cnpj,
     tipo_servico: fixMojibakeText(item.tipo_servico),
+    categoria: item.categoria,
     usuarios: item.usuarios ?? [],
     created_at: item.created_at,
   };
@@ -62,7 +64,7 @@ export async function GET(request: Request) {
     }
     let query = supabaseAdmin
       .from("prestadores")
-      .select("id,nome,cnpj,tipo_servico,usuarios,created_at")
+      .select("id,nome,cnpj,tipo_servico,categoria,usuarios,created_at")
       .order("created_at", { ascending: false });
 
     if (assignedOnly && email) {
@@ -81,6 +83,7 @@ export async function GET(request: Request) {
           nome: item.nome as string,
           cnpj: item.cnpj as string,
           tipo_servico: item.tipo_servico as string,
+          categoria: item.categoria as string,
           usuarios: (item.usuarios as string[] | null) ?? [],
           created_at: item.created_at as string,
           created_by: null,
@@ -119,6 +122,7 @@ export async function POST(request: Request) {
       nome?: string;
       cnpj?: string;
       tipo_servico?: string;
+      categoria?: string;
       usuarios?: string[];
     };
 
@@ -127,6 +131,7 @@ export async function POST(request: Request) {
     const tipoServico = body.tipo_servico
       ? fixMojibakeText(body.tipo_servico.trim())
       : undefined;
+    const categoria = body.categoria === "conservacao" ? "conservacao" : "outro";
     const usuarios = normalizeEmails(body.usuarios ?? []);
 
     if (!nome) {
@@ -151,10 +156,11 @@ export async function POST(request: Request) {
         nome,
         cnpj,
         tipo_servico: tipoServico,
+        categoria,
         usuarios,
         created_by: user.id,
       })
-      .select("id,nome,cnpj,tipo_servico,usuarios,created_at")
+      .select("id,nome,cnpj,tipo_servico,categoria,usuarios,created_at")
       .single();
 
     if (error) {
@@ -197,17 +203,33 @@ export async function PATCH(request: Request) {
       id?: string;
       emails?: string[];
       remove_emails?: string[];
+      categoria?: string;
     };
 
     const prestadorId = body.id?.trim();
     const novosEmails = normalizeEmails(body.emails ?? []);
     const removerEmails = normalizeEmails(body.remove_emails ?? []);
+    const hasCategoriaUpdate = Object.prototype.hasOwnProperty.call(
+      body,
+      "categoria",
+    );
 
     if (!prestadorId) {
       throw new HttpError(400, "Informe o prestador.");
     }
-    if (novosEmails.length === 0 && removerEmails.length === 0) {
-      throw new HttpError(400, "Informe ao menos um e-mail.");
+    if (
+      novosEmails.length === 0 &&
+      removerEmails.length === 0 &&
+      !hasCategoriaUpdate
+    ) {
+      throw new HttpError(400, "Informe ao menos um e-mail ou a categoria.");
+    }
+    if (
+      hasCategoriaUpdate &&
+      body.categoria !== "conservacao" &&
+      body.categoria !== "outro"
+    ) {
+      throw new HttpError(400, "Categoria invalida.");
     }
 
     if (novosEmails.length > 0) {
@@ -223,7 +245,7 @@ export async function PATCH(request: Request) {
 
     const { data: prestadorData, error: prestadorError } = await supabaseAdmin
       .from("prestadores")
-      .select("id,nome,cnpj,tipo_servico,usuarios,created_at")
+      .select("id,nome,cnpj,tipo_servico,categoria,usuarios,created_at")
       .eq("id", prestadorId)
       .single();
 
@@ -236,11 +258,18 @@ export async function PATCH(request: Request) {
       (value) => !removerEmails.includes(value),
     );
 
+    const updatePayload: { usuarios: string[]; categoria?: string } = {
+      usuarios,
+    };
+    if (hasCategoriaUpdate) {
+      updatePayload.categoria = body.categoria;
+    }
+
     const { data, error } = await supabaseAdmin
       .from("prestadores")
-      .update({ usuarios })
+      .update(updatePayload)
       .eq("id", prestadorId)
-      .select("id,nome,cnpj,tipo_servico,usuarios,created_at")
+      .select("id,nome,cnpj,tipo_servico,categoria,usuarios,created_at")
       .single();
 
     if (error) {
