@@ -6,6 +6,7 @@ import { LoaderCircle, RefreshCw, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
+import { useIsAprovadorInterno } from "@/hooks/useIsAprovadorInterno";
 import { DocumentActions } from "../_components/DocumentActions";
 import { DocumentDetailsDrawer } from "../_components/DocumentDetailsDrawer";
 import {
@@ -59,8 +60,10 @@ const downloadSignedUrlAsBlob = async (signedUrl: string, fileName: string) => {
 export default function ConservacaoPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
-  const { isAdmin, role, loading: accessLoading } = useDocumentsAccess();
-  const canAccess = isAdmin || role === "gerente_loja";
+  const { isAdmin, loading: accessLoading } = useDocumentsAccess();
+  const { isAprovadorInterno, loading: aprovadorLoading } =
+    useIsAprovadorInterno();
+  const canAccess = isAdmin || isAprovadorInterno;
   const canManageDocuments = isAdmin;
 
   const [registros, setRegistros] = useState<FormularioRecord[]>([]);
@@ -84,10 +87,16 @@ export default function ConservacaoPage() {
     if (!authLoading && !user) {
       router.replace("/login");
     }
-    if (!authLoading && user && !accessLoading && !canAccess) {
+    if (
+      !authLoading &&
+      user &&
+      !accessLoading &&
+      !aprovadorLoading &&
+      !canAccess
+    ) {
       router.replace("/documentos");
     }
-  }, [accessLoading, authLoading, canAccess, router, user]);
+  }, [accessLoading, aprovadorLoading, authLoading, canAccess, router, user]);
 
   const getAccessToken = useCallback(async () => {
     const { data: sessionData, error: sessionError } =
@@ -292,7 +301,7 @@ export default function ConservacaoPage() {
 
   const editFields: EditField[] = editDialog ? getEditFields(editDialog.registro.tipo) : [];
 
-  if (authLoading || accessLoading || !user) {
+  if (authLoading || accessLoading || aprovadorLoading || !user) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
         Carregando documentos de conservação...

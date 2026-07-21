@@ -30,6 +30,7 @@ import {
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabaseClient";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
+import { useIsAprovadorInterno } from "@/hooks/useIsAprovadorInterno";
 import { SimulacaoControl, SimulacaoBanner } from "@/components/SimulacaoControl";
 
 export default function AppShell({
@@ -46,6 +47,8 @@ export default function AppShell({
     modules: modulesAccess,
     loading: documentsAccessLoading,
   } = useDocumentsAccess();
+  const { isAprovadorInterno, loading: aprovadorLoading } =
+    useIsAprovadorInterno();
   const publicRoutes = new Set(["/login", "/redefinir-senha"]);
   const showNav = !publicRoutes.has(pathname ?? "");
   const isDocumentsRoute = pathname?.startsWith("/documentos");
@@ -56,6 +59,10 @@ export default function AppShell({
     modulesAccess.documentos && !documentsAccessLoading;
   const canAccessCobrancas =
     (isAdmin || role === "gerente_loja") && !documentsAccessLoading;
+  const canAccessConservacao =
+    (isAdmin || isAprovadorInterno) &&
+    !documentsAccessLoading &&
+    !aprovadorLoading;
   const canAccessDashboards = isAdmin && !documentsAccessLoading;
   const canAccessPerfil = isAdmin && !documentsAccessLoading;
   const resolvedWithoutUser = !isLoading && !isAuthenticated;
@@ -115,7 +122,7 @@ export default function AppShell({
           label: "Conservação",
           icon: Sparkles,
           isActive: pathname?.startsWith("/documentos/conservacao"),
-          isVisible: (isAdmin || role === "gerente_loja") && !documentsAccessLoading,
+          isVisible: canAccessConservacao,
         },
         {
           href: "/documentos/orcamentos-internos",

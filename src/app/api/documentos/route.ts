@@ -18,6 +18,7 @@ import {
   hasDocumentosAccess,
 } from "@/lib/apiAuth";
 import { normalizeDisplayData } from "@/lib/textEncoding";
+import { getAprovadorEmails, normalizeEmail } from "@/lib/orcamentosInternos";
 
 type FormularioRow = {
   id: string;
@@ -118,8 +119,16 @@ export async function GET(request: Request) {
       supabaseAdmin,
     );
 
-    const canAccess = actor.isAdmin;
     const { searchParams } = new URL(request.url);
+    const categoriaPrestadorFilter = searchParams.get("categoriaPrestador");
+    let isAprovadorInternoConservacao = false;
+    if (!actor.isAdmin && categoriaPrestadorFilter === "conservacao") {
+      const actorEmail = normalizeEmail(email);
+      const aprovadores = await getAprovadorEmails(supabaseAdmin);
+      isAprovadorInternoConservacao =
+        actorEmail !== null && aprovadores.has(actorEmail);
+    }
+    const canAccess = actor.isAdmin || isAprovadorInternoConservacao;
     const filterUserId = searchParams.get("userId");
     const filterPrestadores = normalizeIds(
       searchParams
@@ -168,7 +177,6 @@ export async function GET(request: Request) {
       query = query.neq("tipo", "contratos");
     }
 
-    const categoriaPrestadorFilter = searchParams.get("categoriaPrestador");
     const {
       data: prestadoresConservacao,
       error: prestadoresConservacaoError,
