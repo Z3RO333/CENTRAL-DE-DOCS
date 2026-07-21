@@ -73,3 +73,24 @@ export const buildDocumentosTextSearchOr = (term: string) => {
     );
   });
 };
+
+export const getValorOrcamento = (
+  dados: Record<string, unknown> | null,
+): number | null => {
+  const raw = dados?.valor;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw;
+  }
+  if (typeof raw === "string" && raw.trim()) {
+    const parsed = Number(raw.trim().replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+export const formatCurrencyBRL = (value: number | null): string | null => {
+  if (value === null) {
+    return null;
+  }
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+};

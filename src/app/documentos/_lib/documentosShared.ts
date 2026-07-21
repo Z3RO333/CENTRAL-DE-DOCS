@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
+export { getValorOrcamento, formatCurrencyBRL } from "@/lib/documentosApiUtils";
 
 export type FormularioRecord = {
   id: string;

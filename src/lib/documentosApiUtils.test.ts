@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_LIMIT,
   MAX_LIMIT,
+  formatCurrencyBRL,
+  getValorOrcamento,
   normalizeIds,
   resolveLimit,
   safeParseDados,
@@ -59,5 +61,33 @@ describe("documentosApiUtils", () => {
       prestador: "Dinâmica Serviços",
       anexos: [{ nome: "Laboratório.pdf" }],
     });
+  });
+
+  it("getValorOrcamento le numero de dados.valor", () => {
+    expect(getValorOrcamento({ valor: 1234.5 })).toBe(1234.5);
+  });
+
+  it("getValorOrcamento converte string com ponto decimal", () => {
+    expect(getValorOrcamento({ valor: "1234.50" })).toBe(1234.5);
+  });
+
+  it("getValorOrcamento converte string com virgula decimal", () => {
+    expect(getValorOrcamento({ valor: "1234,50" })).toBe(1234.5);
+  });
+
+  it("getValorOrcamento retorna null quando valor ausente ou invalido", () => {
+    expect(getValorOrcamento(null)).toBeNull();
+    expect(getValorOrcamento({})).toBeNull();
+    expect(getValorOrcamento({ valor: "abc" })).toBeNull();
+  });
+
+  it("formatCurrencyBRL formata em Real com duas casas decimais", () => {
+    expect(formatCurrencyBRL(1234.5)).toBe(
+      (1234.5).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+    );
+  });
+
+  it("formatCurrencyBRL retorna null quando valor e null", () => {
+    expect(formatCurrencyBRL(null)).toBeNull();
   });
 });
