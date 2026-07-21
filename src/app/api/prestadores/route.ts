@@ -149,6 +149,13 @@ export async function POST(request: Request) {
         "Informe ao menos um e-mail autorizado para o prestador.",
       );
     }
+    if (
+      body.categoria !== undefined &&
+      body.categoria !== "conservacao" &&
+      body.categoria !== "outro"
+    ) {
+      throw new HttpError(400, "Categoria invalida.");
+    }
 
     const { data, error } = await supabaseAdmin
       .from("prestadores")
