@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 type ConservacaoSubNavProps = {
-  active: "documentos" | "notas-fiscais";
+  active: "documentos" | "notas-fiscais" | "dashboard";
 };
 
 export function ConservacaoSubNav({ active }: ConservacaoSubNavProps) {
@@ -13,6 +13,11 @@ export function ConservacaoSubNav({ active }: ConservacaoSubNavProps) {
       key: "notas-fiscais",
       label: "Notas Fiscais",
       href: "/documentos/conservacao/notas-fiscais",
+    },
+    {
+      key: "dashboard",
+      label: "Dashboard",
+      href: "/documentos/conservacao/dashboard",
     },
   ];
 
