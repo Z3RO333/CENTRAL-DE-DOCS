@@ -33,6 +33,7 @@ export default function NotasFiscaisConservacaoPage() {
   const [valor, setValor] = useState("");
   const [competencia, setCompetencia] = useState("");
   const [dataRecebimento, setDataRecebimento] = useState("");
+  const [responsavel, setResponsavel] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -96,6 +97,7 @@ export default function NotasFiscaisConservacaoPage() {
           valor: valor.trim() || undefined,
           competencia: competencia.trim() || undefined,
           dataRecebimento,
+          responsavel: responsavel.trim() || undefined,
           observacoes: observacoes.trim() || undefined,
           arquivo: {
             path: uploadData.path ?? path,
@@ -125,6 +127,7 @@ export default function NotasFiscaisConservacaoPage() {
       setValor("");
       setCompetencia("");
       setDataRecebimento("");
+      setResponsavel("");
       setObservacoes("");
       setFile(null);
     } catch (err) {
@@ -252,6 +255,16 @@ export default function NotasFiscaisConservacaoPage() {
               onChange={(event) => setDataRecebimento(event.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
               required
+            />
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Responsável / Gestor
+            <input
+              type="text"
+              placeholder="Ex.: Wanderleia"
+              value={responsavel}
+              onChange={(event) => setResponsavel(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
             />
           </label>
         </div>

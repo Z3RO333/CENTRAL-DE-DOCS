@@ -24,6 +24,7 @@ export type NotaFiscalConservacaoRow = {
   competencia: string | null;
   data_recebimento: string;
   observacoes: string | null;
+  responsavel: string | null;
   status: "aguardando_verificacao" | "concluida" | "rejeitada";
   motivo_status: string | null;
   created_by: string | null;
@@ -40,6 +41,7 @@ type NotaFiscalConservacaoInput = {
   competencia?: string;
   dataRecebimento?: string;
   observacoes?: string;
+  responsavel?: string;
   arquivo?: { path?: string; name?: string; type?: string; size?: number };
 };
 
@@ -239,6 +241,7 @@ export async function POST(request: Request) {
     const valor = parseValorTotal(body.valor);
     const numeroPedido = normalizeText(body.numeroPedido) || null;
     const observacoes = normalizeText(body.observacoes) || null;
+    const responsavel = normalizeText(body.responsavel) || null;
     const nomeArquivo = normalizeText(body.arquivo?.name) || arquivoPath.split("/").pop() || "nota.pdf";
 
     const { data: formulario, error: formularioError } = await supabaseAdmin
@@ -259,6 +262,7 @@ export async function POST(request: Request) {
           competencia,
           data_recebimento: dataRecebimento,
           observacoes,
+          responsavel,
           nome_arquivo: nomeArquivo,
         },
       })
@@ -282,6 +286,7 @@ export async function POST(request: Request) {
         competencia,
         data_recebimento: dataRecebimento,
         observacoes,
+        responsavel,
         created_by: actor.realUserId,
       })
       .select("*")

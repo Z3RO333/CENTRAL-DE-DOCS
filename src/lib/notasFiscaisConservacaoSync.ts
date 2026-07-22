@@ -77,6 +77,7 @@ export async function syncNotasFiscaisConservacaoFromGenericos(
       (typeof dados.observacoes === "string" && dados.observacoes.trim()) ||
       (typeof dados.descricao === "string" && dados.descricao.trim()) ||
       null;
+    const responsavel = typeof dados.responsavel === "string" ? dados.responsavel.trim() || null : null;
     const dataRecebimento = formulario.created_at.slice(0, 10);
 
     const { error: insertError } = await supabaseAdmin
@@ -90,6 +91,7 @@ export async function syncNotasFiscaisConservacaoFromGenericos(
         competencia,
         data_recebimento: dataRecebimento,
         observacoes,
+        responsavel,
         created_by: formulario.user_id,
       });
     if (insertError) {

@@ -28,6 +28,7 @@ type NotaFiscalConservacao = {
   competencia: string | null;
   data_recebimento: string;
   observacoes: string | null;
+  responsavel: string | null;
   status: "aguardando_verificacao" | "concluida" | "rejeitada";
   motivo_status: string | null;
   created_at: string;
@@ -331,6 +332,11 @@ export default function NotasFiscaisConservacaoManagementPage() {
                   <tr key={nota.id} className="align-top">
                     <td className="px-4 py-3 font-semibold text-slate-900">
                       {nota.prestador_nome}
+                      {nota.responsavel && (
+                        <p className="text-[11px] font-normal text-slate-400">
+                          Gestor: {nota.responsavel}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-600">{nota.loja_nome}</td>
                     <td className="px-4 py-3 text-xs text-slate-600">
