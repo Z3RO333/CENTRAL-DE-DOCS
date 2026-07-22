@@ -115,8 +115,8 @@ export async function GET(request: Request) {
           ors.length > 0 ? ors.join(",") : "id.eq.00000000-0000-0000-0000-000000000000",
         );
       }
-    } else if (tab === "todos" && !actor.isAdmin) {
-      throw new HttpError(403, "A visão geral é restrita a administradores.");
+    } else if (tab === "todos" && !actor.isAdmin && !isAprovador) {
+      throw new HttpError(403, "A visão geral é restrita a administradores e aprovadores.");
     }
 
     if (status && status !== "todos") {

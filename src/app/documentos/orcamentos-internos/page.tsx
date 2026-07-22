@@ -22,6 +22,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
+import { useIsAprovadorInterno } from "@/hooks/useIsAprovadorInterno";
 import {
   STATUS_LABEL,
   type OrcamentoInternoStatus,
@@ -183,6 +184,8 @@ export default function OrcamentosInternosPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
   const { isAdmin, loading: accessLoading, modules } = useDocumentsAccess();
+  const { isAprovadorInterno, loading: aprovadorLoading } = useIsAprovadorInterno();
+  const isGestor = isAdmin || isAprovadorInterno;
   const [tab, setTab] = useState<"meus" | "aprovacao" | "todos">("meus");
   const [orcamentos, setOrcamentos] = useState<OrcamentoInterno[]>([]);
   const [total, setTotal] = useState(0);
@@ -215,6 +218,12 @@ export default function OrcamentosInternosPage() {
       router.replace("/documentos");
     }
   }, [accessLoading, authLoading, canAccess, router, user]);
+
+  useEffect(() => {
+    if (!accessLoading && !aprovadorLoading && !isGestor && tab !== "meus") {
+      setTab("meus");
+    }
+  }, [accessLoading, aprovadorLoading, isGestor, tab]);
 
   const loadOptions = useCallback(async () => {
     try {
@@ -674,8 +683,8 @@ export default function OrcamentosInternosPage() {
             <div className="flex flex-wrap gap-2">
               {[
                 ["meus", "Meus orçamentos"],
-                ["aprovacao", "Aguardando minha aprovação"],
-                ...(isAdmin ? [["todos", "Todos os orçamentos"]] : []),
+                ...(isGestor ? [["aprovacao", "Aguardando minha aprovação"]] : []),
+                ...(isGestor ? [["todos", "Todos os orçamentos"]] : []),
               ].map(([value, label]) => (
                 <button
                   key={value}
