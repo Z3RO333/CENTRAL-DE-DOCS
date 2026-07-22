@@ -26,6 +26,7 @@ import {
   STATUS_LABEL,
   type OrcamentoInternoStatus,
 } from "@/lib/orcamentosInternosShared";
+import { formatPersonName } from "@/lib/displayName";
 
 type GestorOption = {
   id: string | null;
@@ -110,7 +111,6 @@ const STATUS_BADGE: Record<OrcamentoInternoStatus, string> = {
 };
 
 const STORAGE_BUCKET = "formularios";
-const SIGNATURE_STORAGE_PREFIX = "digital-signature:";
 
 const statusOptions: Array<{ value: "todos" | OrcamentoInternoStatus; label: string }> = [
   { value: "todos", label: "Todos os status" },
@@ -177,14 +177,6 @@ async function downloadPath(path: string) {
   link.click();
   document.body.removeChild(link);
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
-}
-
-async function normalizeSignatureDataUrl(dataUrl: string) {
-  if (dataUrl.includes("image/png")) return { dataUrl, format: "png" as const };
-  if (dataUrl.includes("image/jpeg") || dataUrl.includes("image/jpg")) {
-    return { dataUrl, format: "jpg" as const };
-  }
-  throw new Error("Use uma assinatura PNG ou JPG salva no Perfil.");
 }
 
 export default function OrcamentosInternosPage() {
@@ -434,11 +426,6 @@ export default function OrcamentosInternosPage() {
 
   const signAndApprove = async (orcamento: OrcamentoInterno) => {
     if (!user) return;
-    const signature = window.localStorage.getItem(`${SIGNATURE_STORAGE_PREFIX}${user.id}`);
-    if (!signature) {
-      setError("Cadastre uma assinatura no Perfil antes de aprovar.");
-      return;
-    }
     setActionLoading("aprovar_assinar");
     setError(null);
     try {
@@ -448,41 +435,50 @@ export default function OrcamentosInternosPage() {
         return res.arrayBuffer();
       });
       const pdfDoc = await PDFDocument.load(originalBytes);
-      const { dataUrl, format } = await normalizeSignatureDataUrl(signature);
-      const signatureBytes = await fetch(dataUrl).then((res) => res.arrayBuffer());
-      const signatureImage =
-        format === "png"
-          ? await pdfDoc.embedPng(signatureBytes)
-          : await pdfDoc.embedJpg(signatureBytes);
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
       const pages = pdfDoc.getPages();
       const page = pages[pages.length - 1];
-      const { width } = page.getSize();
-      const maxWidth = 170;
-      const scale = Math.min(maxWidth / signatureImage.width, 60 / signatureImage.height, 1);
-      const signatureWidth = signatureImage.width * scale;
-      const signatureHeight = signatureImage.height * scale;
+
+      const displayName =
+        formatPersonName({
+          name: (user.user_metadata?.name as string | undefined) ?? null,
+          fullName: (user.user_metadata?.full_name as string | undefined) ?? null,
+          email: user.email ?? null,
+        }) ||
+        user.email ||
+        "Gestor aprovador";
+
       const approvedAt = new Date();
-      const validationText = `Orçamento autorizado digitalmente por ${user.email ?? "gestor"} em ${approvedAt.toLocaleString("pt-BR")}.`;
-      page.drawText(validationText, {
-        x: 48,
-        y: 54,
+      const pad = (value: number) => String(value).padStart(2, "0");
+      const offsetMinutesTotal = -approvedAt.getTimezoneOffset();
+      const offsetSign = offsetMinutesTotal >= 0 ? "+" : "-";
+      const offsetHours = pad(Math.floor(Math.abs(offsetMinutesTotal) / 60));
+      const offsetMinutes = pad(Math.abs(offsetMinutesTotal) % 60);
+      const dadosLabel = `Dados: ${approvedAt.getFullYear()}.${pad(approvedAt.getMonth() + 1)}.${pad(approvedAt.getDate())} ${pad(approvedAt.getHours())}:${pad(approvedAt.getMinutes())}:${pad(approvedAt.getSeconds())} ${offsetSign}${offsetHours}'${offsetMinutes}'`;
+
+      const stampX = 48;
+      const stampBaseY = 54;
+      page.drawText("Assinado de forma digital por", {
+        x: stampX,
+        y: stampBaseY + 24,
         size: 8,
         font,
-        color: rgb(0.15, 0.23, 0.34),
+        color: rgb(0.4, 0.45, 0.5),
       });
-      page.drawImage(signatureImage, {
-        x: Math.max(48, width - signatureWidth - 64),
-        y: 70,
-        width: signatureWidth,
-        height: signatureHeight,
+      page.drawText(displayName, {
+        x: stampX,
+        y: stampBaseY + 12,
+        size: 12,
+        font: fontBold,
+        color: rgb(0.1, 0.12, 0.16),
       });
-      page.drawText(user.email ?? "Gestor aprovador", {
-        x: Math.max(48, width - signatureWidth - 64),
-        y: 62,
+      page.drawText(dadosLabel, {
+        x: stampX,
+        y: stampBaseY,
         size: 8,
         font,
-        color: rgb(0.15, 0.23, 0.34),
+        color: rgb(0.4, 0.45, 0.5),
       });
 
       const bytes = await pdfDoc.save();
