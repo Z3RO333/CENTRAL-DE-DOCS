@@ -310,6 +310,32 @@ export const getSemaforoVencimento = (
   return { status: "verde", label: "Em dia" };
 };
 
+export const getSemaforoRecebimentoNota = (
+  dataRecebimento: string | null,
+  status: string,
+): { status: SemaforoStatus; label: string } | null => {
+  if (status !== "aguardando_verificacao") {
+    return null;
+  }
+  if (!dataRecebimento) {
+    return { status: "indefinido", label: "Sem data" };
+  }
+  const recebimento = new Date(`${dataRecebimento}T00:00:00`);
+  if (Number.isNaN(recebimento.getTime())) {
+    return { status: "indefinido", label: "Sem data" };
+  }
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const dias = Math.floor((hoje.getTime() - recebimento.getTime()) / 86400000);
+  if (dias <= 3) {
+    return { status: "verde", label: "Dentro do prazo" };
+  }
+  if (dias <= 6) {
+    return { status: "amarelo", label: "Atenção" };
+  }
+  return { status: "vermelho", label: "Atrasada" };
+};
+
 export const getPageCount = (registro: FormularioRecord) => {
   const raw = registro.dados?.page_count;
   if (typeof raw === "number" && Number.isFinite(raw)) {
