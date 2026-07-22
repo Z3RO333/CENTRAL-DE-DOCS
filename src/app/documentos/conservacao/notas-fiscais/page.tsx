@@ -11,6 +11,8 @@ import {
   getSignedFileUrl,
   resolveSignedPdfPath,
   formatCurrencyBRL,
+  getSemaforoRecebimentoNota,
+  SEMAFORO_BADGE,
 } from "../../_lib/documentosShared";
 import { ConservacaoSubNav } from "../_components/ConservacaoSubNav";
 
@@ -319,6 +321,7 @@ export default function NotasFiscaisConservacaoManagementPage() {
                   <th className="px-4 py-3">NF</th>
                   <th className="px-4 py-3 text-right">Valor</th>
                   <th className="px-4 py-3">Competência</th>
+                  <th className="px-4 py-3">Prazo</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
@@ -343,6 +346,24 @@ export default function NotasFiscaisConservacaoManagementPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-600">
                       {nota.competencia ?? "-"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const semaforo = getSemaforoRecebimentoNota(
+                          nota.data_recebimento,
+                          nota.status,
+                        );
+                        if (!semaforo) {
+                          return <span className="text-xs text-slate-400">-</span>;
+                        }
+                        return (
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${SEMAFORO_BADGE[semaforo.status]}`}
+                          >
+                            {semaforo.label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       <span
