@@ -12,6 +12,7 @@ import {
   parseValorTotal,
 } from "@/lib/orcamentosInternos";
 import { parseCompetencia } from "@/lib/competencia";
+import { syncNotasFiscaisConservacaoFromGenericos } from "@/lib/notasFiscaisConservacaoSync";
 
 export type NotaFiscalConservacaoRow = {
   id: string;
@@ -50,6 +51,12 @@ export async function GET(request: Request) {
     const isAprovador = await isAprovadorInterno(actor.email, supabaseAdmin);
     if (!actor.isAdmin && !isAprovador) {
       throw new HttpError(403, "Acesso restrito.");
+    }
+
+    try {
+      await syncNotasFiscaisConservacaoFromGenericos(supabaseAdmin);
+    } catch (syncError) {
+      console.error("Erro ao importar notas fiscais genéricas de conservação:", syncError);
     }
 
     const { searchParams } = new URL(request.url);
