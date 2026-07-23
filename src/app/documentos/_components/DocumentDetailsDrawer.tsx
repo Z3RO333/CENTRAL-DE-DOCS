@@ -49,6 +49,8 @@ type DocumentoAnaliseResultado = {
     confianca?: number | null;
   }>;
   prestador?: string | null;
+  cnpj?: string | null;
+  numero_orcamento?: string | null;
   numero_nf?: string | null;
   numero_pedido?: string | null;
   numero_contrato?: string | null;
@@ -58,6 +60,7 @@ type DocumentoAnaliseResultado = {
   tipo_servico?: string | null;
   data_assinatura?: string | null;
   data_vencimento?: string | null;
+  data_validade?: string | null;
   itens?: Array<{
     descricao?: string;
     competencia?: string | null;
@@ -230,11 +233,18 @@ const buildUpdatesFromAnalise = (resultado: DocumentoAnaliseResultado) => {
   if (valor) updates.valor = valor;
   if (resultado.descricao?.trim()) updates.descricao = resultado.descricao.trim();
   if (resultado.prestador?.trim()) updates.prestador = resultado.prestador.trim();
+  if (resultado.cnpj?.trim()) updates.cnpj = resultado.cnpj.trim();
+  if (resultado.numero_orcamento?.trim()) {
+    updates.numero_orcamento = resultado.numero_orcamento.trim();
+  }
   if (resultado.data_assinatura?.trim()) {
     updates.data_assinatura = resultado.data_assinatura.trim();
   }
   if (resultado.data_vencimento?.trim()) {
     updates.data_vencimento = resultado.data_vencimento.trim();
+  }
+  if (resultado.data_validade?.trim()) {
+    updates.data_validade = resultado.data_validade.trim();
   }
   if (resultado.tipo_servico?.trim()) {
     updates.tipo_servico = resultado.tipo_servico.trim();

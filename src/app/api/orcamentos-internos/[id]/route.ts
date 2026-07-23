@@ -140,10 +140,11 @@ export async function GET(
     if (timelineResult.error) throw timelineResult.error;
 
     const actorRealEmail = normalizeEmail(actor.realEmail);
+    const actorIsAprovador =
+      actorRealEmail !== null && aprovadores.has(actorRealEmail);
     const isGestor =
       orcamento.gestor_id === actor.realUserId ||
-      (actorRealEmail !== null && actorRealEmail === normalizeEmail(orcamento.gestor_email)) ||
-      (actorRealEmail !== null && aprovadores.has(actorRealEmail));
+      (actorRealEmail !== null && actorRealEmail === normalizeEmail(orcamento.gestor_email));
     if (isGestor) {
       await logOrcamentoEvent({
         supabaseAdmin,
@@ -153,19 +154,6 @@ export async function GET(
         actorEmail: actor.realEmail,
         metadata: { status: orcamento.status },
       });
-      if (orcamento.status === "aguardando_aprovacao") {
-        await supabaseAdmin
-          .from("orcamentos_internos")
-          .update({ status: "em_analise_gestor" })
-          .eq("id", id)
-          .eq("status", "aguardando_aprovacao");
-        await updateFormularioStatus({
-          supabaseAdmin,
-          id,
-          status: "em_analise_gestor",
-        });
-        orcamento.status = "em_analise_gestor";
-      }
     }
 
     return NextResponse.json({
@@ -179,7 +167,11 @@ export async function GET(
           }),
         ),
       isAdmin: actor.isAdmin,
-      canDecide: actor.realIsAdmin || isGestor,
+      canDecide:
+        ["aguardando_aprovacao", "em_analise_gestor", "reenviado"].includes(
+          orcamento.status,
+        ) &&
+        (actor.realIsAdmin || (actorIsAprovador && isGestor)),
     });
   } catch (err) {
     console.error("Erro ao carregar orçamento interno:", err);
@@ -241,6 +233,7 @@ export async function PATCH(
           supabaseAdmin,
         ),
       ]);
+
       const updates = {
         loja_id: lojaId,
         loja_nome: lojaNome,
@@ -248,19 +241,32 @@ export async function PATCH(
           normalizeText(body.areaSolicitante) || current.area_solicitante,
         prestador_id: prestadorId,
         prestador_nome: prestadorNome,
-        numero_orcamento:
-          normalizeText(body.numeroOrcamento) || current.numero_orcamento,
-        descricao: normalizeText(body.descricao) || current.descricao,
-        valor_total:
-          parseValorTotal(body.valorTotal) ?? Number(current.valor_total ?? 0),
-        data_validade:
-          normalizeText(body.dataValidade) || current.data_validade,
+        fornecedor_cnpj: Object.prototype.hasOwnProperty.call(body, "fornecedorCnpj")
+          ? normalizeText(body.fornecedorCnpj) || null
+          : current.fornecedor_cnpj,
+        numero_orcamento: Object.prototype.hasOwnProperty.call(body, "numeroOrcamento")
+          ? normalizeText(body.numeroOrcamento)
+          : current.numero_orcamento,
+        descricao: Object.prototype.hasOwnProperty.call(body, "descricao")
+          ? normalizeText(body.descricao)
+          : current.descricao,
+        valor_total: Object.prototype.hasOwnProperty.call(body, "valorTotal")
+          ? parseValorTotal(body.valorTotal)
+          : current.valor_total,
+        data_validade: Object.prototype.hasOwnProperty.call(body, "dataValidade")
+          ? normalizeText(body.dataValidade) || null
+          : current.data_validade,
         numero_referencia:
           normalizeText(body.numeroReferencia) || current.numero_referencia,
-        gestor_id: normalizeText(body.gestorId) || current.gestor_id,
-        gestor_email:
-          normalizeEmail(body.gestorEmail) ?? normalizeEmail(current.gestor_email) ?? "",
-        gestor_nome: normalizeText(body.gestorNome) || current.gestor_nome,
+        gestor_id: Object.prototype.hasOwnProperty.call(body, "gestorId")
+          ? normalizeText(body.gestorId) || null
+          : current.gestor_id,
+        gestor_email: Object.prototype.hasOwnProperty.call(body, "gestorEmail")
+          ? normalizeEmail(body.gestorEmail) ?? ""
+          : normalizeEmail(current.gestor_email) ?? "",
+        gestor_nome: Object.prototype.hasOwnProperty.call(body, "gestorNome")
+          ? normalizeText(body.gestorNome) || null
+          : current.gestor_nome,
         observacoes: normalizeText(body.observacoes) || current.observacoes,
       };
       const { data, error } = await supabaseAdmin
@@ -278,6 +284,7 @@ export async function PATCH(
           loja_id: updates.loja_id,
           loja_nome: updates.loja_nome,
           prestador: updates.prestador_nome,
+          fornecedor_cnpj: updates.fornecedor_cnpj,
           numero_orcamento: updates.numero_orcamento,
           descricao: updates.descricao,
           valor: updates.valor_total,
@@ -305,6 +312,7 @@ export async function PATCH(
           areaSolicitante: body.areaSolicitante ?? current.area_solicitante,
           prestadorId: body.prestadorId ?? current.prestador_id,
           prestadorNome: body.prestadorNome ?? current.prestador_nome,
+          fornecedorCnpj: body.fornecedorCnpj ?? current.fornecedor_cnpj,
           numeroOrcamento: body.numeroOrcamento ?? current.numero_orcamento,
           descricao: body.descricao ?? current.descricao,
           valorTotal: body.valorTotal ?? current.valor_total,
@@ -355,6 +363,12 @@ export async function PATCH(
         ),
       ]);
 
+      const gestorEmailValidado =
+        normalizeEmail(body.gestorEmail) ?? normalizeEmail(current.gestor_email);
+      if (!gestorEmailValidado || !aprovadores.has(gestorEmailValidado)) {
+        throw new HttpError(400, "Selecione um gestor aprovador válido.");
+      }
+
       const nextStatus: OrcamentoInternoStatus =
         action === "reenviar" ? "reenviado" : "aguardando_aprovacao";
       const nextVersion =
@@ -368,19 +382,30 @@ export async function PATCH(
           normalizeText(body.areaSolicitante) || current.area_solicitante,
         prestador_id: prestadorId,
         prestador_nome: prestadorNome,
-        numero_orcamento:
-          normalizeText(body.numeroOrcamento) || current.numero_orcamento,
-        descricao: normalizeText(body.descricao) || current.descricao,
-        valor_total:
-          parseValorTotal(body.valorTotal) ?? Number(current.valor_total ?? 0),
-        data_validade:
-          normalizeText(body.dataValidade) || current.data_validade,
+        fornecedor_cnpj: Object.prototype.hasOwnProperty.call(body, "fornecedorCnpj")
+          ? normalizeText(body.fornecedorCnpj) || null
+          : current.fornecedor_cnpj,
+        numero_orcamento: Object.prototype.hasOwnProperty.call(body, "numeroOrcamento")
+          ? normalizeText(body.numeroOrcamento)
+          : current.numero_orcamento,
+        descricao: Object.prototype.hasOwnProperty.call(body, "descricao")
+          ? normalizeText(body.descricao)
+          : current.descricao,
+        valor_total: Object.prototype.hasOwnProperty.call(body, "valorTotal")
+          ? parseValorTotal(body.valorTotal)
+          : current.valor_total,
+        data_validade: Object.prototype.hasOwnProperty.call(body, "dataValidade")
+          ? normalizeText(body.dataValidade) || null
+          : current.data_validade,
         numero_referencia:
           normalizeText(body.numeroReferencia) || current.numero_referencia,
-        gestor_id: normalizeText(body.gestorId) || current.gestor_id,
-        gestor_email:
-          normalizeEmail(body.gestorEmail) ?? normalizeEmail(current.gestor_email) ?? "",
-        gestor_nome: normalizeText(body.gestorNome) || current.gestor_nome,
+        gestor_id: Object.prototype.hasOwnProperty.call(body, "gestorId")
+          ? normalizeText(body.gestorId) || null
+          : current.gestor_id,
+        gestor_email: gestorEmailValidado,
+        gestor_nome: Object.prototype.hasOwnProperty.call(body, "gestorNome")
+          ? normalizeText(body.gestorNome) || null
+          : current.gestor_nome,
         observacoes: normalizeText(body.observacoes) || current.observacoes,
         arquivo_original_path: principal.path.trim(),
         status: nextStatus,
@@ -425,6 +450,7 @@ export async function PATCH(
           loja_id: updates.loja_id,
           loja_nome: updates.loja_nome,
           prestador: updates.prestador_nome,
+          fornecedor_cnpj: updates.fornecedor_cnpj,
           numero_orcamento: updates.numero_orcamento,
           descricao: updates.descricao,
           valor: updates.valor_total,
@@ -463,6 +489,7 @@ export async function PATCH(
           ultima_justificativa: justificativa,
         })
         .eq("id", id)
+        .eq("status", from)
         .select("*")
         .single();
       if (error || !data) throw error ?? new Error("Falha ao solicitar ajuste.");
@@ -496,6 +523,7 @@ export async function PATCH(
           ultima_justificativa: justificativa,
         })
         .eq("id", id)
+        .eq("status", from)
         .select("*")
         .single();
       if (error || !data) throw error ?? new Error("Falha ao rejeitar.");
@@ -521,6 +549,7 @@ export async function PATCH(
         .from("orcamentos_internos")
         .update({ status: nextStatus })
         .eq("id", id)
+        .eq("status", from)
         .select("*")
         .single();
       if (error || !data) throw error ?? new Error("Falha ao devolver.");
@@ -554,6 +583,7 @@ export async function PATCH(
           ultima_justificativa: null,
         })
         .eq("id", id)
+        .eq("status", from)
         .select("*")
         .single();
       if (error || !data) throw error ?? new Error("Falha ao aprovar.");

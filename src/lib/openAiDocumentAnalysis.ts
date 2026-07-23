@@ -13,6 +13,8 @@ export type DocumentoAnaliseIa = {
     confianca: number;
   }>;
   prestador: string | null;
+  cnpj: string | null;
+  numero_orcamento: string | null;
   numero_nf: string | null;
   numero_pedido: string | null;
   numero_contrato: string | null;
@@ -22,6 +24,7 @@ export type DocumentoAnaliseIa = {
   tipo_servico: string | null;
   data_assinatura: string | null;
   data_vencimento: string | null;
+  data_validade: string | null;
   itens: Array<{
     descricao: string;
     competencia: string | null;
@@ -56,6 +59,8 @@ const ANALISE_SCHEMA = {
     "competencias",
     "lojas",
     "prestador",
+    "cnpj",
+    "numero_orcamento",
     "numero_nf",
     "numero_pedido",
     "numero_contrato",
@@ -65,6 +70,7 @@ const ANALISE_SCHEMA = {
     "tipo_servico",
     "data_assinatura",
     "data_vencimento",
+    "data_validade",
     "itens",
     "alertas",
     "confianca_geral",
@@ -101,6 +107,8 @@ const ANALISE_SCHEMA = {
       },
     },
     prestador: { anyOf: [{ type: "string" }, { type: "null" }] },
+    cnpj: { anyOf: [{ type: "string" }, { type: "null" }] },
+    numero_orcamento: { anyOf: [{ type: "string" }, { type: "null" }] },
     numero_nf: { anyOf: [{ type: "string" }, { type: "null" }] },
     numero_pedido: { anyOf: [{ type: "string" }, { type: "null" }] },
     numero_contrato: { anyOf: [{ type: "string" }, { type: "null" }] },
@@ -112,6 +120,9 @@ const ANALISE_SCHEMA = {
       anyOf: [{ type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, { type: "null" }],
     },
     data_vencimento: {
+      anyOf: [{ type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, { type: "null" }],
+    },
+    data_validade: {
       anyOf: [{ type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, { type: "null" }],
     },
     itens: {
@@ -351,7 +362,7 @@ export async function analisarDocumentoComOpenAi(
         {
           role: "system",
           content:
-            "Voce analisa documentos administrativos brasileiros, incluindo laudos tecnicos, checklists de manutencao, notas fiscais e contratos. Extraia apenas dados presentes ou fortemente inferiveis no arquivo. Se houver mais de uma loja, competencia ou item, liste todos separadamente. Retorne somente JSON valido, sem markdown. Use competencias sempre como MM/AAAA. Se houver divergencia com os dados atuais, coloque em alertas. Para 'observacoes': extraia o texto literal da secao de observacoes ou comentarios finais do documento (ex: anotacoes do tecnico, parecer final). Para 'recomendacoes': extraia como lista de acoes especificas recomendadas ou itens que precisam de atencao identificados no documento — por exemplo, itens marcados como nao conformes em checklists, irregularidades encontradas, servicos sugeridos ou qualquer indicacao de que uma ordem de servico ou acao corretiva seja necessaria. Se nao houver recomendacoes, retorne array vazio. IMPORTANTE — Para documentos do tipo 'contratos': (1) Classifique tipo_documento como 'contratos', nao como nota fiscal ou laudo. (2) Em 'numero_contrato', extraia o numero ou codigo do contrato (ex: PS29011501, Contrato n 001/2015). (3) Em 'objeto', extraia a descricao completa do servico contratado (copia do objeto do contrato ou da proposta tecnica). (4) Em 'data_assinatura', extraia a data em que o contrato foi assinado/celebrado (formato AAAA-MM-DD). (5) Em 'data_vencimento', extraia a data de termino de vigencia — se o prazo for em meses a partir da assinatura, calcule a data final; se for renovacao automatica sem data fixa, deixe null e mencione em alertas. (6) Em 'tipo_servico', classifique o servico numa categoria curta de 2 a 4 palavras (ex: 'Manutencao Preventiva e Corretiva', 'Gestao de Residuos', 'Seguranca Patrimonial'). (7) Em 'prestador', coloque o nome da empresa contratada (nao a contratante). (8) Em 'valor_total', extraia o valor total do contrato em reais. (9) Em 'numero_nf' e 'numero_pedido', retorne null para contratos.",
+            "Voce analisa documentos administrativos brasileiros, incluindo orcamentos, propostas comerciais, laudos tecnicos, checklists de manutencao, notas fiscais e contratos. Extraia apenas dados presentes ou fortemente inferiveis no arquivo. Se houver mais de uma loja, competencia ou item, liste todos separadamente. Retorne somente JSON valido, sem markdown. Use competencias sempre como MM/AAAA. Se houver divergencia com os dados atuais, coloque em alertas. Para 'observacoes': extraia o texto literal da secao de observacoes ou comentarios finais do documento. Para 'recomendacoes': extraia como lista de acoes especificas recomendadas ou itens que precisam de atencao; se nao houver, retorne array vazio. IMPORTANTE — Para documentos do tipo 'orcamentos': (1) Classifique tipo_documento como 'orcamentos'. (2) Em 'prestador', extraia a razao social ou nome da empresa que EMITIU o orcamento, nunca o cliente destinatario. (3) Em 'cnpj', extraia o CNPJ dessa empresa emissora. (4) Em 'numero_orcamento', extraia o numero da proposta, cotacao ou orcamento. (5) Em 'valor_total', extraia o total final proposto em reais. (6) Em 'data_validade', extraia a data final de validade no formato AAAA-MM-DD; quando o documento informar apenas uma quantidade de dias, calcule a partir da data de emissao se ela estiver presente. (7) Em 'descricao', resuma objetivamente o servico ou produto oferecido. (8) Nao avalie se o preco esta bom e nao recomende aprovacao ou rejeicao. IMPORTANTE — Para documentos do tipo 'contratos': (1) Classifique tipo_documento como 'contratos', nao como nota fiscal ou laudo. (2) Em 'numero_contrato', extraia o numero ou codigo do contrato. (3) Em 'objeto', extraia a descricao completa do servico contratado. (4) Em 'data_assinatura', extraia a data de assinatura no formato AAAA-MM-DD. (5) Em 'data_vencimento', extraia a data de termino de vigencia; se houver renovacao automatica sem data fixa, deixe null e mencione em alertas. (6) Em 'tipo_servico', classifique o servico numa categoria curta. (7) Em 'prestador', coloque o nome da empresa contratada. (8) Em 'valor_total', extraia o valor total do contrato. (9) Em 'numero_nf' e 'numero_pedido', retorne null para contratos.",
         },
         {
           role: "user",

@@ -107,14 +107,12 @@ export async function GET(request: Request) {
         "em_analise_gestor",
         "reenviado",
       ]);
-      if (!actor.isAdmin && !isAprovador) {
-        const ors: string[] = [];
-        if (actor.userId) ors.push(`gestor_id.eq.${actor.userId}`);
-        if (actor.email) ors.push(`gestor_email.eq.${actor.email}`);
-        query = query.or(
-          ors.length > 0 ? ors.join(",") : "id.eq.00000000-0000-0000-0000-000000000000",
-        );
-      }
+      const ors: string[] = [];
+      if (actor.realUserId) ors.push(`gestor_id.eq.${actor.realUserId}`);
+      if (actor.realEmail) ors.push(`gestor_email.eq.${actor.realEmail}`);
+      query = query.or(
+        ors.length > 0 ? ors.join(",") : "id.eq.00000000-0000-0000-0000-000000000000",
+      );
     } else if (tab === "todos" && !actor.isAdmin && !isAprovador) {
       throw new HttpError(403, "A visão geral é restrita a administradores e aprovadores.");
     }
@@ -206,6 +204,12 @@ export async function POST(request: Request) {
 
     const gestorEmail = normalizeEmail(body.gestorEmail);
     const gestorId = normalizeText(body.gestorId) || null;
+    if (submit) {
+      const aprovadores = await getAprovadorEmails(supabaseAdmin);
+      if (!gestorEmail || !aprovadores.has(gestorEmail)) {
+        throw new HttpError(400, "Selecione um gestor aprovador válido.");
+      }
+    }
 
     const status = submit ? "aguardando_aprovacao" : "rascunho";
     const dados = {
@@ -213,6 +217,7 @@ export async function POST(request: Request) {
       loja_id: lojaId,
       loja_nome: lojaNome,
       prestador: prestadorNome,
+      fornecedor_cnpj: normalizeText(body.fornecedorCnpj) || null,
       numero_orcamento: normalizeText(body.numeroOrcamento),
       descricao: normalizeText(body.descricao),
       valor: parseValorTotal(body.valorTotal),
@@ -252,6 +257,7 @@ export async function POST(request: Request) {
         area_solicitante: normalizeText(body.areaSolicitante),
         prestador_id: prestadorId,
         prestador_nome: prestadorNome,
+        fornecedor_cnpj: normalizeText(body.fornecedorCnpj) || null,
         numero_orcamento: normalizeText(body.numeroOrcamento),
         descricao: normalizeText(body.descricao),
         valor_total: parseValorTotal(body.valorTotal),
@@ -268,6 +274,7 @@ export async function POST(request: Request) {
       .select("*")
       .single();
     if (orcamentoError || !orcamento) {
+      await supabaseAdmin.from("formularios").delete().eq("id", id);
       throw orcamentoError ?? new Error("Falha ao criar o orçamento.");
     }
 
@@ -288,6 +295,7 @@ export async function POST(request: Request) {
           })),
         );
       if (versoesError) {
+        await supabaseAdmin.from("formularios").delete().eq("id", id);
         throw versoesError;
       }
     }

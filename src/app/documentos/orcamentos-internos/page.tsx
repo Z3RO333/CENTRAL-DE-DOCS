@@ -1,17 +1,15 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
   CheckCircle2,
-  Clock,
   Download,
   ExternalLink,
   FilePlus2,
   History,
   LoaderCircle,
-  PenLine,
   RefreshCw,
   Send,
   Signature,
@@ -28,13 +26,8 @@ import {
   type OrcamentoInternoStatus,
 } from "@/lib/orcamentosInternosShared";
 import { formatPersonName } from "@/lib/displayName";
-
-type GestorOption = {
-  id: string | null;
-  email: string;
-  name: string | null;
-  role: "admin" | "gerente";
-};
+import { OrcamentoIntakeForm } from "./_components/OrcamentoIntakeForm";
+import type { GestorOption, OrcamentoInterno } from "./_lib/orcamentosTypes";
 
 type UploadedFileSummary = {
   path: string;
@@ -42,37 +35,6 @@ type UploadedFileSummary = {
   type: string;
   size: number;
   principal: boolean;
-};
-
-type OrcamentoInterno = {
-  id: string;
-  solicitante_id: string;
-  solicitante_email: string | null;
-  loja_id: string | null;
-  loja_nome: string | null;
-  area_solicitante: string;
-  prestador_id: string | null;
-  prestador_nome: string;
-  numero_orcamento: string;
-  descricao: string;
-  valor_total: number | null;
-  data_validade: string | null;
-  numero_referencia: string | null;
-  gestor_id: string | null;
-  gestor_email: string;
-  gestor_nome: string | null;
-  observacoes: string | null;
-  arquivo_original_path: string;
-  arquivo_assinado_path: string | null;
-  status: OrcamentoInternoStatus;
-  versao_atual: number;
-  enviado_em: string | null;
-  aprovado_em: string | null;
-  rejeitado_em: string | null;
-  cancelado_em: string | null;
-  ultima_justificativa: string | null;
-  created_at: string;
-  updated_at: string;
 };
 
 type Versao = {
@@ -128,9 +90,15 @@ function formatDateTime(value: string | null) {
   return date.toLocaleString("pt-BR");
 }
 
+function formatCurrency(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return "--";
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 function humanizeEvent(value: string) {
   const labels: Record<string, string> = {
     orcamento_criado: "Orçamento criado",
+    orcamento_analisado_ia: "Dados extraídos pela IA",
     orcamento_enviado_aprovacao: "Enviado para aprovação",
     aprovador_atribuido: "Aprovador atribuído",
     orcamento_visualizado_gestor: "Visualizado pelo gestor",
@@ -194,8 +162,8 @@ export default function OrcamentosInternosPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [principalIndex, setPrincipalIndex] = useState(0);
-  const [submitting, setSubmitting] = useState<"draft" | "submit" | null>(null);
   const [gestores, setGestores] = useState<GestorOption[]>([]);
+  const [draftToResume, setDraftToResume] = useState<OrcamentoInterno | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailPayload | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -353,47 +321,6 @@ export default function OrcamentosInternosPage() {
       });
     }
     return uploads;
-  };
-
-  const saveOrSubmit = async (submit: boolean) => {
-    setSubmitting(submit ? "submit" : "draft");
-    setError(null);
-    setSuccess(null);
-    try {
-      const token = await getToken();
-      const arquivos = await uploadSelectedFiles();
-      const response = await fetch("/api/orcamentos-internos", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          submit,
-          arquivos,
-        }),
-      });
-      const payload = (await response.json()) as {
-        orcamento?: OrcamentoInterno;
-        error?: string;
-      };
-      if (!response.ok || !payload.orcamento) {
-        throw new Error(payload.error ?? "Não foi possível salvar o orçamento.");
-      }
-      setSuccess(submit ? "Orçamento enviado para aprovação." : "Rascunho salvo.");
-      setFiles([]);
-      setPrincipalIndex(0);
-      setOrcamentos((current) => [payload.orcamento!, ...current]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível salvar.");
-    } finally {
-      setSubmitting(null);
-    }
-  };
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    void saveOrSubmit(true);
   };
 
   const patchAction = async (
@@ -602,81 +529,23 @@ export default function OrcamentosInternosPage() {
       )}
 
       <section className="grid gap-5 xl:grid-cols-[minmax(360px,0.85fr)_minmax(0,1.5fr)]">
-        <form
-          onSubmit={handleSubmit}
-          className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-100"
-        >
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Novo orçamento
-            </p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">
-              Cadastro pelo auxiliar administrativo
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Ao enviar, o orçamento fica disponível para qualquer aprovador da fila.
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Orçamentos em PDF
-              <input
-                required
-                multiple
-                type="file"
-                accept="application/pdf"
-                onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                  const selected = event.target.files ? Array.from(event.target.files) : [];
-                  setFiles(selected);
-                  setPrincipalIndex(0);
-                }}
-                className="mt-2 block w-full cursor-pointer text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-sky-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"
-              />
-            </label>
-            {files.length > 0 && (
-              <div className="mt-3 space-y-2">
-                {files.map((file, index) => (
-                  <label
-                    key={`${file.name}-${file.size}-${index}`}
-                    className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-xs text-slate-700"
-                  >
-                    <span className="truncate">{file.name}</span>
-                    <span className="inline-flex items-center gap-1">
-                      <input
-                        type="radio"
-                        name="principal"
-                        checked={principalIndex === index}
-                        onChange={() => setPrincipalIndex(index)}
-                      />
-                      Principal
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
-            <button
-              type="button"
-              onClick={() => void saveOrSubmit(false)}
-              disabled={Boolean(submitting)}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-            >
-              <PenLine className="h-4 w-4" />
-              {submitting === "draft" ? "Salvando..." : "Salvar rascunho"}
-            </button>
-            <button
-              type="submit"
-              disabled={Boolean(submitting)}
-              className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-60"
-            >
-              <Send className="h-4 w-4" />
-              {submitting === "submit" ? "Enviando..." : "Enviar para aprovação"}
-            </button>
-          </div>
-        </form>
+        <OrcamentoIntakeForm
+          gestores={gestores}
+          draftToResume={draftToResume}
+          onResumeHandled={() => setDraftToResume(null)}
+          onUpsert={(orcamento) => {
+            setOrcamentos((current) => {
+              const exists = current.some((item) => item.id === orcamento.id);
+              return exists
+                ? current.map((item) => (item.id === orcamento.id ? orcamento : item))
+                : [orcamento, ...current];
+            });
+          }}
+          onSubmitted={(orcamento) => {
+            setSuccess(`Orçamento de ${orcamento.prestador_nome} enviado para aprovação.`);
+            void loadOrcamentos();
+          }}
+        />
 
         <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-100">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -792,10 +661,12 @@ export default function OrcamentosInternosPage() {
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] text-left text-sm">
+                <table className="w-full min-w-[1080px] text-left text-sm">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
                       <th className="px-4 py-3">Orçamento</th>
+                      <th className="px-4 py-3">Fornecedor</th>
+                      <th className="px-4 py-3 text-right">Valor</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3">Gestor</th>
                       <th className="px-4 py-3 text-right">Ações</th>
@@ -812,6 +683,19 @@ export default function OrcamentosInternosPage() {
                             <p className="mt-1 line-clamp-2 text-xs text-slate-500">
                               {orcamento.descricao}
                             </p>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-600">
+                            <p className="font-semibold text-slate-800">
+                              {orcamento.prestador_nome || "Não identificado"}
+                            </p>
+                            {orcamento.fornecedor_cnpj ? (
+                              <p className="mt-1 text-[11px] text-slate-400">
+                                {orcamento.fornecedor_cnpj}
+                              </p>
+                            ) : null}
+                          </td>
+                          <td className="px-4 py-3 text-right text-xs font-semibold text-slate-700">
+                            {formatCurrency(orcamento.valor_total)}
                           </td>
                           <td className="px-4 py-3">
                             <span
@@ -901,6 +785,10 @@ export default function OrcamentosInternosPage() {
                   <section className="grid gap-3 rounded-2xl bg-slate-50 p-4 sm:grid-cols-2">
                     {[
                       ["Status", STATUS_LABEL[selectedDetail.status]],
+                      ["Fornecedor", selectedDetail.prestador_nome || "--"],
+                      ["CNPJ", selectedDetail.fornecedor_cnpj || "--"],
+                      ["Valor", formatCurrency(selectedDetail.valor_total)],
+                      ["Validade", selectedDetail.data_validade || "--"],
                       ["Solicitante", selectedDetail.solicitante_email ?? selectedDetail.solicitante_id],
                       ["Gestor", selectedDetail.gestor_nome || selectedDetail.gestor_email || "--"],
                       ["Enviado em", formatDateTime(selectedDetail.enviado_em)],
@@ -1053,12 +941,40 @@ export default function OrcamentosInternosPage() {
                   </div>
                 ) : null}
                 <div className="flex flex-wrap justify-end gap-2 text-xs">
-                  {detail?.canDecide ? (
+                  {selectedDetail.status === "rascunho" &&
+                  selectedDetail.solicitante_id === user.id ? (
+                    <button
+                      type="button"
+                      disabled={Boolean(actionLoading)}
+                      onClick={() => {
+                        setDraftToResume(selectedDetail);
+                        setDetailId(null);
+                        setDetail(null);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 font-semibold text-white disabled:opacity-60"
+                    >
+                      <FilePlus2 className="h-4 w-4" />
+                      Continuar rascunho
+                    </button>
+                  ) : null}
+                  {detail?.canDecide &&
+                  ["aguardando_aprovacao", "em_analise_gestor", "reenviado"].includes(
+                    selectedDetail.status,
+                  ) ? (
                     <>
                       <button
                         type="button"
                         disabled={Boolean(actionLoading)}
-                        onClick={() => void signAndApprove(selectedDetail)}
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `Aprovar e assinar o orçamento de ${selectedDetail.prestador_nome}?`,
+                            )
+                          ) {
+                            void signAndApprove(selectedDetail);
+                          }
+                        }}
                         className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white disabled:opacity-60"
                       >
                         <Signature className="h-4 w-4" />
@@ -1066,7 +982,7 @@ export default function OrcamentosInternosPage() {
                       </button>
                       <button
                         type="button"
-                        disabled={Boolean(actionLoading)}
+                        disabled={Boolean(actionLoading) || !justificativa.trim()}
                         onClick={() =>
                           void patchAction(
                             selectedDetail.id,
@@ -1081,7 +997,7 @@ export default function OrcamentosInternosPage() {
                       </button>
                       <button
                         type="button"
-                        disabled={Boolean(actionLoading)}
+                        disabled={Boolean(actionLoading) || !justificativa.trim()}
                         onClick={() =>
                           void patchAction(
                             selectedDetail.id,
@@ -1094,47 +1010,43 @@ export default function OrcamentosInternosPage() {
                         <XCircle className="h-4 w-4" />
                         Rejeitar
                       </button>
-                      <button
-                        type="button"
-                        disabled={Boolean(actionLoading)}
-                        onClick={() =>
-                          void patchAction(
-                            selectedDetail.id,
-                            { action: "devolver_sem_decisao" },
-                            "Orçamento devolvido para a fila.",
-                          )
-                        }
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 font-semibold text-slate-700 disabled:opacity-60"
-                      >
-                        <Clock className="h-4 w-4" />
-                        Devolver sem decisão
-                      </button>
                     </>
                   ) : null}
                   {selectedDetail.status === "ajuste_solicitado" &&
                   selectedDetail.solicitante_id === user.id ? (
-                    <button
-                      type="button"
-                      disabled={files.length === 0 || Boolean(actionLoading)}
-                      onClick={async () => {
-                        try {
-                          setActionLoading("reenviar");
-                          const arquivos = await uploadSelectedFiles();
-                          await patchAction(
-                            selectedDetail.id,
-                            { action: "reenviar", arquivos },
-                            "Orçamento reenviado para aprovação.",
-                          );
-                          setFiles([]);
-                        } finally {
-                          setActionLoading(null);
-                        }
-                      }}
-                      className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 font-semibold text-white disabled:opacity-60"
-                    >
-                      <Send className="h-4 w-4" />
-                      Reenviar ajuste
-                    </button>
+                    <div className="flex w-full flex-wrap items-center justify-end gap-2 rounded-xl bg-orange-50 p-3">
+                      <input
+                        type="file"
+                        accept="application/pdf,.pdf"
+                        onChange={(event) => {
+                          setFiles(event.target.files ? Array.from(event.target.files) : []);
+                          setPrincipalIndex(0);
+                        }}
+                        className="min-w-0 flex-1 text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-semibold"
+                      />
+                      <button
+                        type="button"
+                        disabled={files.length === 0 || Boolean(actionLoading)}
+                        onClick={async () => {
+                          try {
+                            setActionLoading("reenviar");
+                            const arquivos = await uploadSelectedFiles();
+                            await patchAction(
+                              selectedDetail.id,
+                              { action: "reenviar", arquivos },
+                              "Orçamento reenviado para aprovação.",
+                            );
+                            setFiles([]);
+                          } finally {
+                            setActionLoading(null);
+                          }
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 font-semibold text-white disabled:opacity-60"
+                      >
+                        <Send className="h-4 w-4" />
+                        Reenviar ajuste
+                      </button>
+                    </div>
                   ) : null}
                   {isAdmin ? (
                     <button

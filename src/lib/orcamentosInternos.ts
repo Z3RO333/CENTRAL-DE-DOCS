@@ -42,6 +42,7 @@ export type OrcamentoInternoInput = {
   areaSolicitante?: string;
   prestadorId?: string | null;
   prestadorNome?: string;
+  fornecedorCnpj?: string | null;
   numeroOrcamento?: string;
   descricao?: string;
   valorTotal?: string | number | null;
@@ -63,6 +64,7 @@ export type OrcamentoInternoRow = {
   area_solicitante: string;
   prestador_id: string | null;
   prestador_nome: string;
+  fornecedor_cnpj: string | null;
   numero_orcamento: string;
   descricao: string;
   valor_total: number | string | null;
@@ -174,6 +176,8 @@ export function validateOrcamentoInput(
 
   const required: Array<[unknown, string]> = [
     [principal?.path, "Anexe o orçamento principal em PDF."],
+    [input.prestadorNome, "Confirme o fornecedor identificado no orçamento."],
+    [input.gestorEmail, "Selecione o gestor responsável pela aprovação."],
   ];
 
   const missing = required.find(([value]) => {
@@ -289,11 +293,12 @@ export function assertCanDecide(
   const actorEmail = normalizeEmail(actor.realEmail);
   const gestorEmail = normalizeEmail(row.gestor_email);
   const isAprovador = actorEmail !== null && aprovadores.has(actorEmail);
+  const isGestorAtribuido =
+    row.gestor_id === actor.realUserId ||
+    (actorEmail !== null && actorEmail === gestorEmail);
   if (
     !actor.realIsAdmin &&
-    row.gestor_id !== actor.realUserId &&
-    (!actorEmail || actorEmail !== gestorEmail) &&
-    !isAprovador
+    (!isAprovador || !isGestorAtribuido)
   ) {
     throw new HttpError(
       403,
