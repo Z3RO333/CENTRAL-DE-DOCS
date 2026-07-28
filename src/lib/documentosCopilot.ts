@@ -668,6 +668,46 @@ const extractLojaMention = (message: string) => {
   return match?.[1] ?? null;
 };
 
+const findLojaMentionInMessage = (
+  message: string,
+  lojas: LojaLookupRow[],
+): LojaLookupRow | null => {
+  const paddedMessage = ` ${normalizeText(message).toLowerCase()} `;
+  let best: { loja: LojaLookupRow; length: number } | null = null;
+  for (const loja of lojas) {
+    const nome = normalizeText(loja.nome ?? "").toLowerCase().trim();
+    const codigo = normalizeText(loja.codigo ?? "").toLowerCase().trim();
+    if (nome.length >= 3 && paddedMessage.includes(` ${nome} `)) {
+      if (!best || nome.length > best.length) {
+        best = { loja, length: nome.length };
+      }
+    }
+    if (codigo.length >= 2 && paddedMessage.includes(` ${codigo} `)) {
+      if (!best || codigo.length > best.length) {
+        best = { loja, length: codigo.length };
+      }
+    }
+  }
+  return best?.loja ?? null;
+};
+
+const findPrestadorMentionInMessage = (
+  message: string,
+  prestadores: PrestadorLookupRow[],
+): PrestadorLookupRow | null => {
+  const paddedMessage = ` ${normalizeText(message).toLowerCase()} `;
+  let best: { prestador: PrestadorLookupRow; length: number } | null = null;
+  for (const prestador of prestadores) {
+    const nome = normalizeText(prestador.nome ?? "").toLowerCase().trim();
+    if (nome.length >= 4 && paddedMessage.includes(` ${nome} `)) {
+      if (!best || nome.length > best.length) {
+        best = { prestador, length: nome.length };
+      }
+    }
+  }
+  return best?.prestador ?? null;
+};
+
 const applyDeterministicFilters = (
   filters: DocumentoCopilotFilters,
   message: string,
@@ -714,25 +754,18 @@ const applyDeterministicFilters = (
   return next;
 };
 
-const resolveEntityFilters = async (input: {
+const resolveEntityFilters = (input: {
   filters: DocumentoCopilotFilters;
   message: string;
-  supabaseAdmin: ReturnType<typeof createSupabaseAdminClient>;
+  lojas: LojaLookupRow[];
+  prestadores: PrestadorLookupRow[];
 }) => {
-  const { message, supabaseAdmin } = input;
+  const { message, lojas, prestadores } = input;
   const filters = { ...input.filters };
   const lojaToken = filters.lojaId?.trim() || extractLojaMention(message);
 
   if (lojaToken) {
     const normalizedToken = normalizeText(lojaToken).toLowerCase();
-    const { data: lojasData, error: lojasError } = await supabaseAdmin
-      .from("lojas")
-      .select("id,nome,codigo")
-      .limit(2000);
-    if (lojasError) {
-      throw lojasError;
-    }
-    const lojas = ((lojasData as LojaLookupRow[]) ?? []) as LojaLookupRow[];
     const match = lojas.find((loja) => {
       const values = [loja.id, loja.codigo ?? "", loja.nome ?? ""].map((value) =>
         normalizeText(value).toLowerCase(),
@@ -744,17 +777,15 @@ const resolveEntityFilters = async (input: {
     }
   }
 
+  if (!filters.lojaId) {
+    const mention = findLojaMentionInMessage(message, lojas);
+    if (mention) {
+      filters.lojaId = mention.id;
+    }
+  }
+
   if (filters.prestadorId) {
     const normalizedPrestador = normalizeText(filters.prestadorId).toLowerCase();
-    const { data: prestadoresData, error: prestadoresError } =
-      await supabaseAdmin
-        .from("prestadores")
-        .select("id,nome")
-        .limit(2000);
-    if (prestadoresError) {
-      throw prestadoresError;
-    }
-    const prestadores = ((prestadoresData as PrestadorLookupRow[]) ?? []) as PrestadorLookupRow[];
     const match = prestadores.find((prestador) => {
       const values = [prestador.id, prestador.nome ?? ""].map((value) =>
         normalizeText(value).toLowerCase(),
@@ -763,6 +794,13 @@ const resolveEntityFilters = async (input: {
     });
     if (match) {
       filters.prestadorId = match.id;
+    }
+  }
+
+  if (!filters.prestadorId) {
+    const mention = findPrestadorMentionInMessage(message, prestadores);
+    if (mention) {
+      filters.prestadorId = mention.id;
     }
   }
 
@@ -810,10 +848,19 @@ const buildSearchSummary = (filters: DocumentoCopilotFilters) => {
 const buildPrompt = (input: {
   message: string;
   currentFilters?: DocumentoCopilotFilters;
+  lojas: LojaLookupRow[];
+  prestadores: PrestadorLookupRow[];
 }) => {
   const currentFilters = input.currentFilters
     ? stripKnownFilters(input.currentFilters)
     : {};
+
+  const lojasConhecidas = input.lojas
+    .filter((loja) => loja.nome || loja.codigo)
+    .map((loja) => ({ id: loja.id, nome: loja.nome, codigo: loja.codigo }));
+  const prestadoresConhecidos = input.prestadores
+    .filter((prestador) => prestador.nome)
+    .map((prestador) => ({ id: prestador.id, nome: prestador.nome }));
 
   return [
     {
@@ -821,6 +868,9 @@ const buildPrompt = (input: {
       content: [
         "Você é um copiloto interno para encontrar documentos em um sistema corporativo.",
         "Seu trabalho é converter a pergunta do usuário em filtros simples e responder em português brasileiro.",
+        "O usuário pode se referir a lojas e prestadores de forma abstrata ou informal (apelido, nome parcial, código, termos como 'matriz' ou 'CD'), sem dizer explicitamente 'loja X' ou 'prestador Y'.",
+        "Você recebe as listas reais de lojas e prestadores conhecidos nos campos lojasConhecidas e prestadoresConhecidos da mensagem do usuário. Se a pergunta mencionar, mesmo indiretamente, um nome, apelido ou código que corresponda a um item dessas listas, preencha lojaId ou prestadorId com o id EXATO daquele item.",
+        "Nunca invente um id que não esteja nessas listas; se não tiver certeza de qual item corresponde, deixe o campo vazio e peça clarificação.",
         "Regras: nunca invente documentos, nunca mencione dados fora do conjunto retornado, e nunca peça acesso admin.",
         "Se faltarem dados para filtrar com confiança, peça uma única pergunta de clarificação curta.",
         "Retorne sempre JSON válido com as chaves reply, filters e intent.",
@@ -834,6 +884,8 @@ const buildPrompt = (input: {
       content: JSON.stringify({
         pergunta: input.message,
         filtrosAtuais: currentFilters,
+        lojasConhecidas,
+        prestadoresConhecidos,
         formatoEsperado: {
           intent: "search|clarify|explain",
           reply: "texto curto e útil",
@@ -844,8 +896,8 @@ const buildPrompt = (input: {
             tipoLaudo: "opcional",
             ano: "opcional",
             mes: "opcional",
-            lojaId: "opcional",
-            prestadorId: "opcional",
+            lojaId: "opcional (id exato de lojasConhecidas)",
+            prestadorId: "opcional (id exato de prestadoresConhecidos)",
             somenteAssinados: "opcional",
             somenteDisponiveisLote: "opcional",
           },
@@ -1117,9 +1169,29 @@ export async function runDocumentoCopilot(
     supabaseAdmin,
   );
 
+  const { data: lojasData, error: lojasError } = await supabaseAdmin
+    .from("lojas")
+    .select("id,nome,codigo")
+    .limit(2000);
+  if (lojasError) {
+    throw lojasError;
+  }
+  const lojas = (lojasData as LojaLookupRow[] | null) ?? [];
+
+  const { data: prestadoresData, error: prestadoresError } = await supabaseAdmin
+    .from("prestadores")
+    .select("id,nome")
+    .limit(2000);
+  if (prestadoresError) {
+    throw prestadoresError;
+  }
+  const prestadores = (prestadoresData as PrestadorLookupRow[] | null) ?? [];
+
   const promptMessages = buildPrompt({
     message: request.message?.trim() || "",
     currentFilters: request.currentFilters,
+    lojas,
+    prestadores,
   });
 
   const raw = await callAzureOpenAiChat({
@@ -1136,10 +1208,11 @@ export async function runDocumentoCopilot(
   let filters = stripKnownFilters(parsed.filters ?? {});
   const message = request.message?.trim() ?? "";
   filters = applyDeterministicFilters(filters, message);
-  filters = await resolveEntityFilters({
+  filters = resolveEntityFilters({
     filters,
     message,
-    supabaseAdmin,
+    lojas,
+    prestadores,
   });
   const hasParsedFilters = hasAnyFilter(filters);
   const fallbackTerm = normalizeText(message);
