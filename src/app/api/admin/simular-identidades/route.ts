@@ -74,7 +74,7 @@ export async function GET(request: Request) {
     };
 
     await carregarPorEscopo("gerente", "gerente_loja", "Gerente");
-    await carregarPorEscopo("fornecedor", "fornecedor", "Fornecedor");
+    await carregarPorEscopo("fornecedor", "fornecedor", "Conservadora");
 
     // ── Prestadores (usuários vinculados) ─────────────────────────────────────
     const { data: prestadores } = await supabaseAdmin

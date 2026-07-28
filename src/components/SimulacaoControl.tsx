@@ -14,7 +14,7 @@ type Identidade = {
 
 const ROLE_LABEL: Record<string, string> = {
   gerente_loja: "Gerente",
-  fornecedor: "Fornecedor",
+  fornecedor: "Conservadora",
   prestador: "Prestador",
   colaborador: "Colaborador",
 };
@@ -140,7 +140,7 @@ export function SimulacaoControl({ canStart }: { canStart: boolean }) {
                     <Grupo titulo="Gerentes" itens={gerentes} onPick={aplicar} atual={simulacao?.email} />
                   )}
                   {fornecedores.length > 0 && (
-                    <Grupo titulo="Fornecedores" itens={fornecedores} onPick={aplicar} atual={simulacao?.email} />
+                    <Grupo titulo="Conservadoras" itens={fornecedores} onPick={aplicar} atual={simulacao?.email} />
                   )}
                   {prestadores.length > 0 && (
                     <Grupo titulo="Prestadores" itens={prestadores} onPick={aplicar} atual={simulacao?.email} />

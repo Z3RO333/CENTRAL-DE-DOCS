@@ -73,7 +73,7 @@ const getRoleLabel = (
     return "Gerente de Loja";
   }
   if (role === "fornecedor") {
-    return "Fornecedor";
+    return "Conservadora";
   }
   return "Colaborador";
 };
@@ -1020,12 +1020,12 @@ export default function UsuariosPage() {
                   <option value="admin">Administrador</option>
                   <option value="colaborador">Colaborador</option>
                   <option value="gerente_loja">Gerente de Loja</option>
-                  <option value="fornecedor">Fornecedor</option>
+                  <option value="fornecedor">Conservadora</option>
                 </select>
               </label>
               <p className="mt-2 text-[11px] text-slate-500">
                 {editingRole === "fornecedor"
-                  ? "Fornecedores veem todos os documentos das lojas/locais autorizados (ex: CD), independente de quem enviou."
+                  ? "Conservadoras veem todos os documentos das lojas/locais autorizados (ex: CD), independente de quem enviou."
                   : "Gerentes veem apenas os documentos das lojas autorizadas e, se configurado, apenas dos prestadores selecionados."}
               </p>
 
