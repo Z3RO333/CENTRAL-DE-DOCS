@@ -29,7 +29,7 @@ export async function callAzureOpenAiChat({
   const payload = {
     messages,
     temperature,
-    max_tokens: maxTokens,
+    max_completion_tokens: maxTokens,
     response_format: { type: "json_object" },
   };
 
