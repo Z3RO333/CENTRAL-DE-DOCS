@@ -82,7 +82,12 @@ export const getValorOrcamento = (
     return raw;
   }
   if (typeof raw === "string" && raw.trim()) {
-    const parsed = Number(raw.trim().replace(",", "."));
+    const normalized = raw
+      .trim()
+      .replace(/[^\d,.-]/g, "")
+      .replace(/\.(?=\d{3}(?:\D|$))/g, "")
+      .replace(",", ".");
+    const parsed = Number.parseFloat(normalized);
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;

@@ -81,6 +81,11 @@ describe("documentosApiUtils", () => {
     expect(getValorOrcamento({ valor: "abc" })).toBeNull();
   });
 
+  it("getValorOrcamento converte string com separador de milhar (formato pt-BR)", () => {
+    expect(getValorOrcamento({ valor: "1.155,00" })).toBe(1155);
+    expect(getValorOrcamento({ valor: "1.234.567,89" })).toBe(1234567.89);
+  });
+
   it("formatCurrencyBRL formata em Real com duas casas decimais", () => {
     expect(formatCurrencyBRL(1234.5)).toBe(
       (1234.5).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
