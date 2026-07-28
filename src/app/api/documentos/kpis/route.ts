@@ -6,8 +6,6 @@ import {
   getActorFromRequest,
   getAuthorizedPrestadorIds,
   getGerenteAccessEntries,
-  getSessionUserFromRequest,
-  hasDocumentosAccess,
 } from "@/lib/apiAuth";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 
@@ -33,6 +31,14 @@ const hasLojaVinculada = (row: Row) => {
   const dados = safeParseDados(row.dados);
   const lojaId = typeof dados?.loja_id === "string" ? dados.loja_id.trim() : "";
   return Boolean(lojaId);
+};
+
+const getDataVencimento = (row: Row) => {
+  const dados = safeParseDados(row.dados);
+  const raw = dados?.data_vencimento ?? dados?.data_fim;
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  const date = new Date(`${raw.trim()}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
 };
 
 export async function GET(request: Request) {
@@ -97,6 +103,10 @@ export async function GET(request: Request) {
     todayEnd.setHours(23, 59, 59, 999);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const nextThirtyDays = new Date(todayStart);
+    nextThirtyDays.setDate(nextThirtyDays.getDate() + 30);
+    const sevenDaysAgo = new Date(todayStart);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const kpis = rows.reduce(
       (acc, row) => {
@@ -129,6 +139,28 @@ export async function GET(request: Request) {
         if (row.tipo === TIPO_ASSINAVEL && status !== "assinado") {
           acc.aguardandoAssinatura += 1;
         }
+        const vencimento = getDataVencimento(row);
+        if (
+          vencimento &&
+          vencimento >= todayStart &&
+          vencimento <= nextThirtyDays &&
+          status !== "assinado"
+        ) {
+          acc.documentosVencendo += 1;
+        }
+        if (
+          (status === "pendente" || status === "em_analise") &&
+          !Number.isNaN(createdAt.getTime()) &&
+          createdAt < sevenDaysAgo
+        ) {
+          acc.pendenciasCriticas += 1;
+        }
+        if (
+          row.tipo === "notas_fiscais_conservacao" &&
+          row.status === "aguardando_verificacao"
+        ) {
+          acc.notasAguardandoAnalise += 1;
+        }
         return acc;
       },
       {
@@ -141,6 +173,9 @@ export async function GET(request: Request) {
         enviadosHoje: 0,
         enviadosNoMes: 0,
         aguardandoAssinatura: 0,
+        documentosVencendo: 0,
+        pendenciasCriticas: 0,
+        notasAguardandoAnalise: 0,
       },
     );
 

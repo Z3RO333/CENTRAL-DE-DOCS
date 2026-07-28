@@ -21,6 +21,7 @@ import {
 } from "./_lib/documentosShared";
 import { getCompetenciaFromDados } from "@/lib/competencia";
 import { fixMojibakeText } from "@/lib/textEncoding";
+import { StatusBadge } from "@/components/StatusBadge";
 
 type FormularioRecord = {
   id: string;
@@ -2358,6 +2359,7 @@ export default function DocumentosPage() {
             <div className="hidden min-w-0 overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200 xl:block">
               <div className="relative max-w-full overflow-x-auto">
                 <table className="w-full min-w-[1280px] divide-y divide-slate-100 text-sm">
+                  <caption className="sr-only">Documentos encontrados e ações disponíveis</caption>
               <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   {canManageDocuments && (
@@ -2547,17 +2549,7 @@ export default function DocumentosPage() {
                           : "-"}
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                            registro.status === "assinado"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : registro.status === "revisado"
-                                ? "bg-sky-50 text-sky-700"
-                              : "bg-amber-50 text-amber-700"
-                          }`}
-                        >
-                          {formatStatusLabel(registro.status)}
-                        </span>
+                        <StatusBadge status={registro.status} />
                       </td>
                       <td className="hidden px-4 py-3 text-xs text-slate-500 md:table-cell">
                         <span className="font-medium">{getDataLabel(registro)}</span>
@@ -2766,17 +2758,7 @@ export default function DocumentosPage() {
                     </div>
                   )}
                   <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                        registro.status === "assinado"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : registro.status === "revisado"
-                            ? "bg-sky-50 text-sky-700"
-                          : "bg-amber-50 text-amber-700"
-                      }`}
-                    >
-                      {formatStatusLabel(registro.status)}
-                    </span>
+                    <StatusBadge status={registro.status} />
                     <span className="text-[11px] text-slate-500">
                       {registro.tipo === "notas_fiscais"
                         ? getDataLabel(registro)

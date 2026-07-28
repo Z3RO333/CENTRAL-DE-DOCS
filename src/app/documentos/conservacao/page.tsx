@@ -381,6 +381,7 @@ export default function ConservacaoPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[960px] text-left text-sm">
+              <caption className="sr-only">Documentos de conservação</caption>
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Documento</th>

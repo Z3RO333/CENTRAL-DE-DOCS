@@ -7,8 +7,6 @@ import {
   getActorFromRequest,
   getAuthorizedPrestadorIds,
   getGerenteAccessEntries,
-  getSessionUserFromRequest,
-  hasDocumentosAccess,
 } from "@/lib/apiAuth";
 import { fixMojibakeText } from "@/lib/textEncoding";
 

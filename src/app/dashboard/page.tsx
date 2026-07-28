@@ -23,6 +23,8 @@ import {
   Sparkles,
   Store,
   TriangleAlert,
+  CalendarClock,
+  MailWarning,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
@@ -30,12 +32,21 @@ import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { supabase } from "@/lib/supabaseClient";
 import { fixMojibakeText } from "@/lib/textEncoding";
 import { formatPersonName } from "@/lib/displayName";
+import { StatusBadge } from "@/components/StatusBadge";
 
 type DocumentosKpis = {
   pendentes: number;
   aguardandoAssinatura: number;
   enviadosHoje: number;
   enviadosNoMes: number;
+  documentosVencendo: number;
+  pendenciasCriticas: number;
+  notasAguardandoAnalise: number;
+};
+
+type ActionCounts = {
+  cobrancasFalhas: number;
+  orcamentosAguardando: number;
 };
 
 type AtividadeRecente = {
@@ -52,18 +63,6 @@ const TIPO_LABEL: Record<string, string> = {
   notas_fiscais: "Notas Fiscais",
   contratos: "Contratos",
   orcamentos: "Orçamentos",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  pendente: "Pendente",
-  em_analise: "Em análise",
-  assinado: "Assinado",
-};
-
-const STATUS_BADGE: Record<string, string> = {
-  pendente: "bg-amber-50 text-amber-700",
-  em_analise: "bg-sky-50 text-sky-700",
-  assinado: "bg-emerald-50 text-emerald-700",
 };
 
 type ModuleCard = {
@@ -193,6 +192,10 @@ export default function DashboardPage() {
   const [kpisLoading, setKpisLoading] = useState(true);
   const [atividades, setAtividades] = useState<AtividadeRecente[]>([]);
   const [atividadesLoading, setAtividadesLoading] = useState(true);
+  const [actionCounts, setActionCounts] = useState<ActionCounts>({
+    cobrancasFalhas: 0,
+    orcamentosAguardando: 0,
+  });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -216,9 +219,14 @@ export default function DashboardPage() {
 
       const headers = { Authorization: `Bearer ${token}` };
 
-      const [kpisRes, atividadesRes] = await Promise.all([
+      const [kpisRes, atividadesRes, cobrancasRes, orcamentosRes] = await Promise.all([
         fetch("/api/documentos/kpis", { headers, signal }),
         fetch("/api/documentos?limit=5&offset=0", { headers, signal }),
+        fetch("/api/cobrancas/pendencias", { headers, signal }),
+        fetch("/api/orcamentos-internos?tab=aprovacao&limit=1&offset=0", {
+          headers,
+          signal,
+        }),
       ]);
 
       if (signal.aborted) return;
@@ -231,9 +239,28 @@ export default function DashboardPage() {
             aguardandoAssinatura: payload.kpis.aguardandoAssinatura ?? 0,
             enviadosHoje: payload.kpis.enviadosHoje ?? 0,
             enviadosNoMes: payload.kpis.enviadosNoMes ?? 0,
+            documentosVencendo: payload.kpis.documentosVencendo ?? 0,
+            pendenciasCriticas: payload.kpis.pendenciasCriticas ?? 0,
+            notasAguardandoAnalise: payload.kpis.notasAguardandoAnalise ?? 0,
           });
         }
       }
+
+      const nextActionCounts: ActionCounts = {
+        cobrancasFalhas: 0,
+        orcamentosAguardando: 0,
+      };
+      if (cobrancasRes.ok) {
+        const payload = (await cobrancasRes.json()) as {
+          total_falhas_cobranca?: number;
+        };
+        nextActionCounts.cobrancasFalhas = payload.total_falhas_cobranca ?? 0;
+      }
+      if (orcamentosRes.ok) {
+        const payload = (await orcamentosRes.json()) as { total?: number };
+        nextActionCounts.orcamentosAguardando = payload.total ?? 0;
+      }
+      setActionCounts(nextActionCounts);
 
       if (atividadesRes.ok) {
         const payload = (await atividadesRes.json()) as {
@@ -311,6 +338,49 @@ export default function DashboardPage() {
     },
   ];
 
+  const actionCards = [
+    {
+      label: "Documentos vencendo",
+      description: "Vencimento nos próximos 30 dias",
+      value: kpis?.documentosVencendo ?? 0,
+      icon: CalendarClock,
+      href: "/documentos/contratos",
+      accent: "bg-rose-50 text-rose-700",
+    },
+    {
+      label: "Pendências críticas",
+      description: "Abertas há mais de 7 dias",
+      value: kpis?.pendenciasCriticas ?? 0,
+      icon: TriangleAlert,
+      href: "/documentos/pendencias",
+      accent: "bg-amber-50 text-amber-800",
+    },
+    {
+      label: "Falhas de cobrança",
+      description: "Envios que precisam ser reprocessados",
+      value: actionCounts.cobrancasFalhas,
+      icon: MailWarning,
+      href: "/documentos/cobrancas",
+      accent: "bg-orange-50 text-orange-700",
+    },
+    {
+      label: "Notas aguardando análise",
+      description: "Conservação pendente de verificação",
+      value: kpis?.notasAguardandoAnalise ?? 0,
+      icon: ReceiptText,
+      href: "/documentos/conservacao/notas-fiscais",
+      accent: "bg-sky-50 text-sky-700",
+    },
+    {
+      label: "Orçamentos para aprovar",
+      description: "Aguardando sua decisão",
+      value: actionCounts.orcamentosAguardando,
+      icon: ClipboardSignature,
+      href: "/documentos/orcamentos-internos",
+      accent: "bg-violet-50 text-violet-700",
+    },
+  ];
+
   const nomeCompleto = formatPersonName({
     name: (user.user_metadata?.name as string | undefined) ?? null,
     fullName: (user.user_metadata?.full_name as string | undefined) ?? null,
@@ -368,6 +438,43 @@ export default function DashboardPage() {
       </section>
 
       {/* KPIs leves */}
+      <section aria-labelledby="acoes-hoje-title" className="space-y-4">
+        <header>
+          <p className="text-xs font-semibold uppercase tracking-widest text-rose-600">
+            Prioridades
+          </p>
+          <h2 id="acoes-hoje-title" className="text-xl font-semibold text-slate-900">
+            O que exige ação hoje
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Itens abertos que merecem atenção antes das atividades de rotina.
+          </p>
+        </header>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {actionCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Link
+                key={card.label}
+                href={card.href}
+                className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${card.accent}`}>
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <span className="text-2xl font-semibold text-slate-900">
+                    {kpisLoading ? "—" : card.value}
+                  </span>
+                </div>
+                <h3 className="mt-3 text-sm font-semibold text-slate-900">{card.label}</h3>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{card.description}</p>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {kpiCards.map((card) => {
           const Icon = card.icon;
@@ -543,13 +650,7 @@ export default function DashboardPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                          STATUS_BADGE[status] ?? "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {STATUS_LABEL[status] ?? status}
-                      </span>
+                      <StatusBadge status={status} />
                       <span className="text-[11px] text-slate-400">
                         {formatDataCurta(registro.created_at)}
                       </span>

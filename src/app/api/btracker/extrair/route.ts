@@ -6,6 +6,7 @@ import {
   aiResultToNfseExtracted,
 } from "@/lib/nfseExtractor";
 import { extractPdfViaBtracker } from "@/lib/btrackerApi";
+import { ApiHttpError, getSessionUserFromRequest } from "@/lib/apiAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ function getAzureOpenAiConfig() {
   const url = endpoint.includes("/chat/completions")
     ? endpoint
     : `${endpoint.replace(/\/+$/, "")}/openai/deployments/${encodeURIComponent(deployment)}/chat/completions?api-version=${encodeURIComponent(apiVersion)}`;
-  return { apiKey, deployment, url };
+  return { apiKey, url };
 }
 
 async function extrairTextoOcr(buf: ArrayBuffer, mimeType: string): Promise<string> {
@@ -60,7 +61,7 @@ async function extrairTextoOcr(buf: ArrayBuffer, mimeType: string): Promise<stri
 }
 
 async function callOpenAi(text: string): Promise<unknown> {
-  const { apiKey, deployment, url } = getAzureOpenAiConfig();
+  const { apiKey, url } = getAzureOpenAiConfig();
   const r = await fetch(url, {
     method: "POST",
     headers: { "api-key": apiKey, "Content-Type": "application/json" },
@@ -90,16 +91,40 @@ async function callOpenAi(text: string): Promise<unknown> {
 
 export async function POST(req: Request) {
   try {
+    await getSessionUserFromRequest(req);
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const useBtrackerFallback = formData.get("btrackerFallback") === "1";
 
     if (!file) return NextResponse.json({ error: "Arquivo obrigatorio." }, { status: 400 });
+    const maxBytes = 15 * 1024 * 1024;
+    if (file.size <= 0) throw new ApiHttpError(400, "O arquivo esta vazio.");
+    if (file.size > maxBytes) {
+      throw new ApiHttpError(413, "O arquivo excede o limite de 15 MB.");
+    }
 
     const mimeType = file.type || "application/octet-stream";
     const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
     const isXml =
       mimeType.includes("xml") || file.name.toLowerCase().endsWith(".xml");
+    const isPdf =
+      bytes.length >= 5 && String.fromCharCode(...bytes.slice(0, 5)) === "%PDF-";
+    const isPng =
+      bytes.length >= 8 &&
+      bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+    const isJpeg =
+      bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    const isWebp =
+      bytes.length >= 12 &&
+      String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
+      String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+    const xmlPreview = isXml
+      ? new TextDecoder("utf-8").decode(bytes.slice(0, 512)).trimStart()
+      : "";
+    if (isXml ? !xmlPreview.startsWith("<") : !isPdf && !isPng && !isJpeg && !isWebp) {
+      throw new ApiHttpError(415, "Conteudo invalido. Envie XML, PDF, PNG, JPEG ou WebP.");
+    }
 
     // ── XML: parse directly, no AI needed ─────────────────────────────────────
     if (isXml) {
@@ -137,6 +162,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ source: "ocr+ai", data: extracted });
   } catch (err) {
+    if (err instanceof ApiHttpError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     const msg = err instanceof Error ? err.message : "Erro na extracao";
     return NextResponse.json({ error: msg }, { status: 500 });
   }

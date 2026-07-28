@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   Download,
   PenLine,
@@ -431,9 +432,12 @@ export default function PerfilPage() {
             </span>
             {signaturePreview ? (
               <div className="rounded-2xl bg-white/90 p-3">
-                <img
+                <Image
                   src={signaturePreview}
                   alt="Pré-visualização da assinatura"
+                  width={800}
+                  height={224}
+                  unoptimized
                   className="h-28 w-full rounded-xl border border-slate-100 bg-white object-contain p-2"
                 />
                 <p className="mt-2 text-[11px] text-slate-500">

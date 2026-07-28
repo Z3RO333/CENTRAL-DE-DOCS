@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { FileText, Upload, X } from "lucide-react";
 import type { NfseExtracted } from "@/lib/nfseExtractor";
 import type { BtrackerNfse } from "@/lib/btrackerApi";
+import { supabase } from "@/lib/supabaseClient";
 
 type ExtractionResult =
   | { source: "xml" | "ocr+ai"; data: NfseExtracted }
@@ -30,7 +31,15 @@ export function NfseUploader({ btrackerConnected, onExtracted }: Props) {
       form.append("file", file);
       if (btrackerConnected) form.append("btrackerFallback", "1");
 
-      const res = await fetch("/api/btracker/extrair", { method: "POST", body: form });
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+
+      const res = await fetch("/api/btracker/extrair", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
       const json = (await res.json()) as ExtractionResult & { error?: string };
 
       if (!res.ok || json.error) throw new Error(json.error ?? `Status ${res.status}`);

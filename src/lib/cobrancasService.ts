@@ -195,7 +195,8 @@ async function carregarCobrancasDeHoje(
     .from("cobrancas_documentacao_historico")
     .select("prestador_id, loja_id")
     .eq("ano_referencia", anoRef)
-    .eq("dia_cobranca", diaManaus());
+    .eq("dia_cobranca", diaManaus())
+    .eq("status", "enviado");
 
   if (error) throw error;
 
@@ -299,10 +300,13 @@ export async function processarCobrancas(
             meses_pendentes: p.meses_pendentes,
             emails_destinatarios: emails,
             dia_cobranca: diaManaus(),
+            status: "enviado",
+            erro: null,
+            enviado_em: new Date().toISOString(),
           })),
           {
             onConflict: "prestador_id,loja_id,ano_referencia,dia_cobranca",
-            ignoreDuplicates: true,
+            ignoreDuplicates: false,
           },
         );
 
@@ -319,6 +323,28 @@ export async function processarCobrancas(
       resultado.emails_enviados++;
     } catch (err) {
       const mensagem = err instanceof Error ? err.message : "Erro desconhecido";
+      const { error: failureLogError } = await supabase
+        .from("cobrancas_documentacao_historico")
+        .upsert(
+          novas.map((pend) => ({
+            prestador_id: pend.prestador_id,
+            loja_id: pend.loja_id,
+            ano_referencia: pend.ano_referencia,
+            meses_pendentes: pend.meses_pendentes,
+            emails_destinatarios: emails,
+            dia_cobranca: diaManaus(),
+            status: "falha",
+            erro: mensagem.slice(0, 2000),
+            enviado_em: new Date().toISOString(),
+          })),
+          {
+            onConflict: "prestador_id,loja_id,ano_referencia,dia_cobranca",
+            ignoreDuplicates: false,
+          },
+        );
+      if (failureLogError) {
+        console.error("[cobrancas] Falha ao registrar erro de envio:", failureLogError);
+      }
       for (const pend of novas) {
         resultado.erros.push({
           prestador: pend.prestador_nome,

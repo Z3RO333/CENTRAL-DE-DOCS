@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -25,6 +25,7 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   X,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
@@ -32,6 +33,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { useIsAprovadorInterno } from "@/hooks/useIsAprovadorInterno";
 import { SimulacaoControl, SimulacaoBanner } from "@/components/SimulacaoControl";
+import { GlobalSearch } from "@/components/GlobalSearch";
+import { useAccessibleDialog } from "@/hooks/useAccessibleDialog";
 
 export default function AppShell({
   children,
@@ -69,6 +72,17 @@ export default function AppShell({
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isDocumentsMenuOpen, setIsDocumentsMenuOpen] = useState(
+    Boolean(isDocumentsRoute),
+  );
+  const helpDialogRef = useAccessibleDialog<HTMLDivElement>(
+    isHelpOpen,
+    () => setIsHelpOpen(false),
+  );
+
+  useEffect(() => {
+    if (isDocumentsRoute) setIsDocumentsMenuOpen(true);
+  }, [isDocumentsRoute]);
 
   const handleLogout = async () => {
     try {
@@ -219,6 +233,9 @@ export default function AppShell({
       ],
     },
   ];
+  const documentSubItems = navGroups[0].items.filter(
+    (item) => item.href.startsWith("/documentos/") && item.href !== "/documentos",
+  );
 
   return (
     <div
@@ -326,8 +343,19 @@ export default function AppShell({
               isSidebarCollapsed ? "md:px-2" : ""
             }`}
           >
+            <div className="mb-1">
+              <GlobalSearch collapsed={isSidebarCollapsed} />
+            </div>
             {navGroups.map((group) => {
-              const visibleItems = group.items.filter((item) => item.isVisible);
+              const visibleItems = group.items.filter(
+                (item) =>
+                  item.isVisible &&
+                  !(
+                    group.title === "Operação" &&
+                    item.href.startsWith("/documentos/") &&
+                    item.href !== "/documentos"
+                  ),
+              );
               if (visibleItems.length === 0) {
                 return null;
               }
@@ -342,25 +370,71 @@ export default function AppShell({
                   </p>
                   {visibleItems.map((item) => {
                     const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setIsSidebarOpen(false)}
-                    className={`group flex items-center rounded-2xl px-4 py-3 text-sm font-semibold transition ${
-                      item.isActive
-                        ? "bg-[var(--app-surface)] text-slate-900 shadow-lg shadow-slate-200/70"
-                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                    } ${isSidebarCollapsed ? "gap-3 md:justify-center md:gap-0" : "gap-3"}`}
-                  >
-                    <span className="flex h-9 w-9 items-center justify-center text-slate-600 group-hover:text-sky-700">
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <span className={isSidebarCollapsed ? "md:hidden" : ""}>
-                      {item.label}
-                    </span>
-                  </Link>
-                );
+                    const isDocumentsParent = item.href === "/documentos";
+                    const isActive = isDocumentsParent
+                      ? Boolean(isDocumentsRoute)
+                      : item.isActive;
+                    return (
+                      <div key={item.href}>
+                        <div className="flex items-center gap-1">
+                          <Link
+                            href={item.href}
+                            onClick={() => setIsSidebarOpen(false)}
+                            className={`group flex min-w-0 flex-1 items-center rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                              isActive
+                                ? "bg-[var(--app-surface)] text-slate-900 shadow-lg shadow-slate-200/70"
+                                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                            } ${isSidebarCollapsed ? "gap-3 md:justify-center md:gap-0" : "gap-3"}`}
+                            title={isSidebarCollapsed ? item.label : undefined}
+                          >
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center text-slate-600 group-hover:text-sky-700">
+                              <Icon className="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <span className={isSidebarCollapsed ? "md:hidden" : ""}>
+                              {item.label}
+                            </span>
+                          </Link>
+                          {isDocumentsParent && !isSidebarCollapsed ? (
+                            <button
+                              type="button"
+                              onClick={() => setIsDocumentsMenuOpen((current) => !current)}
+                              className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                              aria-label={isDocumentsMenuOpen ? "Recolher submenu de documentos" : "Expandir submenu de documentos"}
+                              aria-expanded={isDocumentsMenuOpen}
+                              aria-controls="documents-submenu"
+                            >
+                              <ChevronDown
+                                className={`h-4 w-4 transition ${isDocumentsMenuOpen ? "rotate-180" : ""}`}
+                              />
+                            </button>
+                          ) : null}
+                        </div>
+                        {isDocumentsParent && isDocumentsMenuOpen && !isSidebarCollapsed ? (
+                          <div id="documents-submenu" className="ml-7 mt-1 space-y-1 border-l border-slate-200 pl-3">
+                            {documentSubItems
+                              .filter((subItem) => subItem.isVisible)
+                              .map((subItem) => {
+                                const SubIcon = subItem.icon;
+                                return (
+                                  <Link
+                                    key={subItem.href}
+                                    href={subItem.href}
+                                    onClick={() => setIsSidebarOpen(false)}
+                                    className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                                      subItem.isActive
+                                        ? "bg-sky-50 text-sky-800"
+                                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                                    }`}
+                                  >
+                                    <SubIcon className="h-4 w-4" aria-hidden="true" />
+                                    {subItem.label}
+                                  </Link>
+                                );
+                              })}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
                   })}
                 </div>
               );
@@ -531,7 +605,11 @@ export default function AppShell({
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-3xl rounded-3xl bg-white p-6 text-slate-900 shadow-xl">
+          <div
+            ref={helpDialogRef}
+            tabIndex={-1}
+            className="w-full max-w-3xl rounded-3xl bg-white p-6 text-slate-900 shadow-xl outline-none"
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">

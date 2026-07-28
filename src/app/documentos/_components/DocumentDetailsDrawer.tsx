@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { BtrackerModal } from "@/app/documentos/_components/BtrackerModal";
+import { useAccessibleDialog } from "@/hooks/useAccessibleDialog";
 
 export type DrawerFormularioRecord = {
   id: string;
@@ -389,6 +390,7 @@ export function DocumentDetailsDrawer({
   onSign,
   onAppliedSuggestions,
 }: DocumentDetailsDrawerProps) {
+  const dialogRef = useAccessibleDialog<HTMLElement>(isOpen, onClose);
   const [payload, setPayload] = useState<DetailsPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -613,10 +615,12 @@ export function DocumentDetailsDrawer({
       onClick={onClose}
     >
       <aside
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="documento-detalhes-title"
-        className="flex h-full w-full max-w-2xl flex-col overflow-hidden bg-white shadow-2xl shadow-slate-900/30"
+        className="flex h-full w-full max-w-2xl flex-col overflow-hidden bg-white shadow-2xl shadow-slate-900/30 outline-none"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">

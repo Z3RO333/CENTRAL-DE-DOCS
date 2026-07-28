@@ -32,7 +32,8 @@ jobs:
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
           AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
         run: |
-          npm install
+          npm ci
+          npm run lint
           npm run build --if-present
           npm run test --if-present
 

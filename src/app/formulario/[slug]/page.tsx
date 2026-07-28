@@ -17,6 +17,7 @@ import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { useLojas } from "@/hooks/useLojas";
 import { resolveServicoOficial } from "@/lib/servicosVocab";
+import { uploadDocumentFile } from "@/lib/documentUpload";
 import LojaCombobox from "./_components/LojaCombobox";
 import PrestadorCombobox from "./_components/PrestadorCombobox";
 
@@ -718,31 +719,13 @@ export default function FormularioPage() {
       beginFormProgress();
 
       const uploadResults: UploadedFileSummary[] = [];
-      for (const [index, currentFile] of files.entries()) {
-        const ext = currentFile.name.split(".").pop() ?? "bin";
-        const uniqueSuffix = `${Date.now()}-${index}`;
-        const filePath = `${user.id}/${config.tipo}/${uniqueSuffix}.${ext}`;
-
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("formularios")
-          .upload(filePath, currentFile);
-
-        if (uploadError || !uploadData) {
-          resetFormProgress();
-          setError(
-            uploadError?.message ||
-              "Erro ao fazer upload de um dos arquivos para o Storage.",
-          );
-          return;
-        }
+      for (const currentFile of files) {
+        const uploadData = await uploadDocumentFile(currentFile, config.tipo);
 
         const pageCount = await getPdfPageCount(currentFile);
 
         uploadResults.push({
-          path: uploadData.path ?? filePath,
-          name: currentFile.name,
-          type: currentFile.type,
-          size: currentFile.size,
+          ...uploadData,
           pageCount,
         });
       }

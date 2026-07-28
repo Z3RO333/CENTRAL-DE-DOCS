@@ -5,6 +5,7 @@ import { FileSearch, LoaderCircle, Save, Send, Sparkles, X } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
 import type { GestorOption, OrcamentoInterno } from "../_lib/orcamentosTypes";
+import { uploadDocumentFile } from "@/lib/documentUpload";
 
 type FormValues = {
   prestadorId: string;
@@ -178,14 +179,11 @@ export function OrcamentoIntakeForm({
     setSuccess(null);
     let uploadedPath: string | null = null;
     try {
-      const path = `${user.id}/orcamentos_internos/originais/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("formularios")
-        .upload(path, file, { contentType: "application/pdf" });
-      if (uploadError || !uploadData) {
-        throw uploadError ?? new Error("Não foi possível enviar o PDF.");
-      }
-      uploadedPath = uploadData.path ?? path;
+      const uploadData = await uploadDocumentFile(
+        file,
+        "orcamentos_internos/originais",
+      );
+      uploadedPath = uploadData.path;
 
       const token = await getToken();
       const response = await fetch("/api/orcamentos-internos", {

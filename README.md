@@ -1,51 +1,75 @@
-## Visão geral
+# Central de Documentos
 
-Aplicação Next.js (App Router) que integra com Supabase para autenticação e armazenamento de documentos. Foi pensada para ser executada na Vercel, mas também pode rodar localmente via Node.js 18+.
+Aplicação interna em Next.js para envio, revisão, assinatura e consulta de documentos. O sistema usa Supabase para autenticação, banco e armazenamento, além de integrações opcionais com Azure OpenAI, Azure Document Intelligence, SendGrid e BTracker.
 
-## Dependências
+## Requisitos
 
-- Node.js 18.18 ou 20+
-- npm (ou pnpm/yarn/bun) – o projeto usa `npm` nos exemplos
-- Conta Supabase com as chaves públicas disponíveis
+- Node.js 22
+- npm
+- Projeto Supabase com as migrations deste repositório aplicadas
 
-## Configuração de variáveis
+## Configuração local
 
-1. Copie o arquivo de exemplo:
+1. Instale as dependências:
+
+   ```bash
+   npm ci
+   ```
+
+2. Copie o arquivo de exemplo e preencha as credenciais do ambiente:
 
    ```bash
    cp .env.example .env.local
    ```
 
-2. Preencha `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` com os valores do seu projeto Supabase.  
-   Essas mesmas variáveis devem ser configuradas no painel da Vercel (Project Settings → Environment Variables).
-3. Se quiser habilitar o copilot de documentos, configure também:
+3. Inicie o ambiente de desenvolvimento:
 
-   - `AZURE_OPENAI_API_KEY`
+   ```bash
+   npm run dev
+   ```
 
-   O endpoint do Azure OpenAI já está definido no projeto para:
+O app ficará disponível em `http://localhost:3000`.
 
-   `https://bml-azure-openai-agents.openai.azure.com/openai/deployments/gpt-5-chat/chat/completions?api-version=2025-01-01-preview`
-
-## Scripts principais
+## Comandos de qualidade
 
 ```bash
-npm install        # instala dependências
-npm run dev        # modo desenvolvimento em http://localhost:3000
-npm run lint       # checa problemas com ESLint
-npm run build      # gera build de produção
-npm run start      # executa o build localmente
+npm run lint      # ESLint e regras do React/Next.js
+npm test          # testes unitários com Vitest
+npm run build     # build de produção e verificação TypeScript
 ```
 
-> A Vercel utilizará automaticamente `npm install`, `npm run build` e `npm run start` no deploy.
+Antes de abrir um pull request, execute os três comandos.
 
-## Implantação na Vercel
+## Variáveis de ambiente
 
-1. Faça o push do repositório para GitHub/GitLab/Bitbucket.
-2. Em [vercel.com](https://vercel.com), clique em **New Project** e importe o repositório.
-3. Defina as variáveis da seção acima em *Environment Variables*.  
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-4. O comando de build padrão já é `npm run build`. Não modifique a pasta de saída (`.vercel` cuida do ambiente Next).
-5. Finalize a importação. A Vercel executará o build e exibirá a URL pública.
+As variáveis obrigatórias e opcionais estão documentadas em `.env.example`. Nunca versione `.env`, `.env.local`, chaves de serviço ou tokens do BTracker.
 
-Sempre que fizer push na branch monitorada (por exemplo `main` ou `master`), a Vercel criará um novo deploy automaticamente.
+O limite dos uploads originais é controlado por `MAX_DOCUMENT_UPLOAD_MB` e assume 15 MB quando não configurado. PDF, PNG e JPEG são validados no servidor pelo conteúdo binário, não apenas pela extensão.
+
+## Banco e Storage
+
+As alterações de banco ficam em `supabase/migrations`. Aplique migrations novas no ambiente de homologação antes da produção e valide as políticas de RLS tanto nas tabelas quanto no bucket `formularios`.
+
+Operações administrativas do servidor usam `SUPABASE_SERVICE_ROLE_KEY`; essa variável jamais deve ser exposta com prefixo `NEXT_PUBLIC_`.
+
+## Implantação no Azure
+
+O deploy de produção é feito pelo GitHub Actions em `.github/workflows/master_formscentral.yml` quando há push na branch `master` ou execução manual do workflow.
+
+O pipeline:
+
+1. instala dependências com Node.js 22;
+2. executa lint, testes e build;
+3. monta o bundle standalone do Next.js;
+4. publica no Azure Web App `FORMSCENTRAL`.
+
+Os segredos devem ser configurados em **GitHub → Settings → Secrets and variables → Actions**. O workflow de cobrança agendada também exige `CRON_SECRET`.
+
+## Estrutura principal
+
+- `src/app`: páginas e rotas da API
+- `src/components`: componentes compartilhados
+- `src/hooks`: estado e acesso do cliente
+- `src/lib`: regras de negócio e integrações
+- `supabase/migrations`: evolução do banco e políticas RLS
+- `.github/workflows`: deploy e automações agendadas

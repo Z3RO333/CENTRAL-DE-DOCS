@@ -121,7 +121,7 @@ export async function POST(request: Request) {
       if (!resolvedUserId) {
         const perPage = 200;
         let page = 1;
-        // eslint-disable-next-line no-constant-condition
+
         while (true) {
           const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers(
             {

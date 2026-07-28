@@ -6,6 +6,7 @@ import { Pencil, Search, Trash2, X } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { useLojas, type Loja, type LojaCategoria } from "@/hooks/useLojas";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 
 const PAGE_SIZES = [10, 20, 50];
 
@@ -47,6 +48,7 @@ const normalizeEmails = (value: string) =>
     .filter(Boolean);
 
 export default function LojasPage() {
+  const { confirm, confirmationDialog } = useConfirmDialog();
   const router = useRouter();
   const { user, isLoading: authLoading, error: authError } = useAuth();
   const { isAdmin, loading: accessLoading } = useDocumentsAccess();
@@ -213,7 +215,12 @@ export default function LojasPage() {
   };
 
   const handleRemove = async (loja: Loja) => {
-    if (!window.confirm(`Remover a loja "${loja.nome}"?`)) {
+    if (!(await confirm({
+      title: "Remover loja",
+      description: `Remover a loja "${loja.nome}"? Esta ação não pode ser desfeita.`,
+      confirmLabel: "Remover loja",
+      destructive: true,
+    }))) {
       return;
     }
     setFeedback(null);
@@ -247,6 +254,7 @@ export default function LojasPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6">
+      {confirmationDialog}
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">
@@ -431,6 +439,7 @@ export default function LojasPage() {
 
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[640px] text-sm">
+            <caption className="sr-only">Lojas cadastradas</caption>
             <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-5 py-3 text-left">Centro</th>

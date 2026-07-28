@@ -15,6 +15,7 @@ import {
   SEMAFORO_BADGE,
 } from "../../_lib/documentosShared";
 import { ConservacaoSubNav } from "../_components/ConservacaoSubNav";
+import { StatusBadge } from "@/components/StatusBadge";
 
 type NotaFiscalConservacao = {
   id: string;
@@ -33,18 +34,6 @@ type NotaFiscalConservacao = {
   motivo_status: string | null;
   created_at: string;
   arquivo_path: string;
-};
-
-const STATUS_LABEL: Record<NotaFiscalConservacao["status"], string> = {
-  aguardando_verificacao: "Aguardando verificação",
-  concluida: "Concluída",
-  rejeitada: "Rejeitada",
-};
-
-const STATUS_BADGE: Record<NotaFiscalConservacao["status"], string> = {
-  aguardando_verificacao: "bg-amber-50 text-amber-700",
-  concluida: "bg-emerald-50 text-emerald-700",
-  rejeitada: "bg-red-50 text-red-700",
 };
 
 export default function NotasFiscaisConservacaoManagementPage() {
@@ -315,6 +304,7 @@ export default function NotasFiscaisConservacaoManagementPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[960px] text-left text-sm">
+              <caption className="sr-only">Notas fiscais de conservação</caption>
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Conservadora</th>
@@ -372,11 +362,7 @@ export default function NotasFiscaisConservacaoManagementPage() {
                       })()}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_BADGE[nota.status]}`}
-                      >
-                        {STATUS_LABEL[nota.status]}
-                      </span>
+                      <StatusBadge status={nota.status} />
                       {nota.motivo_status && (
                         <p className="mt-1 max-w-[200px] text-[11px] text-slate-400">
                           {nota.motivo_status}

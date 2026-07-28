@@ -120,6 +120,7 @@ export async function GET(request: Request) {
     );
 
     const { searchParams } = new URL(request.url);
+    const globalSearch = searchParams.get("globalSearch") === "true";
     const categoriaPrestadorFilter = searchParams.get("categoriaPrestador");
     let isAprovadorInternoConservacao = false;
     if (!actor.isAdmin && categoriaPrestadorFilter === "conservacao") {
@@ -162,7 +163,13 @@ export async function GET(request: Request) {
     const offsetParam = Number(searchParams.get("offset"));
     const limit = resolveLimit(searchParams.get("limit"));
     const offset = Number.isFinite(offsetParam) ? Math.max(offsetParam, 0) : 0;
-    const userFilter = filterUserId;
+    const userFilter =
+      globalSearch &&
+      !actor.isAdmin &&
+      allowedPrestadores.length === 0 &&
+      gerenteEntries.length === 0
+        ? actor.userId
+        : filterUserId;
 
     let query = supabaseAdmin
       .from("formularios")
@@ -170,14 +177,17 @@ export async function GET(request: Request) {
         "id,tipo,status,arquivo_path,arquivo_assinado_path,created_at,dados,assinado_por,user_id,prestador_id",
         { count: "exact" },
       )
-      .neq("tipo", "orcamentos_internos")
       .order("created_at", { ascending: false });
 
-    if (tipoFilter !== "contratos") {
+    if (!globalSearch) {
+      query = query.neq("tipo", "orcamentos_internos");
+    }
+
+    if (!globalSearch && tipoFilter !== "contratos") {
       query = query.neq("tipo", "contratos");
     }
 
-    if (tipoFilter !== "notas_fiscais_conservacao") {
+    if (!globalSearch && tipoFilter !== "notas_fiscais_conservacao") {
       query = query.neq("tipo", "notas_fiscais_conservacao");
     }
 
@@ -203,7 +213,7 @@ export async function GET(request: Request) {
       if (tipoFilter !== "notas_fiscais") {
         query = query.neq("tipo", "notas_fiscais");
       }
-    } else if (conservacaoIds.length > 0) {
+    } else if (!globalSearch && conservacaoIds.length > 0) {
       query = query.or(
         `prestador_id.is.null,prestador_id.not.in.(${conservacaoIds.join(",")})`,
       );

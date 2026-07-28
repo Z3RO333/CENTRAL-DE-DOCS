@@ -66,18 +66,21 @@ export function SimulacaoProvider({ children }: { children: React.ReactNode }) {
 
   // restaura simulação salva (sobrevive a reload)
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Simulacao;
-        if (parsed?.email) {
-          setSimulacao(parsed);
-          setCookie(parsed.email);
+    const timer = window.setTimeout(() => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Simulacao;
+          if (parsed?.email) {
+            setSimulacao(parsed);
+            setCookie(parsed.email);
+          }
         }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
-    }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const iniciar = useCallback((s: Simulacao) => {

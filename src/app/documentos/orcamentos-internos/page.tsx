@@ -26,6 +26,9 @@ import {
   type OrcamentoInternoStatus,
 } from "@/lib/orcamentosInternosShared";
 import { formatPersonName } from "@/lib/displayName";
+import { uploadDocumentFile } from "@/lib/documentUpload";
+import { StatusBadge } from "@/components/StatusBadge";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { OrcamentoIntakeForm } from "./_components/OrcamentoIntakeForm";
 import type { GestorOption, OrcamentoInterno } from "./_lib/orcamentosTypes";
 
@@ -60,17 +63,6 @@ type DetailPayload = {
   timeline: TimelineEvent[];
   canDecide: boolean;
   error?: string;
-};
-
-const STATUS_BADGE: Record<OrcamentoInternoStatus, string> = {
-  rascunho: "bg-slate-100 text-slate-700 ring-slate-200",
-  aguardando_aprovacao: "bg-amber-50 text-amber-700 ring-amber-200",
-  em_analise_gestor: "bg-sky-50 text-sky-700 ring-sky-200",
-  ajuste_solicitado: "bg-orange-50 text-orange-700 ring-orange-200",
-  reenviado: "bg-indigo-50 text-indigo-700 ring-indigo-200",
-  aprovado_assinado: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  rejeitado: "bg-red-50 text-red-700 ring-red-200",
-  cancelado: "bg-zinc-100 text-zinc-600 ring-zinc-200",
 };
 
 const STORAGE_BUCKET = "formularios";
@@ -149,6 +141,7 @@ async function downloadPath(path: string) {
 }
 
 export default function OrcamentosInternosPage() {
+  const { confirm, confirmationDialog } = useConfirmDialog();
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
   const { isAdmin, loading: accessLoading, modules } = useDocumentsAccess();
@@ -304,19 +297,12 @@ export default function OrcamentosInternosPage() {
     }
     const uploads: UploadedFileSummary[] = [];
     for (const [index, file] of files.entries()) {
-      const ext = file.name.split(".").pop() ?? "pdf";
-      const path = `${user.id}/orcamentos_internos/originais/${Date.now()}-${index}.${ext}`;
-      const { data, error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(path, file);
-      if (uploadError || !data) {
-        throw uploadError ?? new Error("Erro ao enviar arquivo.");
-      }
+      const data = await uploadDocumentFile(
+        file,
+        "orcamentos_internos/originais",
+      );
       uploads.push({
-        path: data.path ?? path,
-        name: file.name,
-        type: file.type,
-        size: file.size,
+        ...data,
         principal: index === principalIndex,
       });
     }
@@ -493,6 +479,7 @@ export default function OrcamentosInternosPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 py-4">
+      {confirmationDialog}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <button
@@ -662,6 +649,7 @@ export default function OrcamentosInternosPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1080px] text-left text-sm">
+                  <caption className="sr-only">Orçamentos internos e status de aprovação</caption>
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
                       <th className="px-4 py-3">Orçamento</th>
@@ -698,13 +686,7 @@ export default function OrcamentosInternosPage() {
                             {formatCurrency(orcamento.valor_total)}
                           </td>
                           <td className="px-4 py-3">
-                            <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${
-                                STATUS_BADGE[orcamento.status]
-                              }`}
-                            >
-                              {STATUS_LABEL[orcamento.status]}
-                            </span>
+                            <StatusBadge status={orcamento.status} />
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-600">
                             {orcamento.gestor_nome || orcamento.gestor_email || "--"}
@@ -966,14 +948,13 @@ export default function OrcamentosInternosPage() {
                       <button
                         type="button"
                         disabled={Boolean(actionLoading)}
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `Aprovar e assinar o orçamento de ${selectedDetail.prestador_nome}?`,
-                            )
-                          ) {
-                            void signAndApprove(selectedDetail);
-                          }
+                        onClick={async () => {
+                          const confirmed = await confirm({
+                            title: "Aprovar e assinar orçamento",
+                            description: `Confirma a aprovação e assinatura do orçamento de ${selectedDetail.prestador_nome}?`,
+                            confirmLabel: "Aprovar e assinar",
+                          });
+                          if (confirmed) void signAndApprove(selectedDetail);
                         }}
                         className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white disabled:opacity-60"
                       >

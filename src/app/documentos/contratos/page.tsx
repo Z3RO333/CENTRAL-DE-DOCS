@@ -16,6 +16,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
+import { uploadDocumentFile } from "@/lib/documentUpload";
 import { DocumentActions } from "../_components/DocumentActions";
 import { DocumentDetailsDrawer } from "../_components/DocumentDetailsDrawer";
 import {
@@ -191,19 +192,12 @@ export default function ContratosPage() {
     try {
       setNovoContratoSaving(true);
       setNovoContratoError(null);
-      const ext = novoContratoFile.name.split(".").pop() ?? "pdf";
-      const filePath = `${user.id}/contratos/${Date.now()}-0.${ext}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("formularios")
-        .upload(filePath, novoContratoFile);
-      if (uploadError || !uploadData) {
-        throw uploadError ?? new Error("Erro ao enviar o PDF.");
-      }
+      const uploadData = await uploadDocumentFile(novoContratoFile, "contratos");
       const { error: insertError } = await supabase.from("formularios").insert({
         user_id: user.id,
         tipo: TIPO_CONTRATOS,
         status: "em_analise",
-        arquivo_path: uploadData.path ?? filePath,
+        arquivo_path: uploadData.path,
         prestador_id: null,
         dados: { prestador: novoContratoPrestador.trim() },
       });
@@ -236,19 +230,12 @@ export default function ContratosPage() {
     try {
       setNovoAditivoSaving(true);
       setNovoAditivoError(null);
-      const ext = novoAditivoFile.name.split(".").pop() ?? "pdf";
-      const filePath = `${user.id}/contratos/${Date.now()}-aditivo.${ext}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("formularios")
-        .upload(filePath, novoAditivoFile);
-      if (uploadError || !uploadData) {
-        throw uploadError ?? new Error("Erro ao enviar o PDF.");
-      }
+      const uploadData = await uploadDocumentFile(novoAditivoFile, "contratos/aditivos");
       const { error: insertError } = await supabase.from("formularios").insert({
         user_id: user.id,
         tipo: TIPO_CONTRATOS,
         status: "em_analise",
-        arquivo_path: uploadData.path ?? filePath,
+        arquivo_path: uploadData.path,
         prestador_id: null,
         dados: {
           prestador: novoAditivo.prestador,
@@ -529,6 +516,7 @@ export default function ContratosPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
+              <caption className="sr-only">Contratos e aditivos cadastrados</caption>
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="w-8 px-2 py-3" />

@@ -132,7 +132,6 @@ export function BtrackerAuth({ connected, onConnected, onDisconnected }: Props) 
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[10px] font-bold text-sky-700">1</span>
                 <div className="flex flex-wrap items-center gap-2">
                   <span>Arraste este botão para a barra de favoritos:</span>
-                  {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
                   <a
                     ref={linkRef}
                     href="#"

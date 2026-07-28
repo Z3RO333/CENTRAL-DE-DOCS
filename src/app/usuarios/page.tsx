@@ -911,6 +911,7 @@ export default function UsuariosPage() {
 
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[640px] text-sm">
+                <caption className="sr-only">Usuários e suas permissões de acesso</caption>
                 <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-5 py-3 text-left">Nome</th>

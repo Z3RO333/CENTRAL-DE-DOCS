@@ -9,6 +9,7 @@ import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { useLojas } from "@/hooks/useLojas";
 import { parseCompetencia } from "@/lib/competencia";
+import { uploadDocumentFile } from "@/lib/documentUpload";
 import PrestadorCombobox from "../[slug]/_components/PrestadorCombobox";
 import LojaCombobox from "../[slug]/_components/LojaCombobox";
 
@@ -73,14 +74,7 @@ export default function NotasFiscaisConservacaoPage() {
 
     setSubmitting(true);
     try {
-      const ext = file.name.split(".").pop() ?? "pdf";
-      const path = `${user.id}/notas_fiscais_conservacao/${Date.now()}.${ext}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("formularios")
-        .upload(path, file);
-      if (uploadError || !uploadData) {
-        throw uploadError ?? new Error("Erro ao enviar o PDF.");
-      }
+      const uploadData = await uploadDocumentFile(file, "notas_fiscais_conservacao");
 
       const token = await getAccessToken();
       const response = await fetch("/api/notas-fiscais-conservacao", {
@@ -100,16 +94,13 @@ export default function NotasFiscaisConservacaoPage() {
           responsavel: responsavel.trim() || undefined,
           observacoes: observacoes.trim() || undefined,
           arquivo: {
-            path: uploadData.path ?? path,
-            name: file.name,
-            type: file.type,
-            size: file.size,
+            ...uploadData,
           },
         }),
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
-        const cleanupPath = uploadData.path ?? path;
+        const cleanupPath = uploadData.path;
         const { error: removeError } = await supabase.storage
           .from("formularios")
           .remove([cleanupPath]);

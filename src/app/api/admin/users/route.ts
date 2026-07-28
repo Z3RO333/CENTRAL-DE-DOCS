@@ -98,7 +98,6 @@ export async function GET(request: Request) {
     const perPage = 200;
     let page = 1;
 
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       const {
         data: paged,

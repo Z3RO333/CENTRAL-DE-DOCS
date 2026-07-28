@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import Script from "next/script";
+import NextImage from "next/image";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { supabase } from "@/lib/supabaseClient";
 import { FileSignature } from "lucide-react";
@@ -1065,9 +1066,12 @@ export default function AssinaturaDocumentoPage() {
           >
             {activeSignature ? (
               <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-center">
-                <img
+                <NextImage
                   src={activeSignature}
                   alt="Assinatura selecionada"
+                  width={800}
+                  height={256}
+                  unoptimized
                   className="h-32 max-w-full rounded-xl border border-slate-200 bg-white object-contain p-2"
                 />
                 <p className="text-[11px] text-slate-500">

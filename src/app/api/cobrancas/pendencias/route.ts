@@ -2,10 +2,8 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 import {
   getActorFromRequest,
-  getSessionUserFromRequest,
   getAuthorizedPrestadorIds,
   getGerenteAccessEntries,
-  hasDocumentosAccess,
   ApiHttpError as HttpError,
 } from "@/lib/apiAuth";
 import { anoManaus, levantarPendencias } from "@/lib/cobrancasService";
@@ -126,11 +124,30 @@ export async function GET(request: Request) {
       (a, b) => b.total_documentos_faltantes - a.total_documentos_faltantes,
     );
 
+    const { data: falhasData, error: falhasError } = await supabase
+      .from("cobrancas_documentacao_historico")
+      .select("prestador_id,loja_id")
+      .eq("status", "falha");
+    if (falhasError) throw falhasError;
+
+    const allowedPrestadorSet = new Set(allowedPrestadores);
+    const falhasVisiveis = isAdmin
+      ? falhasData ?? []
+      : (falhasData ?? []).filter((falha) => {
+          if (allowedPrestadorSet.has(falha.prestador_id as string)) return true;
+          return gerenteEntries.some(
+            (entry) =>
+              entry.loja_id === falha.loja_id &&
+              (entry.can_view_all || entry.prestador_id === falha.prestador_id),
+          );
+        });
+
     return NextResponse.json({
       ano: ano ?? anoManaus(),
       perfil: isAdmin ? "admin" : "gerente",
       total_fornecedores: fornecedores.length,
       total_pendencias: pendencias.length,
+      total_falhas_cobranca: falhasVisiveis.length,
       fornecedores,
     });
   } catch (err) {

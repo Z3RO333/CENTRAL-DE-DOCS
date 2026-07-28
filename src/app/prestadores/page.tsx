@@ -3,15 +3,25 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, UserPlus } from "lucide-react";
+import { Search } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { supabase } from "@/lib/supabaseClient";
 import { SERVICOS_OFICIAIS } from "@/lib/servicosVocab";
 import { type PrestadorRegra } from "@/lib/prestadorRegras";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
+
+const FORMULARIO_OPTIONS = [
+  { value: "registro_laudos", label: "Registro e Laudos" },
+  { value: "retencao_trabalhista", label: "Retenção Trabalhista" },
+  { value: "notas_fiscais", label: "Notas Fiscais" },
+  { value: "contratos", label: "Contratos" },
+  { value: "orcamentos", label: "Orçamentos" },
+];
 
 export default function PrestadoresPage() {
+  const { confirm, confirmationDialog } = useConfirmDialog();
   const router = useRouter();
   const { user, isLoading, error: authError } = useAuth();
   const { isAdmin, loading: accessLoading } = useDocumentsAccess();
@@ -133,16 +143,9 @@ export default function PrestadoresPage() {
     [filteredPrestadores, pageSize],
   );
 
-  const formularioOptions = [
-    { value: "registro_laudos", label: "Registro e Laudos" },
-    { value: "retencao_trabalhista", label: "Retenção Trabalhista" },
-    { value: "notas_fiscais", label: "Notas Fiscais" },
-    { value: "contratos", label: "Contratos" },
-    { value: "orcamentos", label: "Orçamentos" },
-  ];
   const alvoSugestoes = useMemo(() => {
     if (regraForm.tipo_regra === "formulario") {
-      return formularioOptions.map((option) => option.value);
+      return FORMULARIO_OPTIONS.map((option) => option.value);
     }
     return [...SERVICOS_OFICIAIS];
   }, [regraForm.tipo_regra]);
@@ -150,7 +153,7 @@ const resolveRegraLabel = (alvo: string, label?: string | null) => {
   if (label && label.trim()) {
     return label.trim();
   }
-  const match = formularioOptions.find((option) => option.value === alvo);
+  const match = FORMULARIO_OPTIONS.find((option) => option.value === alvo);
   return match?.label ?? alvo;
 };
 
@@ -673,11 +676,11 @@ const getDocumentoNome = (registro: {
       return;
     }
 
-    if (
-      !window.confirm(
-        `Adicionar ${emails.length} e-mail(s) ao prestador selecionado?`,
-      )
-    ) {
+    if (!(await confirm({
+      title: "Adicionar e-mails",
+      description: `Adicionar ${emails.length} e-mail(s) ao prestador selecionado?`,
+      confirmLabel: "Adicionar",
+    }))) {
       return;
     }
 
@@ -770,7 +773,12 @@ const getDocumentoNome = (registro: {
       return;
     }
     setEmailsFeedback({ error: null, success: null });
-    if (!window.confirm(`Remover o e-mail ${emailToRemove}?`)) {
+    if (!(await confirm({
+      title: "Remover e-mail",
+      description: `Remover o e-mail ${emailToRemove}?`,
+      confirmLabel: "Remover",
+      destructive: true,
+    }))) {
       return;
     }
 
@@ -825,7 +833,12 @@ const getDocumentoNome = (registro: {
       return;
     }
     setPrestadorFeedback({ error: null, success: null });
-    if (!window.confirm("Remover este prestador e suas regras?")) {
+    if (!(await confirm({
+      title: "Remover prestador",
+      description: "O prestador e suas regras serão removidos. Esta ação não pode ser desfeita.",
+      confirmLabel: "Remover prestador",
+      destructive: true,
+    }))) {
       return;
     }
 
@@ -870,7 +883,12 @@ const getDocumentoNome = (registro: {
 
   const handleRegraDelete = async (regraId: string) => {
     setRegraFeedback({ error: null, success: null });
-    if (!window.confirm("Remover esta regra de monitoramento?")) {
+    if (!(await confirm({
+      title: "Remover regra",
+      description: "Remover esta regra de monitoramento?",
+      confirmLabel: "Remover regra",
+      destructive: true,
+    }))) {
       return;
     }
     try {
@@ -1026,6 +1044,7 @@ const getDocumentoNome = (registro: {
 
   return (
     <div className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6">
+      {confirmationDialog}
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">
@@ -1156,6 +1175,7 @@ const getDocumentoNome = (registro: {
 
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[760px] text-sm">
+            <caption className="sr-only">Prestadores cadastrados</caption>
             <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-5 py-3 text-left">Nome</th>
@@ -1572,7 +1592,7 @@ const getDocumentoNome = (registro: {
                     <option value="conservacao">Conservação/Limpeza</option>
                   </select>
                   <span className="text-[11px] font-normal text-slate-500">
-                    Prestadores de conservação ficam separados na aba "Conservação".
+                    Prestadores de conservação ficam separados na aba &quot;Conservação&quot;.
                   </span>
                 </label>
                 <label className="text-xs font-semibold text-slate-600">

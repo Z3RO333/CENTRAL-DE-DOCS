@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Filter,
   LayoutGrid,
@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { SearchableSelect } from "@/components/SearchableSelect";
+import { useAccessibleDialog } from "@/hooks/useAccessibleDialog";
 
 type FilterOption = {
   value: string;
@@ -109,21 +110,10 @@ export function DocumentosFilters({
   onSomenteDisponiveisLoteChange,
 }: DocumentosFiltersProps) {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-
-  useEffect(() => {
-    if (!isAdvancedOpen) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsAdvancedOpen(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isAdvancedOpen]);
+  const advancedDialogRef = useAccessibleDialog<HTMLElement>(
+    isAdvancedOpen,
+    () => setIsAdvancedOpen(false),
+  );
 
   const quickFilters: { value: QuickFilter; label: string }[] = [
     { value: "todos", label: "Todos" },
@@ -252,10 +242,12 @@ export function DocumentosFilters({
           onClick={() => setIsAdvancedOpen(false)}
         >
           <aside
+            ref={advancedDialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-labelledby="documentos-filtros-title"
-            className="flex h-full w-full max-w-xl flex-col overflow-hidden bg-white shadow-2xl shadow-slate-900/20"
+            className="flex h-full w-full max-w-xl flex-col overflow-hidden bg-white shadow-2xl shadow-slate-900/20 outline-none"
             onClick={(event) => event.stopPropagation()}
           >
             <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-100 bg-white px-5 py-4">
