@@ -1124,7 +1124,6 @@ export async function runDocumentoCopilot(
 
   const raw = await callAzureOpenAiChat({
     messages: promptMessages,
-    temperature: 0.1,
     maxTokens: 650,
   });
 

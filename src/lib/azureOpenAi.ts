@@ -8,13 +8,11 @@ const DEFAULT_AZURE_OPENAI_ENDPOINT =
 
 type CallAzureOpenAiChatInput = {
   messages: AzureOpenAiChatMessage[];
-  temperature?: number;
   maxTokens?: number;
 };
 
 export async function callAzureOpenAiChat({
   messages,
-  temperature = 0.2,
   maxTokens = 700,
 }: CallAzureOpenAiChatInput) {
   const endpoint =
@@ -28,7 +26,6 @@ export async function callAzureOpenAiChat({
 
   const payload = {
     messages,
-    temperature,
     max_completion_tokens: maxTokens,
     response_format: { type: "json_object" },
   };
