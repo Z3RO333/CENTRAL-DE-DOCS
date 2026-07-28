@@ -93,6 +93,7 @@ const EDIT_FIELDS_BY_TIPO: Record<string, EditField[]> = {
 };
 
 const TIPO_ASSINAVEL = "registro_laudos";
+const TIPOS_COM_VALOR = ["notas_fiscais", "contratos", "orcamentos"];
 const STORAGE_BUCKET = "formularios";
 const SIGNED_URL_EXPIRES_IN = 60 * 30;
 const LIST_STATE_STORAGE_KEY = "documentos:list-state";
@@ -2419,10 +2420,9 @@ export default function DocumentosPage() {
                   const numeroPedido = getNumeroPedido(registro);
                   const cnpjDocumento = getCnpjDocumento(registro);
                   const lojaNome = getLojaNome(registro);
-                  const valorOrcamento =
-                    registro.tipo === "orcamentos"
-                      ? formatCurrencyBRL(getValorOrcamento(registro.dados))
-                      : null;
+                  const valorOrcamento = TIPOS_COM_VALOR.includes(registro.tipo)
+                    ? formatCurrencyBRL(getValorOrcamento(registro.dados))
+                    : null;
                   const prestadorNome = getPrestadorNome(registro);
                   const responsavel = getResponsavel(registro);
                   const enviadoPor = registro.user_id
@@ -2616,10 +2616,9 @@ export default function DocumentosPage() {
             const numeroPedido = getNumeroPedido(registro);
             const cnpjDocumento = getCnpjDocumento(registro);
             const lojaNome = getLojaNome(registro);
-            const valorOrcamento =
-              registro.tipo === "orcamentos"
-                ? formatCurrencyBRL(getValorOrcamento(registro.dados))
-                : null;
+            const valorOrcamento = TIPOS_COM_VALOR.includes(registro.tipo)
+              ? formatCurrencyBRL(getValorOrcamento(registro.dados))
+              : null;
             const prestadorNome = getPrestadorNome(registro);
             const responsavel = getResponsavel(registro);
             const enviadoPor = registro.user_id
