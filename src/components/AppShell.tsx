@@ -46,7 +46,6 @@ export default function AppShell({
   const { user, isLoading, error: authError, refresh } = useAuth();
   const {
     isAdmin,
-    role,
     modules: modulesAccess,
     loading: documentsAccessLoading,
   } = useDocumentsAccess();
@@ -60,12 +59,12 @@ export default function AppShell({
   const isAuthenticated = !!user;
   const canAccessDocuments =
     modulesAccess.documentos && !documentsAccessLoading;
-  const canAccessCobrancas =
-    (isAdmin || role === "gerente_loja") && !documentsAccessLoading;
-  const canAccessConservacao =
-    (isAdmin || isAprovadorInterno) &&
-    !documentsAccessLoading &&
-    !aprovadorLoading;
+  const isAdminOuGestor =
+    (isAdmin || isAprovadorInterno) && !documentsAccessLoading && !aprovadorLoading;
+  const canAccessOrcamentosInternos = isAdminOuGestor;
+  const canAccessPendencias = isAdminOuGestor;
+  const canAccessCobrancas = isAdminOuGestor;
+  const canAccessConservacao = isAdminOuGestor;
   const canAccessDashboards = isAdmin && !documentsAccessLoading;
   const canAccessPerfil = isAdmin && !documentsAccessLoading;
   const resolvedWithoutUser = !isLoading && !isAuthenticated;
@@ -143,7 +142,7 @@ export default function AppShell({
           label: "Orçamentos internos",
           icon: ClipboardSignature,
           isActive: pathname?.startsWith("/documentos/orcamentos-internos"),
-          isVisible: canAccessDocuments,
+          isVisible: canAccessOrcamentosInternos,
         },
         {
           href: "/documentos/por-loja",
@@ -157,7 +156,7 @@ export default function AppShell({
           label: "Pendências",
           icon: CircleAlert,
           isActive: pathname?.startsWith("/documentos/pendencias"),
-          isVisible: canAccessDocuments,
+          isVisible: canAccessPendencias,
         },
         {
           href: "/documentos/cobrancas",

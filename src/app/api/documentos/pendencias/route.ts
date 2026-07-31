@@ -1,12 +1,7 @@
 import { NextResponse } from "next/server";
-import { buildDocumentosAccessOr } from "@/lib/documentosAccessFilters";
 import { safeParseDados } from "@/lib/documentosApiUtils";
-import {
-  ApiHttpError as HttpError,
-  getActorFromRequest,
-  getAuthorizedPrestadorIds,
-  getGerenteAccessEntries,
-} from "@/lib/apiAuth";
+import { ApiHttpError as HttpError, getActorFromRequest } from "@/lib/apiAuth";
+import { isAprovadorInterno } from "@/lib/orcamentosInternos";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 import { fixMojibakeText, normalizeDisplayData } from "@/lib/textEncoding";
 
@@ -104,15 +99,14 @@ export async function GET(request: Request) {
     const supabaseAdmin = createSupabaseAdminClient();
     const actor = await getActorFromRequest(request, supabaseAdmin);
     const email = actor.email;
-    const allowedPrestadores = await getAuthorizedPrestadorIds(email, supabaseAdmin);
-    const gerenteEntries = await getGerenteAccessEntries(
-      actor.userId,
-      email,
-      supabaseAdmin,
-    );
-    const canAccess = actor.isAdmin;
 
-    let query = supabaseAdmin
+    const isGestor =
+      actor.isAdmin || (await isAprovadorInterno(email, supabaseAdmin));
+    if (!isGestor) {
+      throw new HttpError(403, "Pendências são restritas a administradores e gestores.");
+    }
+
+    const query = supabaseAdmin
       .from("formularios")
       .select(
         "id,tipo,status,arquivo_path,arquivo_assinado_path,created_at,dados,prestador_id,user_id",
@@ -120,19 +114,6 @@ export async function GET(request: Request) {
       )
       .neq("tipo", "orcamentos_internos")
       .order("created_at", { ascending: false });
-
-    if (!canAccess) {
-      const accessOr = buildDocumentosAccessOr({
-        canAccess,
-        allowedPrestadores,
-        gerenteEntries,
-        userId: actor.userId,
-        filterUserId: actor.userId,
-        filterPrestadores: [],
-        filterLojas: [],
-      });
-      query = query.or(accessOr.join(","));
-    }
 
     const { data: firstPage, error, count } = await query.range(
       0,

@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
-import {
-  getActorFromRequest,
-  getAuthorizedPrestadorIds,
-  getGerenteAccessEntries,
-  ApiHttpError as HttpError,
-} from "@/lib/apiAuth";
+import { getActorFromRequest, ApiHttpError as HttpError } from "@/lib/apiAuth";
 import { anoManaus, levantarPendencias } from "@/lib/cobrancasService";
-import { filtrarPendenciasPorAcesso } from "@/lib/cobrancasAccess";
+import { isAprovadorInterno } from "@/lib/orcamentosInternos";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,23 +24,12 @@ export async function GET(request: Request) {
     const email = actor.email;
 
     const isAdmin = actor.isAdmin;
+    const isGestor = isAdmin || (await isAprovadorInterno(email, supabase));
 
-    // Gerente/fornecedor: precisa ter algum escopo concedido
-    const allowedPrestadores = isAdmin
-      ? []
-      : await getAuthorizedPrestadorIds(email, supabase);
-    const gerenteEntries = isAdmin
-      ? []
-      : await getGerenteAccessEntries(actor.userId, email, supabase);
-
-    if (
-      !isAdmin &&
-      allowedPrestadores.length === 0 &&
-      gerenteEntries.length === 0
-    ) {
+    if (!isGestor) {
       throw new HttpError(
         403,
-        "Você não possui permissão para consultar pendências.",
+        "Cobranças são restritas a administradores e gestores.",
       );
     }
 
@@ -54,15 +38,7 @@ export async function GET(request: Request) {
     const anoNum = anoParam ? Number(anoParam) : NaN;
     const ano = Number.isFinite(anoNum) ? anoNum : undefined;
 
-    let pendencias = await levantarPendencias(ano, supabase);
-
-    // Restringe ao escopo de gerente/fornecedor (admin vê tudo)
-    if (!isAdmin) {
-      pendencias = filtrarPendenciasPorAcesso(pendencias, {
-        allowedPrestadores,
-        gerenteEntries,
-      });
-    }
+    const pendencias = await levantarPendencias(ano, supabase);
 
     // Agrupa por prestador para facilitar a exibição no painel
     type LojaResumo = {
@@ -130,21 +106,11 @@ export async function GET(request: Request) {
       .eq("status", "falha");
     if (falhasError) throw falhasError;
 
-    const allowedPrestadorSet = new Set(allowedPrestadores);
-    const falhasVisiveis = isAdmin
-      ? falhasData ?? []
-      : (falhasData ?? []).filter((falha) => {
-          if (allowedPrestadorSet.has(falha.prestador_id as string)) return true;
-          return gerenteEntries.some(
-            (entry) =>
-              entry.loja_id === falha.loja_id &&
-              (entry.can_view_all || entry.prestador_id === falha.prestador_id),
-          );
-        });
+    const falhasVisiveis = falhasData ?? [];
 
     return NextResponse.json({
       ano: ano ?? anoManaus(),
-      perfil: isAdmin ? "admin" : "gerente",
+      perfil: isAdmin ? "admin" : "gestor",
       total_fornecedores: fornecedores.length,
       total_pendencias: pendencias.length,
       total_falhas_cobranca: falhasVisiveis.length,
