@@ -27,6 +27,7 @@ import {
   ChevronRight,
   ChevronDown,
   X,
+  Wrench,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabaseClient";
@@ -203,6 +204,13 @@ export default function AppShell({
           label: "Prestadores",
           icon: Building2,
           isActive: pathname?.startsWith("/prestadores"),
+          isVisible: isAdmin,
+        },
+        {
+          href: "/equipamentos",
+          label: "Equipamentos",
+          icon: Wrench,
+          isActive: pathname?.startsWith("/equipamentos"),
           isVisible: isAdmin,
         },
       ],
