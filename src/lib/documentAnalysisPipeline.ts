@@ -17,6 +17,12 @@ export function deveAnalisarAutomaticamente(tipo: string): boolean {
   return (TIPOS_ANALISE_AUTOMATICA as readonly string[]).includes(tipo);
 }
 
+const TIPOS_COM_EQUIPAMENTO = ["registro_laudos", "notas_fiscais"] as const;
+
+function deveTentarEquipamento(tipo: string): boolean {
+  return (TIPOS_COM_EQUIPAMENTO as readonly string[]).includes(tipo);
+}
+
 const LIMIAR_CONFIANCA_REVISAO = 0.5;
 
 export function determinarStatusFinal(
@@ -334,10 +340,34 @@ export async function processarDocumentoComIa(
       resultado,
     });
 
-    const statusFinal = determinarStatusFinal(resultado);
+    let equipamentoId: string | null = null;
+    let equipamentoRequerido = false;
+    const lojaId = typeof dados?.loja_id === "string" ? dados.loja_id : null;
+
+    if (deveTentarEquipamento(row.tipo) && lojaId) {
+      const equipamentosAtivos = await buscarEquipamentosAtivosDaLoja(supabaseAdmin, lojaId);
+      if (equipamentosAtivos.length > 0) {
+        equipamentoRequerido = true;
+        const match = encontrarEquipamentoCorrespondente(equipamentosAtivos, resultado);
+        equipamentoId = match?.id ?? null;
+      }
+    }
+
+    const statusFinal = determinarStatusFinal(resultado, {
+      equipamentoRequerido,
+      equipamentoResolvido: equipamentoId !== null,
+    });
+
+    const updatePayload: { status_analise_ia: string; equipamento_id?: string | null } = {
+      status_analise_ia: statusFinal,
+    };
+    if (deveTentarEquipamento(row.tipo)) {
+      updatePayload.equipamento_id = equipamentoId;
+    }
+
     await supabaseAdmin
       .from("formularios")
-      .update({ status_analise_ia: statusFinal })
+      .update(updatePayload)
       .eq("id", row.id);
 
     return { status: statusFinal };

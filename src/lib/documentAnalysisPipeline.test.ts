@@ -21,6 +21,7 @@ import {
   registrarAnaliseIa,
   processarDocumentoComIa,
   buscarEquipamentosAtivosDaLoja,
+  type EquipamentoAtivo,
 } from "@/lib/documentAnalysisPipeline";
 import { analisarDocumentoComOpenAi } from "@/lib/openAiDocumentAnalysis";
 import type { DocumentoAnaliseIa } from "@/lib/openAiDocumentAnalysis";
@@ -420,6 +421,7 @@ function criarSupabaseFake(options: {
   registro: Record<string, unknown> | null;
   duplicado?: boolean;
   downloadOk?: boolean;
+  equipamentosAtivos?: EquipamentoAtivo[];
 }) {
   const updates: Array<{ table: string; payload: Record<string, unknown> }> = [];
   let selectCallCount = 0;
@@ -465,6 +467,18 @@ function criarSupabaseFake(options: {
             select: () => ({
               single: async () => ({
                 data: { id: "analise-1", status: "concluida" },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "equipamentos") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: async () => ({
+                data: options.equipamentosAtivos ?? [],
                 error: null,
               }),
             }),
@@ -605,9 +619,129 @@ describe("processarDocumentoComIa", () => {
     expect(statusGravados).toEqual(["em_analise", "erro"]);
     expect(analisarDocumentoComOpenAi).not.toHaveBeenCalled();
   });
+
+  it("vincula equipamento quando ha match confiavel para registro_laudos", async () => {
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
+      provider: "azure-openai",
+      model: "gpt-5-chat",
+      resultado: resultadoBase({
+        equipamento_tipo: "Gerador",
+        equipamento_identificacao: null,
+        equipamento_numero_serie: null,
+      }),
+    });
+
+    const { supabase, updates } = criarSupabaseFake({
+      registro: {
+        id: "doc-3",
+        tipo: "registro_laudos",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/laudo.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: null,
+      },
+      equipamentosAtivos: [
+        { id: "eq-1", tipo_equipamento: "Gerador", identificacao: null, numero_serie: null },
+      ],
+    });
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-3");
+
+    expect(resultado.status).toBe("concluida");
+    const ultimoUpdate = updates[updates.length - 1];
+    expect(ultimoUpdate.payload.equipamento_id).toBe("eq-1");
+  });
+
+  it("marca necessita_revisao quando a loja tem equipamentos mas nenhum bate", async () => {
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
+      provider: "azure-openai",
+      model: "gpt-5-chat",
+      resultado: resultadoBase({
+        equipamento_tipo: "Subestacao",
+        equipamento_identificacao: null,
+        equipamento_numero_serie: null,
+      }),
+    });
+
+    const { supabase, updates } = criarSupabaseFake({
+      registro: {
+        id: "doc-4",
+        tipo: "registro_laudos",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/laudo.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: null,
+      },
+      equipamentosAtivos: [
+        { id: "eq-1", tipo_equipamento: "Gerador", identificacao: null, numero_serie: null },
+      ],
+    });
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-4");
+
+    expect(resultado.status).toBe("necessita_revisao");
+    const ultimoUpdate = updates[updates.length - 1];
+    expect(ultimoUpdate.payload.equipamento_id).toBeNull();
+  });
+
+  it("nao tenta match de equipamento quando a loja nao tem nenhum cadastrado", async () => {
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
+      provider: "azure-openai",
+      model: "gpt-5-chat",
+      resultado: resultadoBase({
+        equipamento_tipo: null,
+        equipamento_identificacao: null,
+        equipamento_numero_serie: null,
+      }),
+    });
+
+    const { supabase, updates } = criarSupabaseFake({
+      registro: {
+        id: "doc-5",
+        tipo: "registro_laudos",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/laudo.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: null,
+      },
+      // sem equipamentosAtivos: loja sem nenhum equipamento cadastrado
+    });
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-5");
+
+    expect(resultado.status).toBe("concluida");
+  });
+
+  it("nao tenta match de equipamento para tipos fora de escopo mesmo com equipamentos cadastrados", async () => {
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
+      provider: "azure-openai",
+      model: "gpt-5-chat",
+      resultado: resultadoBase(),
+    });
+
+    const { supabase, updates } = criarSupabaseFake({
+      registro: {
+        id: "doc-6",
+        tipo: "contratos",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/contrato.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: null,
+      },
+      equipamentosAtivos: [
+        { id: "eq-1", tipo_equipamento: "Gerador", identificacao: null, numero_serie: null },
+      ],
+    });
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-6");
+
+    expect(resultado.status).toBe("concluida");
+    const ultimoUpdate = updates[updates.length - 1];
+    expect(ultimoUpdate.payload.equipamento_id).toBeUndefined();
+  });
 });
 
-import { encontrarEquipamentoCorrespondente, type EquipamentoAtivo } from "@/lib/documentAnalysisPipeline";
+import { encontrarEquipamentoCorrespondente } from "@/lib/documentAnalysisPipeline";
 
 describe("encontrarEquipamentoCorrespondente", () => {
   const equipamentos: EquipamentoAtivo[] = [
