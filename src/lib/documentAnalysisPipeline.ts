@@ -44,6 +44,14 @@ export function determinarStatusFinal(
   return "concluida";
 }
 
+const PRIORIDADES_URGENTES = new Set(["emergencial", "critica"]);
+
+export function temAchadoUrgente(resultado: DocumentoAnaliseIa): boolean {
+  return (resultado.recomendacoes_criticas ?? []).some((achado) =>
+    PRIORIDADES_URGENTES.has(achado.prioridade),
+  );
+}
+
 export function verificarSegredoWebhook(
   authHeader: string | null,
   secretEsperado: string | undefined,

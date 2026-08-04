@@ -21,10 +21,11 @@ import {
   registrarAnaliseIa,
   processarDocumentoComIa,
   buscarEquipamentosAtivosDaLoja,
+  temAchadoUrgente,
   type EquipamentoAtivo,
 } from "@/lib/documentAnalysisPipeline";
 import { analisarDocumentoComOpenAi } from "@/lib/openAiDocumentAnalysis";
-import type { DocumentoAnaliseIa } from "@/lib/openAiDocumentAnalysis";
+import type { DocumentoAnaliseIa, RecomendacaoCritica } from "@/lib/openAiDocumentAnalysis";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 function resultadoBase(overrides: Partial<DocumentoAnaliseIa> = {}): DocumentoAnaliseIa {
@@ -53,6 +54,29 @@ function resultadoBase(overrides: Partial<DocumentoAnaliseIa> = {}): DocumentoAn
     equipamento_tipo: null,
     equipamento_identificacao: null,
     equipamento_numero_serie: null,
+    recomendacoes_criticas: [],
+    ...overrides,
+  };
+}
+
+function recomendacaoCriticaBase(
+  overrides: Partial<RecomendacaoCritica> = {},
+): RecomendacaoCritica {
+  return {
+    trecho: "Equipamento apresenta ruido anormal.",
+    pagina: 1,
+    problema: "Ruido anormal no compressor.",
+    componente: "Compressor",
+    recomendacao_tecnica: "Inspecionar e lubrificar rolamentos do compressor.",
+    prioridade: "moderada",
+    prazo_dias: 7,
+    impacto: "Risco de parada do equipamento.",
+    acao_necessaria: "Agendar inspecao tecnica.",
+    desligar_equipamento: false,
+    substituir_peca: false,
+    precisa_inspecao_presencial: true,
+    abrir_ordem_corretiva: false,
+    riscos: ["operacional"],
     ...overrides,
   };
 }
@@ -161,6 +185,47 @@ describe("determinarStatusFinal com contexto de equipamento", () => {
       equipamentoResolvido: false,
     });
     expect(resultado).toBe("concluida");
+  });
+});
+
+describe("temAchadoUrgente", () => {
+  it("retorna false quando nao ha recomendacoes_criticas", () => {
+    expect(temAchadoUrgente(resultadoBase({ recomendacoes_criticas: [] }))).toBe(false);
+  });
+
+  it("retorna false quando so ha achados de prioridade baixa", () => {
+    const resultado = resultadoBase({
+      recomendacoes_criticas: [
+        recomendacaoCriticaBase({ prioridade: "moderada" }),
+        recomendacaoCriticaBase({ prioridade: "preventiva" }),
+        recomendacaoCriticaBase({ prioridade: "informativa" }),
+      ],
+    });
+    expect(temAchadoUrgente(resultado)).toBe(false);
+  });
+
+  it("retorna false para prioridade alta isolada", () => {
+    const resultado = resultadoBase({
+      recomendacoes_criticas: [recomendacaoCriticaBase({ prioridade: "alta" })],
+    });
+    expect(temAchadoUrgente(resultado)).toBe(false);
+  });
+
+  it("retorna true quando ha um achado critica", () => {
+    const resultado = resultadoBase({
+      recomendacoes_criticas: [
+        recomendacaoCriticaBase({ prioridade: "moderada" }),
+        recomendacaoCriticaBase({ prioridade: "critica" }),
+      ],
+    });
+    expect(temAchadoUrgente(resultado)).toBe(true);
+  });
+
+  it("retorna true quando ha um achado emergencial", () => {
+    const resultado = resultadoBase({
+      recomendacoes_criticas: [recomendacaoCriticaBase({ prioridade: "emergencial" })],
+    });
+    expect(temAchadoUrgente(resultado)).toBe(true);
   });
 });
 
