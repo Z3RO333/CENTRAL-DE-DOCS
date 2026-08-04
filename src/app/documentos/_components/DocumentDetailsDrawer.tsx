@@ -42,6 +42,29 @@ type TimelineEvent = {
   created_at: string;
 };
 
+type RecomendacaoCriticaResultado = {
+  trecho: string;
+  pagina: number | null;
+  problema: string;
+  componente: string | null;
+  recomendacao_tecnica: string;
+  prioridade:
+    | "emergencial"
+    | "critica"
+    | "alta"
+    | "moderada"
+    | "preventiva"
+    | "informativa";
+  prazo_dias: number | null;
+  impacto: string | null;
+  acao_necessaria: string;
+  desligar_equipamento: boolean;
+  substituir_peca: boolean;
+  precisa_inspecao_presencial: boolean;
+  abrir_ordem_corretiva: boolean;
+  riscos: string[];
+};
+
 type DocumentoAnaliseResultado = {
   tipo_documento?: string;
   competencias?: string[];
@@ -73,6 +96,7 @@ type DocumentoAnaliseResultado = {
   confianca_geral?: number | null;
   observacoes?: string | null;
   recomendacoes?: string[];
+  recomendacoes_criticas?: RecomendacaoCriticaResultado[];
 };
 
 type DocumentoAnaliseIa = {
@@ -220,6 +244,18 @@ const formatConfidence = (value: number | null | undefined) => {
     return "--";
   }
   return `${Math.round(value * 100)}%`;
+};
+
+const PRIORIDADE_ESTILO: Record<
+  RecomendacaoCriticaResultado["prioridade"],
+  { label: string; badgeClass: string }
+> = {
+  emergencial: { label: "Emergencial", badgeClass: "bg-red-600 text-white" },
+  critica: { label: "Critica", badgeClass: "bg-red-100 text-red-800" },
+  alta: { label: "Alta", badgeClass: "bg-orange-100 text-orange-800" },
+  moderada: { label: "Moderada", badgeClass: "bg-amber-100 text-amber-800" },
+  preventiva: { label: "Preventiva", badgeClass: "bg-blue-100 text-blue-800" },
+  informativa: { label: "Informativa", badgeClass: "bg-slate-100 text-slate-700" },
 };
 
 const stringifyValor = (value: number | null | undefined) => {
@@ -874,6 +910,61 @@ export function DocumentDetailsDrawer({
                             Gerar ordem
                           </a>
                         </div>
+                      </div>
+                    ) : null}
+                    {analiseResultado.recomendacoes_criticas &&
+                    analiseResultado.recomendacoes_criticas.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          Achados criticos identificados
+                        </p>
+                        {analiseResultado.recomendacoes_criticas.map((achado, i) => {
+                          const estilo = PRIORIDADE_ESTILO[achado.prioridade];
+                          const flags = [
+                            achado.desligar_equipamento && "Desligar equipamento",
+                            achado.substituir_peca && "Substituir peca",
+                            achado.precisa_inspecao_presencial && "Inspecao presencial",
+                            achado.abrir_ordem_corretiva && "Abrir ordem corretiva",
+                          ].filter((flag): flag is string => Boolean(flag));
+
+                          return (
+                            <div
+                              key={i}
+                              className="rounded-xl border border-red-100 bg-red-50 px-4 py-3"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span
+                                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${estilo.badgeClass}`}
+                                >
+                                  {estilo.label}
+                                </span>
+                                {achado.prazo_dias !== null ? (
+                                  <span className="text-[11px] font-medium text-red-700">
+                                    Prazo: {achado.prazo_dias} dia(s)
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="mt-2 text-sm font-medium text-red-900">
+                                {achado.problema}
+                              </p>
+                              <p className="mt-1 text-xs text-red-800">
+                                {achado.acao_necessaria}
+                              </p>
+                              {flags.length > 0 ? (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {flags.map((flag) => (
+                                    <span
+                                      key={flag}
+                                      className="rounded-full bg-red-600/10 px-2 py-0.5 text-[10px] font-semibold text-red-700"
+                                    >
+                                      {flag}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : null}
                     <p className="text-[11px] text-slate-400">
