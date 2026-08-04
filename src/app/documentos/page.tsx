@@ -2143,7 +2143,9 @@ export default function DocumentosPage() {
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
                 >
                   <option value="">Nenhum</option>
-                  {equipamentosDaLojaSelecionada.map((equipamento) => (
+                  {equipamentosDaLojaSelecionada
+                    .filter((equipamento) => equipamento.status === "ativo")
+                    .map((equipamento) => (
                     <option key={equipamento.id} value={equipamento.id}>
                       {equipamento.tipo_equipamento}
                       {equipamento.identificacao

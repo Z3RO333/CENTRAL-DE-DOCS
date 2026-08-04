@@ -520,6 +520,10 @@ export async function PATCH(request: Request) {
       updatePayload.dados.loja_id = loja.id;
       updatePayload.dados.loja_nome =
         typeof loja.nome === "string" ? loja.nome : "Loja";
+
+      if (!hasEquipamentoUpdate) {
+        updatePayload.equipamento_id = null;
+      }
     }
 
     if (hasPrestadorUpdate) {
