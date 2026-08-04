@@ -1,12 +1,15 @@
 ﻿import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 import {
   buildDocumentosTextSearchOr,
   normalizeIds,
   resolveLimit,
+  resumirAchadosCriticosPorDocumento,
   safeParseDados,
   sanitizeId,
 } from "@/lib/documentosApiUtils";
+import type { AchadoCriticoResumo } from "@/lib/documentosApiUtils";
 import { getCompetenciaFromDados } from "@/lib/competencia";
 import { buildDocumentosAccessOr } from "@/lib/documentosAccessFilters";
 import {
@@ -48,6 +51,7 @@ type DocumentRecord = {
   prestador_id: string | null;
   status_analise_ia: string | null;
   equipamento_id: string | null;
+  achado_critico: AchadoCriticoResumo | null;
 };
 
 const PAGE_SIZE = 1000;
@@ -107,6 +111,40 @@ function mapRows(rows: FormularioRow[]): DocumentRecord[] {
     prestador_id: item.prestador_id ?? null,
     status_analise_ia: item.status_analise_ia ?? null,
     equipamento_id: item.equipamento_id ?? null,
+    achado_critico: null,
+  }));
+}
+
+async function anexarAchadosCriticos(
+  supabaseAdmin: SupabaseClient,
+  registros: DocumentRecord[],
+): Promise<DocumentRecord[]> {
+  if (registros.length === 0) {
+    return registros;
+  }
+
+  const ids = registros.map((registro) => registro.id);
+  const { data, error } = await supabaseAdmin
+    .from("documento_recomendacoes_criticas")
+    .select("documento_id,problema,prioridade")
+    .in("documento_id", ids)
+    .in("prioridade", ["emergencial", "critica"]);
+
+  if (error) {
+    throw error;
+  }
+
+  const resumoPorDocumento = resumirAchadosCriticosPorDocumento(
+    (data ?? []) as Array<{
+      documento_id: string;
+      problema: string;
+      prioridade: string;
+    }>,
+  );
+
+  return registros.map((registro) => ({
+    ...registro,
+    achado_critico: resumoPorDocumento[registro.id] ?? null,
   }));
 }
 
@@ -212,6 +250,25 @@ export async function GET(request: Request) {
       (item) => item.id,
     );
 
+    let idsComAchadoCritico: string[] | null = null;
+    if (statusAnaliseIaFilter === "achado_critico") {
+      const { data: achadosCriticos, error: achadosCriticosError } =
+        await supabaseAdmin
+          .from("documento_recomendacoes_criticas")
+          .select("documento_id")
+          .in("prioridade", ["emergencial", "critica"]);
+      if (achadosCriticosError) {
+        throw achadosCriticosError;
+      }
+      idsComAchadoCritico = Array.from(
+        new Set(
+          ((achadosCriticos ?? []) as { documento_id: string }[]).map(
+            (item) => item.documento_id,
+          ),
+        ),
+      );
+    }
+
     if (categoriaPrestadorFilter === "conservacao") {
       query =
         conservacaoIds.length > 0
@@ -263,7 +320,12 @@ export async function GET(request: Request) {
       query = query.eq("status", statusFilter);
     }
 
-    if (statusAnaliseIaFilter && statusAnaliseIaFilter !== "todos") {
+    if (statusAnaliseIaFilter === "achado_critico") {
+      query =
+        idsComAchadoCritico && idsComAchadoCritico.length > 0
+          ? query.in("id", idsComAchadoCritico)
+          : query.eq("id", "00000000-0000-0000-0000-000000000000");
+    } else if (statusAnaliseIaFilter && statusAnaliseIaFilter !== "todos") {
       query = query.eq("status_analise_ia", statusAnaliseIaFilter);
     }
 
@@ -324,14 +386,22 @@ export async function GET(request: Request) {
         matchesPeriodo(row, anoFilter, mesFilter),
       );
 
+      const registrosComAchados = await anexarAchadosCriticos(
+        supabaseAdmin,
+        mapRows(filtrados.slice(offset, offset + limit)),
+      );
       return NextResponse.json({
-        registros: mapRows(filtrados.slice(offset, offset + limit)),
+        registros: registrosComAchados,
         total: filtrados.length,
       });
     }
 
+    const registrosComAchados = await anexarAchadosCriticos(
+      supabaseAdmin,
+      mapRows((data as FormularioRow[]) ?? []),
+    );
     return NextResponse.json({
-      registros: mapRows((data as FormularioRow[]) ?? []),
+      registros: registrosComAchados,
       total: count ?? 0,
     });
   } catch (err) {
