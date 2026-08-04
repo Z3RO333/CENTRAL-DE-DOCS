@@ -31,6 +31,8 @@ type FormularioRow = {
   assinado_por?: string | null;
   user_id: string;
   prestador_id?: string | null;
+  status_analise_ia?: string | null;
+  equipamento_id?: string | null;
 };
 
 type DocumentRecord = {
@@ -44,6 +46,8 @@ type DocumentRecord = {
   assinado_por: string | null;
   user_id: string;
   prestador_id: string | null;
+  status_analise_ia: string | null;
+  equipamento_id: string | null;
 };
 
 const PAGE_SIZE = 1000;
@@ -101,6 +105,8 @@ function mapRows(rows: FormularioRow[]): DocumentRecord[] {
     assinado_por: item.assinado_por ?? null,
     user_id: item.user_id,
     prestador_id: item.prestador_id ?? null,
+    status_analise_ia: item.status_analise_ia ?? null,
+    equipamento_id: item.equipamento_id ?? null,
   }));
 }
 
@@ -154,6 +160,7 @@ export async function GET(request: Request) {
       ),
     );
     const statusFilter = searchParams.get("status");
+    const statusAnaliseIaFilter = searchParams.get("statusAnaliseIa");
     const anoFilter = searchParams.get("ano");
     const mesFilter = searchParams.get("mes");
     const identificacaoFilter = searchParams.get("identificacao")?.trim() ?? "";
@@ -174,7 +181,7 @@ export async function GET(request: Request) {
     let query = supabaseAdmin
       .from("formularios")
       .select(
-        "id,tipo,status,arquivo_path,arquivo_assinado_path,created_at,dados,assinado_por,user_id,prestador_id",
+        "id,tipo,status,arquivo_path,arquivo_assinado_path,created_at,dados,assinado_por,user_id,prestador_id,status_analise_ia,equipamento_id",
         { count: "exact" },
       )
       .order("created_at", { ascending: false });
@@ -254,6 +261,10 @@ export async function GET(request: Request) {
 
     if (statusFilter && statusFilter !== "todos") {
       query = query.eq("status", statusFilter);
+    }
+
+    if (statusAnaliseIaFilter && statusAnaliseIaFilter !== "todos") {
+      query = query.eq("status_analise_ia", statusAnaliseIaFilter);
     }
 
     if (somenteAssinados) {
@@ -428,6 +439,7 @@ export async function PATCH(request: Request) {
       updates?: Record<string, unknown>;
       lojaId?: string | null;
       prestadorId?: string | null;
+      equipamentoId?: string | null;
       status?: string;
     };
     const id = body.id?.trim();
@@ -440,11 +452,19 @@ export async function PATCH(request: Request) {
       body,
       "prestadorId",
     );
+    const hasEquipamentoUpdate = Object.prototype.hasOwnProperty.call(
+      body,
+      "equipamentoId",
+    );
     const hasStatusUpdate = Object.prototype.hasOwnProperty.call(body, "status");
 
     if (
       !id ||
-      (!hasDadosUpdates && !hasLojaUpdate && !hasPrestadorUpdate && !hasStatusUpdate)
+      (!hasDadosUpdates &&
+        !hasLojaUpdate &&
+        !hasPrestadorUpdate &&
+        !hasEquipamentoUpdate &&
+        !hasStatusUpdate)
     ) {
       throw new HttpError(400, "Informe o id e os dados para atualizacao.");
     }
@@ -472,6 +492,7 @@ export async function PATCH(request: Request) {
     const updatePayload: {
       dados: Record<string, unknown>;
       prestador_id?: string | null;
+      equipamento_id?: string | null;
       status?: string;
       assinado_por?: string | null;
     } = {
@@ -524,6 +545,35 @@ export async function PATCH(request: Request) {
       }
     }
 
+    if (hasEquipamentoUpdate) {
+      const equipamentoId = sanitizeId((body.equipamentoId ?? "").trim());
+      if (!equipamentoId) {
+        updatePayload.equipamento_id = null;
+      } else {
+        const { data: equipamento, error: equipamentoError } = await supabaseAdmin
+          .from("equipamentos")
+          .select("id,loja_id")
+          .eq("id", equipamentoId)
+          .maybeSingle();
+        if (equipamentoError) {
+          throw equipamentoError;
+        }
+        if (!equipamento) {
+          throw new HttpError(404, "Equipamento nao encontrado.");
+        }
+
+        const lojaIdParaValidar = hasLojaUpdate
+          ? (updatePayload.dados.loja_id as string | undefined)
+          : (safeParseDados(registro.dados)?.loja_id as string | undefined);
+
+        if (lojaIdParaValidar && equipamento.loja_id !== lojaIdParaValidar) {
+          throw new HttpError(400, "Equipamento nao pertence a loja do documento.");
+        }
+
+        updatePayload.equipamento_id = equipamento.id;
+      }
+    }
+
     if (hasStatusUpdate) {
       const nextStatus =
         typeof body.status === "string" ? body.status.trim() : "";
@@ -551,7 +601,7 @@ export async function PATCH(request: Request) {
       .update(updatePayload)
       .eq("id", id)
       .select(
-        "id,tipo,status,arquivo_path,arquivo_assinado_path,created_at,dados,assinado_por,user_id,prestador_id",
+        "id,tipo,status,arquivo_path,arquivo_assinado_path,created_at,dados,assinado_por,user_id,prestador_id,status_analise_ia,equipamento_id",
       )
       .maybeSingle();
     if (updateError) {
