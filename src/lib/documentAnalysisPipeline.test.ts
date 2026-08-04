@@ -48,6 +48,9 @@ function resultadoBase(overrides: Partial<DocumentoAnaliseIa> = {}): DocumentoAn
     confianca_geral: 0.9,
     observacoes: null,
     recomendacoes: [],
+    equipamento_tipo: null,
+    equipamento_identificacao: null,
+    equipamento_numero_serie: null,
     ...overrides,
   };
 }
@@ -532,5 +535,72 @@ describe("processarDocumentoComIa", () => {
     const statusGravados = updates.map((u) => u.payload.status_analise_ia);
     expect(statusGravados).toEqual(["em_analise", "erro"]);
     expect(analisarDocumentoComOpenAi).not.toHaveBeenCalled();
+  });
+});
+
+import { encontrarEquipamentoCorrespondente, type EquipamentoAtivo } from "@/lib/documentAnalysisPipeline";
+
+describe("encontrarEquipamentoCorrespondente", () => {
+  const equipamentos: EquipamentoAtivo[] = [
+    { id: "eq-1", tipo_equipamento: "Gerador", identificacao: "Gerador 01", numero_serie: "SN-100" },
+    { id: "eq-2", tipo_equipamento: "Gerador", identificacao: "Gerador 02", numero_serie: "SN-200" },
+    { id: "eq-3", tipo_equipamento: "Ar Condicionado", identificacao: null, numero_serie: null },
+  ];
+
+  it("da prioridade ao numero de serie quando bate com exatamente um equipamento", () => {
+    const resultado = resultadoBase({
+      equipamento_tipo: "Gerador",
+      equipamento_identificacao: "Gerador 02",
+      equipamento_numero_serie: "sn-100",
+    });
+    const match = encontrarEquipamentoCorrespondente(equipamentos, resultado);
+    expect(match?.id).toBe("eq-1");
+  });
+
+  it("casa por tipo quando ha exatamente um equipamento daquele tipo", () => {
+    const resultado = resultadoBase({
+      equipamento_tipo: "ar condicionado",
+      equipamento_identificacao: null,
+      equipamento_numero_serie: null,
+    });
+    const match = encontrarEquipamentoCorrespondente(equipamentos, resultado);
+    expect(match?.id).toBe("eq-3");
+  });
+
+  it("desempata por identificacao quando ha mais de um equipamento do mesmo tipo", () => {
+    const resultado = resultadoBase({
+      equipamento_tipo: "Gerador",
+      equipamento_identificacao: "Gerador 02",
+      equipamento_numero_serie: null,
+    });
+    const match = encontrarEquipamentoCorrespondente(equipamentos, resultado);
+    expect(match?.id).toBe("eq-2");
+  });
+
+  it("retorna null quando ha mais de um candidato e a identificacao nao desempata", () => {
+    const resultado = resultadoBase({
+      equipamento_tipo: "Gerador",
+      equipamento_identificacao: "Gerador Principal",
+      equipamento_numero_serie: null,
+    });
+    expect(encontrarEquipamentoCorrespondente(equipamentos, resultado)).toBeNull();
+  });
+
+  it("retorna null quando nao ha equipamento_tipo nem match de numero de serie", () => {
+    const resultado = resultadoBase({
+      equipamento_tipo: null,
+      equipamento_identificacao: null,
+      equipamento_numero_serie: null,
+    });
+    expect(encontrarEquipamentoCorrespondente(equipamentos, resultado)).toBeNull();
+  });
+
+  it("retorna null quando o tipo extraido nao bate com nenhum equipamento", () => {
+    const resultado = resultadoBase({
+      equipamento_tipo: "Subestacao",
+      equipamento_identificacao: null,
+      equipamento_numero_serie: null,
+    });
+    expect(encontrarEquipamentoCorrespondente(equipamentos, resultado)).toBeNull();
   });
 });

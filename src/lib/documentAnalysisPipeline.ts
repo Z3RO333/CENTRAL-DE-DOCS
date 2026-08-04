@@ -184,6 +184,66 @@ type FormularioRow = {
   prestador_id: string | null;
 };
 
+export type EquipamentoAtivo = {
+  id: string;
+  tipo_equipamento: string;
+  identificacao: string | null;
+  numero_serie: string | null;
+};
+
+function normalizarTextoEquipamento(valor: string): string {
+  return valor
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase()
+    .trim();
+}
+
+export function encontrarEquipamentoCorrespondente(
+  equipamentos: EquipamentoAtivo[],
+  resultado: DocumentoAnaliseIa,
+): EquipamentoAtivo | null {
+  const numeroSerie = resultado.equipamento_numero_serie?.trim();
+  if (numeroSerie) {
+    const porSerie = equipamentos.filter(
+      (eq) =>
+        eq.numero_serie &&
+        normalizarTextoEquipamento(eq.numero_serie) ===
+          normalizarTextoEquipamento(numeroSerie),
+    );
+    if (porSerie.length === 1) {
+      return porSerie[0];
+    }
+  }
+
+  const tipo = resultado.equipamento_tipo?.trim();
+  if (!tipo) {
+    return null;
+  }
+  const tipoNormalizado = normalizarTextoEquipamento(tipo);
+  const porTipo = equipamentos.filter(
+    (eq) => normalizarTextoEquipamento(eq.tipo_equipamento) === tipoNormalizado,
+  );
+  if (porTipo.length === 1) {
+    return porTipo[0];
+  }
+  if (porTipo.length > 1) {
+    const identificacao = resultado.equipamento_identificacao?.trim();
+    if (identificacao) {
+      const identificacaoNormalizada = normalizarTextoEquipamento(identificacao);
+      const porIdentificacao = porTipo.filter(
+        (eq) =>
+          eq.identificacao &&
+          normalizarTextoEquipamento(eq.identificacao) === identificacaoNormalizada,
+      );
+      if (porIdentificacao.length === 1) {
+        return porIdentificacao[0];
+      }
+    }
+  }
+  return null;
+}
+
 export async function processarDocumentoComIa(
   supabaseAdmin: SupabaseClient,
   documentoId: string,
