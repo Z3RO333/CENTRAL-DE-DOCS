@@ -350,18 +350,37 @@ function criarSupabaseFake(options: {
   downloadOk?: boolean;
 }) {
   const updates: Array<{ table: string; payload: Record<string, unknown> }> = [];
+  let selectCallCount = 0;
 
   const supabase = {
     from: (table: string) => {
       if (table === "formularios") {
         return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: async () => ({ data: options.registro, error: null }),
-            }),
-            // usado por verificarDuplicado: encadeia varios .eq()
-            // cada .eq() retorna o mesmo objeto ate .neq().limit().maybeSingle()
-          }),
+          select: () => {
+            selectCallCount += 1;
+            const isInitialFetch = selectCallCount === 1;
+            // O mesmo objeto de encadeamento atende tanto a busca inicial
+            // (select().eq().maybeSingle()) quanto a checagem de duplicidade
+            // do verificarDuplicado (select().eq()...eq().neq().limit().maybeSingle()).
+            const chain: {
+              eq: () => typeof chain;
+              neq: () => typeof chain;
+              limit: () => typeof chain;
+              maybeSingle: () => Promise<{ data: unknown; error: null }>;
+            } = {
+              eq: () => chain,
+              neq: () => chain,
+              limit: () => chain,
+              maybeSingle: async () =>
+                isInitialFetch
+                  ? { data: options.registro, error: null }
+                  : {
+                      data: options.duplicado ? { id: "doc-existente" } : null,
+                      error: null,
+                    },
+            };
+            return chain;
+          },
           update: (payload: Record<string, unknown>) => {
             updates.push({ table, payload });
             return { eq: async () => ({ data: null, error: null }) };
@@ -468,5 +487,50 @@ describe("processarDocumentoComIa", () => {
     expect(resultado.motivo).toBe("Document Intelligence indisponivel");
     const statusGravados = updates.map((u) => u.payload.status_analise_ia);
     expect(statusGravados).toEqual(["em_analise", "erro"]);
+  });
+
+  it("marca duplicado e nao chama a analise por IA quando ja existe documento concluido com a mesma chave", async () => {
+    vi.mocked(analisarDocumentoComOpenAi).mockClear();
+
+    const { supabase, updates } = criarSupabaseFake({
+      registro: {
+        id: "doc-3",
+        tipo: "notas_fiscais",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/nota.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: "prestador-1",
+      },
+      duplicado: true,
+    });
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-3");
+
+    expect(resultado.status).toBe("duplicado");
+    const statusGravados = updates.map((u) => u.payload.status_analise_ia);
+    expect(statusGravados).toEqual(["duplicado"]);
+    expect(analisarDocumentoComOpenAi).not.toHaveBeenCalled();
+  });
+
+  it("marca erro e nao chama a analise por IA quando o documento nao tem arquivo", async () => {
+    vi.mocked(analisarDocumentoComOpenAi).mockClear();
+
+    const { supabase, updates } = criarSupabaseFake({
+      registro: {
+        id: "doc-4",
+        tipo: "notas_fiscais",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: null,
+        arquivo_assinado_path: null,
+        prestador_id: null,
+      },
+    });
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-4");
+
+    expect(resultado.status).toBe("erro");
+    const statusGravados = updates.map((u) => u.payload.status_analise_ia);
+    expect(statusGravados).toEqual(["em_analise", "erro"]);
+    expect(analisarDocumentoComOpenAi).not.toHaveBeenCalled();
   });
 });

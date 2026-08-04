@@ -188,59 +188,59 @@ export async function processarDocumentoComIa(
   supabaseAdmin: SupabaseClient,
   documentoId: string,
 ): Promise<{ status: string; motivo?: string }> {
-  const { data: registro, error: registroError } = await supabaseAdmin
-    .from("formularios")
-    .select("id,tipo,dados,arquivo_path,arquivo_assinado_path,prestador_id")
-    .eq("id", documentoId)
-    .maybeSingle();
-
-  if (registroError) {
-    throw registroError;
-  }
-  if (!registro) {
-    return { status: "erro", motivo: "Documento nao encontrado." };
-  }
-
-  const row = registro as FormularioRow;
-  if (!deveAnalisarAutomaticamente(row.tipo)) {
-    return { status: "ignorado", motivo: `Tipo ${row.tipo} fora do escopo automatico.` };
-  }
-
-  const dados = safeParseDados(row.dados);
-  const duplicado = await verificarDuplicado(supabaseAdmin, row.id, {
-    tipo: row.tipo,
-    prestador_id: row.prestador_id,
-    dados,
-  });
-  if (duplicado) {
-    await supabaseAdmin
-      .from("formularios")
-      .update({ status_analise_ia: "duplicado" })
-      .eq("id", row.id);
-    return { status: "duplicado" };
-  }
-
-  await supabaseAdmin
-    .from("formularios")
-    .update({ status_analise_ia: "em_analise" })
-    .eq("id", row.id);
-
-  const path = row.arquivo_assinado_path ?? row.arquivo_path;
-  if (!path) {
-    await registrarAnaliseIa(supabaseAdmin, {
-      documentoId: row.id,
-      provider: "azure-openai",
-      model: "n/a",
-      erro: "Documento sem arquivo para analise.",
-    });
-    await supabaseAdmin
-      .from("formularios")
-      .update({ status_analise_ia: "erro" })
-      .eq("id", row.id);
-    return { status: "erro", motivo: "Documento sem arquivo." };
-  }
-
   try {
+    const { data: registro, error: registroError } = await supabaseAdmin
+      .from("formularios")
+      .select("id,tipo,dados,arquivo_path,arquivo_assinado_path,prestador_id")
+      .eq("id", documentoId)
+      .maybeSingle();
+
+    if (registroError) {
+      throw registroError;
+    }
+    if (!registro) {
+      return { status: "erro", motivo: "Documento nao encontrado." };
+    }
+
+    const row = registro as FormularioRow;
+    if (!deveAnalisarAutomaticamente(row.tipo)) {
+      return { status: "ignorado", motivo: `Tipo ${row.tipo} fora do escopo automatico.` };
+    }
+
+    const dados = safeParseDados(row.dados);
+    const duplicado = await verificarDuplicado(supabaseAdmin, row.id, {
+      tipo: row.tipo,
+      prestador_id: row.prestador_id,
+      dados,
+    });
+    if (duplicado) {
+      await supabaseAdmin
+        .from("formularios")
+        .update({ status_analise_ia: "duplicado" })
+        .eq("id", row.id);
+      return { status: "duplicado" };
+    }
+
+    await supabaseAdmin
+      .from("formularios")
+      .update({ status_analise_ia: "em_analise" })
+      .eq("id", row.id);
+
+    const path = row.arquivo_assinado_path ?? row.arquivo_path;
+    if (!path) {
+      await registrarAnaliseIa(supabaseAdmin, {
+        documentoId: row.id,
+        provider: "azure-openai",
+        model: "n/a",
+        erro: "Documento sem arquivo para analise.",
+      });
+      await supabaseAdmin
+        .from("formularios")
+        .update({ status_analise_ia: "erro" })
+        .eq("id", row.id);
+      return { status: "erro", motivo: "Documento sem arquivo." };
+    }
+
     const { provider, model, resultado } = await baixarEAnalisarArquivo(supabaseAdmin, {
       path,
       tipoDocumento: row.tipo,
@@ -264,16 +264,27 @@ export async function processarDocumentoComIa(
   } catch (err) {
     const mensagem =
       err instanceof Error ? err.message : "Falha desconhecida na analise.";
-    await registrarAnaliseIa(supabaseAdmin, {
-      documentoId: row.id,
-      provider: "azure-openai",
-      model: "n/a",
-      erro: mensagem,
-    });
-    await supabaseAdmin
-      .from("formularios")
-      .update({ status_analise_ia: "erro" })
-      .eq("id", row.id);
+
+    try {
+      await registrarAnaliseIa(supabaseAdmin, {
+        documentoId,
+        provider: "azure-openai",
+        model: "n/a",
+        erro: mensagem,
+      });
+    } catch {
+      // Best-effort: nao deixar uma falha ao registrar mascarar o erro original.
+    }
+
+    try {
+      await supabaseAdmin
+        .from("formularios")
+        .update({ status_analise_ia: "erro" })
+        .eq("id", documentoId);
+    } catch {
+      // Best-effort: nao deixar uma falha ao atualizar mascarar o erro original.
+    }
+
     return { status: "erro", motivo: mensagem };
   }
 }
