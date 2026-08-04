@@ -8,7 +8,10 @@ import {
 } from "@/lib/apiAuth";
 import {
   baixarEAnalisarArquivo,
+  buscarEquipamentosAtivosDaLoja,
   determinarStatusFinal,
+  deveTentarEquipamento,
+  encontrarEquipamentoCorrespondente,
   registrarAnaliseIa,
 } from "@/lib/documentAnalysisPipeline";
 
@@ -21,6 +24,7 @@ type FormularioRow = {
   dados: Record<string, unknown> | string | null;
   arquivo_path: string | null;
   arquivo_assinado_path: string | null;
+  equipamento_id: string | null;
 };
 
 export async function POST(
@@ -45,7 +49,7 @@ export async function POST(
 
     const { data: registro, error: registroError } = await supabaseAdmin
       .from("formularios")
-      .select("id,tipo,dados,arquivo_path,arquivo_assinado_path")
+      .select("id,tipo,dados,arquivo_path,arquivo_assinado_path,equipamento_id")
       .eq("id", id)
       .maybeSingle();
 
@@ -62,10 +66,12 @@ export async function POST(
       throw new HttpError(400, "Documento sem arquivo para analise.");
     }
 
+    const dadosAtuais = safeParseDados(row.dados);
+
     const { provider, model, resultado } = await baixarEAnalisarArquivo(supabaseAdmin, {
       path,
       tipoDocumento: row.tipo,
-      dadosAtuais: safeParseDados(row.dados),
+      dadosAtuais,
     });
 
     const analise = await registrarAnaliseIa(supabaseAdmin, {
@@ -75,9 +81,41 @@ export async function POST(
       resultado,
     });
 
+    let equipamentoId: string | null = row.equipamento_id;
+    let equipamentoRequerido = false;
+    const lojaId = typeof dadosAtuais?.loja_id === "string" ? dadosAtuais.loja_id : null;
+
+    if (deveTentarEquipamento(row.tipo) && lojaId && !equipamentoId) {
+      const sinalDeEquipamento = Boolean(
+        resultado.equipamento_tipo?.trim() ||
+          resultado.equipamento_numero_serie?.trim() ||
+          resultado.equipamento_identificacao?.trim(),
+      );
+      if (sinalDeEquipamento) {
+        const equipamentosAtivos = await buscarEquipamentosAtivosDaLoja(supabaseAdmin, lojaId);
+        if (equipamentosAtivos.length > 0) {
+          equipamentoRequerido = true;
+          const match = encontrarEquipamentoCorrespondente(equipamentosAtivos, resultado);
+          equipamentoId = match?.id ?? null;
+        }
+      }
+    }
+
+    const statusFinal = determinarStatusFinal(resultado, {
+      equipamentoRequerido,
+      equipamentoResolvido: equipamentoId !== null,
+    });
+
+    const updatePayload: { status_analise_ia: string; equipamento_id?: string | null } = {
+      status_analise_ia: statusFinal,
+    };
+    if (deveTentarEquipamento(row.tipo)) {
+      updatePayload.equipamento_id = equipamentoId;
+    }
+
     const { error: statusUpdateError } = await supabaseAdmin
       .from("formularios")
-      .update({ status_analise_ia: determinarStatusFinal(resultado) })
+      .update(updatePayload)
       .eq("id", row.id);
 
     if (statusUpdateError) {
