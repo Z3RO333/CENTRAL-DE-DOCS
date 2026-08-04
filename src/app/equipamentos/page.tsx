@@ -6,7 +6,9 @@ import { Pencil, X } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { useLojas } from "@/hooks/useLojas";
+import { usePrestadores } from "@/hooks/usePrestadores";
 import { useEquipamentos, type Equipamento } from "@/hooks/useEquipamentos";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 
 type FeedbackState = { kind: "success" | "error"; message: string } | null;
 
@@ -15,6 +17,7 @@ export default function EquipamentosPage() {
   const { user, isLoading: authLoading, error: authError } = useAuth();
   const { isAdmin, loading: accessLoading } = useDocumentsAccess();
   const { lojas } = useLojas({ enabled: isAdmin });
+  const { prestadores } = usePrestadores({ enabled: isAdmin });
   const {
     equipamentos,
     loading: equipamentosLoading,
@@ -22,6 +25,7 @@ export default function EquipamentosPage() {
     createEquipamento,
     updateEquipamento,
   } = useEquipamentos({ enabled: isAdmin });
+  const { confirm, confirmationDialog } = useConfirmDialog();
 
   const [lojaFilter, setLojaFilter] = useState<string>("todas");
   const [feedback, setFeedback] = useState<FeedbackState>(null);
@@ -35,6 +39,11 @@ export default function EquipamentosPage() {
   const [formMarca, setFormMarca] = useState("");
   const [formModelo, setFormModelo] = useState("");
   const [formPotencia, setFormPotencia] = useState("");
+  const [formPrestadorId, setFormPrestadorId] = useState("");
+  const [formNumeroSerie, setFormNumeroSerie] = useState("");
+  const [formLocalizacao, setFormLocalizacao] = useState("");
+  const [formDataInstalacao, setFormDataInstalacao] = useState("");
+  const [formDataAtivacao, setFormDataAtivacao] = useState("");
 
   useEffect(() => {
     if (authLoading || accessLoading) return;
@@ -67,6 +76,11 @@ export default function EquipamentosPage() {
     setFormMarca("");
     setFormModelo("");
     setFormPotencia("");
+    setFormPrestadorId("");
+    setFormNumeroSerie("");
+    setFormLocalizacao("");
+    setFormDataInstalacao("");
+    setFormDataAtivacao("");
   };
 
   const openCreate = () => {
@@ -83,6 +97,11 @@ export default function EquipamentosPage() {
     setFormMarca(equipamento.marca ?? "");
     setFormModelo(equipamento.modelo ?? "");
     setFormPotencia(equipamento.potencia ?? "");
+    setFormPrestadorId(equipamento.prestador_id ?? "");
+    setFormNumeroSerie(equipamento.numero_serie ?? "");
+    setFormLocalizacao(equipamento.localizacao ?? "");
+    setFormDataInstalacao(equipamento.data_instalacao ?? "");
+    setFormDataAtivacao(equipamento.data_ativacao ?? "");
     setEditing(equipamento);
     setFeedback(null);
     setIsCreateOpen(true);
@@ -108,6 +127,11 @@ export default function EquipamentosPage() {
           marca: formMarca || null,
           modelo: formModelo || null,
           potencia: formPotencia || null,
+          prestador_id: formPrestadorId || null,
+          numero_serie: formNumeroSerie || null,
+          localizacao: formLocalizacao || null,
+          data_instalacao: formDataInstalacao || null,
+          data_ativacao: formDataAtivacao || null,
         });
         setFeedback({ kind: "success", message: "Equipamento atualizado." });
       } else {
@@ -118,6 +142,11 @@ export default function EquipamentosPage() {
           marca: formMarca || null,
           modelo: formModelo || null,
           potencia: formPotencia || null,
+          prestador_id: formPrestadorId || null,
+          numero_serie: formNumeroSerie || null,
+          localizacao: formLocalizacao || null,
+          data_instalacao: formDataInstalacao || null,
+          data_ativacao: formDataAtivacao || null,
         });
         setFeedback({ kind: "success", message: "Equipamento cadastrado." });
       }
@@ -135,6 +164,18 @@ export default function EquipamentosPage() {
   };
 
   const handleDesativar = async (equipamento: Equipamento) => {
+    if (
+      !(await confirm({
+        title: "Desativar equipamento",
+        description: `Desativar o equipamento "${equipamento.tipo_equipamento}"${
+          equipamento.identificacao ? ` (${equipamento.identificacao})` : ""
+        }?`,
+        confirmLabel: "Desativar",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     setFeedback(null);
     try {
       await updateEquipamento({
@@ -147,6 +188,23 @@ export default function EquipamentosPage() {
       setFeedback({
         kind: "error",
         message: err instanceof Error ? err.message : "Falha ao desativar.",
+      });
+    }
+  };
+
+  const handleReativar = async (equipamento: Equipamento) => {
+    setFeedback(null);
+    try {
+      await updateEquipamento({
+        id: equipamento.id,
+        status: "ativo",
+        data_desativacao: null,
+      });
+      setFeedback({ kind: "success", message: "Equipamento reativado." });
+    } catch (err) {
+      setFeedback({
+        kind: "error",
+        message: err instanceof Error ? err.message : "Falha ao reativar.",
       });
     }
   };
@@ -173,6 +231,7 @@ export default function EquipamentosPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6">
+      {confirmationDialog}
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">
@@ -240,6 +299,9 @@ export default function EquipamentosPage() {
           ) : (
             visibleEquipamentos.map((equipamento) => {
               const loja = lojas.find((item) => item.id === equipamento.loja_id);
+              const prestador = prestadores.find(
+                (item) => item.id === equipamento.prestador_id,
+              );
               return (
                 <article
                   key={equipamento.id}
@@ -267,6 +329,7 @@ export default function EquipamentosPage() {
                         .filter(Boolean)
                         .join(" / ") || "—"}
                     </p>
+                    <p>{prestador?.nome ?? "—"}</p>
                   </div>
                   <div className="mt-3 flex items-center justify-end gap-2">
                     <button
@@ -277,13 +340,21 @@ export default function EquipamentosPage() {
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
-                    {equipamento.status === "ativo" && (
+                    {equipamento.status === "ativo" ? (
                       <button
                         type="button"
                         onClick={() => void handleDesativar(equipamento)}
                         className="rounded-full border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50"
                       >
                         Desativar
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void handleReativar(equipamento)}
+                        className="rounded-full border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-50"
+                      >
+                        Reativar
                       </button>
                     )}
                   </div>
@@ -302,6 +373,7 @@ export default function EquipamentosPage() {
                 <th className="px-5 py-3 text-left">Tipo</th>
                 <th className="px-5 py-3 text-left">Identificação</th>
                 <th className="px-5 py-3 text-left">Marca/Modelo</th>
+                <th className="px-5 py-3 text-left">Prestador</th>
                 <th className="px-5 py-3 text-left">Status</th>
                 <th className="px-5 py-3 text-right">Ações</th>
               </tr>
@@ -309,19 +381,22 @@ export default function EquipamentosPage() {
             <tbody className="divide-y divide-slate-100">
               {equipamentosLoading ? (
                 <tr>
-                  <td className="px-5 py-6 text-center text-slate-500" colSpan={6}>
+                  <td className="px-5 py-6 text-center text-slate-500" colSpan={7}>
                     Carregando equipamentos...
                   </td>
                 </tr>
               ) : visibleEquipamentos.length === 0 ? (
                 <tr>
-                  <td className="px-5 py-6 text-center text-slate-500" colSpan={6}>
+                  <td className="px-5 py-6 text-center text-slate-500" colSpan={7}>
                     Nenhum equipamento encontrado.
                   </td>
                 </tr>
               ) : (
                 visibleEquipamentos.map((equipamento) => {
                   const loja = lojas.find((item) => item.id === equipamento.loja_id);
+                  const prestador = prestadores.find(
+                    (item) => item.id === equipamento.prestador_id,
+                  );
                   return (
                     <tr key={equipamento.id} className="text-slate-700">
                       <td className="px-5 py-4">{loja?.nome ?? "—"}</td>
@@ -334,6 +409,7 @@ export default function EquipamentosPage() {
                           .filter(Boolean)
                           .join(" / ") || "—"}
                       </td>
+                      <td className="px-5 py-4">{prestador?.nome ?? "—"}</td>
                       <td className="px-5 py-4">
                         <span
                           className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
@@ -355,13 +431,21 @@ export default function EquipamentosPage() {
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
-                          {equipamento.status === "ativo" && (
+                          {equipamento.status === "ativo" ? (
                             <button
                               type="button"
                               onClick={() => void handleDesativar(equipamento)}
                               className="rounded-full border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50"
                             >
                               Desativar
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void handleReativar(equipamento)}
+                              className="rounded-full border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-50"
+                            >
+                              Reativar
                             </button>
                           )}
                         </div>
@@ -470,6 +554,58 @@ export default function EquipamentosPage() {
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
                   />
                 </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Prestador
+                  <select
+                    value={formPrestadorId}
+                    onChange={(event) => setFormPrestadorId(event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                  >
+                    <option value="">Nenhum</option>
+                    {prestadores.map((prestador) => (
+                      <option key={prestador.id} value={prestador.id}>
+                        {prestador.nome}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Número de série
+                  <input
+                    value={formNumeroSerie}
+                    onChange={(event) => setFormNumeroSerie(event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Localização
+                  <input
+                    value={formLocalizacao}
+                    onChange={(event) => setFormLocalizacao(event.target.value)}
+                    placeholder="Ex.: Cobertura, área técnica"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                  />
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-xs font-semibold text-slate-600">
+                    Data de instalação
+                    <input
+                      type="date"
+                      value={formDataInstalacao}
+                      onChange={(event) => setFormDataInstalacao(event.target.value)}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-600">
+                    Data de ativação
+                    <input
+                      type="date"
+                      value={formDataAtivacao}
+                      onChange={(event) => setFormDataAtivacao(event.target.value)}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                    />
+                  </label>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2">
