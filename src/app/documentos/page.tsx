@@ -23,6 +23,13 @@ import {
 import { getCompetenciaFromDados } from "@/lib/competencia";
 import { fixMojibakeText } from "@/lib/textEncoding";
 import { StatusBadge } from "@/components/StatusBadge";
+import { getStatusPresentation } from "@/lib/uiStatus";
+
+type AchadoCriticoResumo = {
+  problema: string;
+  prioridade: "emergencial" | "critica";
+  total: number;
+};
 
 type FormularioRecord = {
   id: string;
@@ -36,6 +43,8 @@ type FormularioRecord = {
   prestador_id?: string | null;
   user_id?: string | null;
   equipamento_id?: string | null;
+  status_analise_ia?: string | null;
+  achado_critico?: AchadoCriticoResumo | null;
 };
 
 type EditField = {
@@ -170,6 +179,42 @@ const formatStatusLabel = (status: string) =>
 const getTipoDescricao = (tipo: string) =>
   tipoLabel[tipo] ?? humanizeTexto(tipo);
 
+function AnaliseIaBadge({ status }: { status: string | null | undefined }) {
+  if (!status) {
+    return null;
+  }
+  const presentation = getStatusPresentation(status);
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset ${presentation.className}`}
+    >
+      {presentation.label}
+    </span>
+  );
+}
+
+function AchadoCriticoBadge({
+  achado,
+}: {
+  achado: AchadoCriticoResumo | null | undefined;
+}) {
+  if (!achado) {
+    return null;
+  }
+  const titulo =
+    achado.total > 1
+      ? `${achado.total} achados críticos — ${achado.problema}`
+      : achado.problema;
+  return (
+    <span
+      title={titulo}
+      className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white"
+    >
+      ⚠ Achado crítico{achado.total > 1 ? ` (${achado.total})` : ""}
+    </span>
+  );
+}
+
 const STATUS_ANALISE_IA_OPTIONS = [
   { value: "todos", label: "Todos" },
   { value: "recebido", label: "Aguardando análise" },
@@ -178,6 +223,7 @@ const STATUS_ANALISE_IA_OPTIONS = [
   { value: "necessita_revisao", label: "Necessita revisão" },
   { value: "erro", label: "Erro na leitura" },
   { value: "duplicado", label: "Documento duplicado" },
+  { value: "achado_critico", label: "Achado crítico" },
 ];
 
 const getEditFields = (tipo: string) => EDIT_FIELDS_BY_TIPO[tipo] ?? [];
@@ -2632,7 +2678,11 @@ export default function DocumentosPage() {
                           : "-"}
                       </td>
                       <td className="px-4 py-3">
-                        <StatusBadge status={registro.status} />
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <StatusBadge status={registro.status} />
+                          <AnaliseIaBadge status={registro.status_analise_ia} />
+                          <AchadoCriticoBadge achado={registro.achado_critico} />
+                        </div>
                       </td>
                       <td className="hidden px-4 py-3 text-xs text-slate-500 md:table-cell">
                         <span className="font-medium">{getDataLabel(registro)}</span>
@@ -2841,6 +2891,8 @@ export default function DocumentosPage() {
                   )}
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge status={registro.status} />
+                    <AnaliseIaBadge status={registro.status_analise_ia} />
+                    <AchadoCriticoBadge achado={registro.achado_critico} />
                     <span className="text-[11px] text-slate-500">
                       {registro.tipo === "notas_fiscais"
                         ? getDataLabel(registro)
