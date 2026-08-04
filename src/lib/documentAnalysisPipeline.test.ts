@@ -1,4 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/openAiDocumentAnalysis", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/openAiDocumentAnalysis")
+  >("@/lib/openAiDocumentAnalysis");
+  return {
+    ...actual,
+    analisarDocumentoComOpenAi: vi.fn(),
+  };
+});
+
 import {
   deveAnalisarAutomaticamente,
   determinarStatusFinal,
@@ -6,7 +17,10 @@ import {
   resolveMimeType,
   verificarSegredoWebhook,
   verificarDuplicado,
+  baixarEAnalisarArquivo,
+  registrarAnaliseIa,
 } from "@/lib/documentAnalysisPipeline";
+import { analisarDocumentoComOpenAi } from "@/lib/openAiDocumentAnalysis";
 import type { DocumentoAnaliseIa } from "@/lib/openAiDocumentAnalysis";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -203,5 +217,128 @@ describe("verificarDuplicado", () => {
         dados: { loja_id: "loja-1", competencia: "07/2026" },
       }),
     ).toBe(false);
+  });
+});
+
+describe("baixarEAnalisarArquivo", () => {
+  it("baixa o arquivo do storage e chama a analise por IA", async () => {
+    const download = vi.fn(async () => ({
+      data: {
+        type: "application/pdf",
+        arrayBuffer: async () => new ArrayBuffer(4),
+      },
+      error: null,
+    }));
+    const supabase = {
+      storage: { from: () => ({ download }) },
+    } as unknown as SupabaseClient;
+
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
+      provider: "azure-openai",
+      model: "gpt-5-chat",
+      resultado: resultadoBase(),
+    });
+
+    const resultado = await baixarEAnalisarArquivo(supabase, {
+      path: "pasta/nota.pdf",
+      tipoDocumento: "notas_fiscais",
+      dadosAtuais: { loja_id: "loja-1" },
+    });
+
+    expect(download).toHaveBeenCalledWith("pasta/nota.pdf");
+    expect(resultado.provider).toBe("azure-openai");
+    expect(analisarDocumentoComOpenAi).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fileName: "nota.pdf",
+        mimeType: "application/pdf",
+        tipoDocumento: "notas_fiscais",
+      }),
+    );
+  });
+
+  it("lanca erro quando o download falha", async () => {
+    const supabase = {
+      storage: {
+        from: () => ({
+          download: async () => ({ data: null, error: new Error("falhou") }),
+        }),
+      },
+    } as unknown as SupabaseClient;
+
+    await expect(
+      baixarEAnalisarArquivo(supabase, {
+        path: "pasta/nota.pdf",
+        tipoDocumento: "notas_fiscais",
+      }),
+    ).rejects.toThrow("falhou");
+  });
+
+  it("lanca erro para tipo de arquivo nao suportado", async () => {
+    const supabase = {
+      storage: {
+        from: () => ({
+          download: async () => ({
+            data: { type: "application/zip", arrayBuffer: async () => new ArrayBuffer(4) },
+            error: null,
+          }),
+        }),
+      },
+    } as unknown as SupabaseClient;
+
+    await expect(
+      baixarEAnalisarArquivo(supabase, {
+        path: "pasta/nota.zip",
+        tipoDocumento: "notas_fiscais",
+      }),
+    ).rejects.toThrow("Tipo de arquivo nao suportado");
+  });
+});
+
+describe("registrarAnaliseIa", () => {
+  it("grava status concluida quando ha resultado", async () => {
+    const insert = vi.fn(() => ({
+      select: () => ({
+        single: async () => ({
+          data: { id: "analise-1", status: "concluida" },
+          error: null,
+        }),
+      }),
+    }));
+    const supabase = { from: () => ({ insert }) } as unknown as SupabaseClient;
+
+    const analise = await registrarAnaliseIa(supabase, {
+      documentoId: "doc-1",
+      provider: "azure-openai",
+      model: "gpt-5-chat",
+      resultado: resultadoBase(),
+    });
+
+    expect(analise.status).toBe("concluida");
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({ documento_id: "doc-1", status: "concluida" }),
+    );
+  });
+
+  it("grava status erro quando ha mensagem de erro", async () => {
+    const insert = vi.fn(() => ({
+      select: () => ({
+        single: async () => ({
+          data: { id: "analise-2", status: "erro" },
+          error: null,
+        }),
+      }),
+    }));
+    const supabase = { from: () => ({ insert }) } as unknown as SupabaseClient;
+
+    await registrarAnaliseIa(supabase, {
+      documentoId: "doc-1",
+      provider: "azure-openai",
+      model: "n/a",
+      erro: "OCR falhou",
+    });
+
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "erro", erro: "OCR falhou" }),
+    );
   });
 });

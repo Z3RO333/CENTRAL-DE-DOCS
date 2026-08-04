@@ -1,4 +1,7 @@
-import type { DocumentoAnaliseIa } from "@/lib/openAiDocumentAnalysis";
+import {
+  analisarDocumentoComOpenAi,
+  type DocumentoAnaliseIa,
+} from "@/lib/openAiDocumentAnalysis";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const TIPOS_ANALISE_AUTOMATICA = [
@@ -96,4 +99,77 @@ export async function verificarDuplicado(
   }
 
   return Boolean(data);
+}
+
+export async function baixarEAnalisarArquivo(
+  supabaseAdmin: SupabaseClient,
+  params: {
+    path: string;
+    tipoDocumento: string | null;
+    dadosAtuais?: Record<string, unknown> | null;
+  },
+) {
+  const { data: fileBlob, error: downloadError } = await supabaseAdmin.storage
+    .from("formularios")
+    .download(params.path);
+
+  if (downloadError || !fileBlob) {
+    throw downloadError ?? new Error("Nao foi possivel baixar o arquivo.");
+  }
+
+  const mimeType = resolveMimeType(params.path, fileBlob.type);
+  if (
+    mimeType !== "application/pdf" &&
+    mimeType !== "image/png" &&
+    mimeType !== "image/jpeg"
+  ) {
+    throw new Error(`Tipo de arquivo nao suportado: ${mimeType}.`);
+  }
+
+  return analisarDocumentoComOpenAi({
+    fileName: resolveFileName(params.path),
+    mimeType,
+    bytes: await fileBlob.arrayBuffer(),
+    dadosAtuais: params.dadosAtuais ?? null,
+    tipoDocumento: params.tipoDocumento,
+  });
+}
+
+export async function registrarAnaliseIa(
+  supabaseAdmin: SupabaseClient,
+  params: {
+    documentoId: string;
+    provider: string;
+    model: string;
+    resultado?: DocumentoAnaliseIa;
+    erro?: string;
+  },
+) {
+  const status = params.erro ? "erro" : "concluida";
+  const { data, error } = await supabaseAdmin
+    .from("documentos_analises_ia")
+    .insert({
+      documento_id: params.documentoId,
+      provider: params.provider,
+      model: params.model,
+      status,
+      resultado: params.resultado ?? {},
+      erro: params.erro ?? null,
+    })
+    .select("id,documento_id,provider,model,status,resultado,erro,created_at")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+  return data as {
+    id: string;
+    documento_id: string;
+    provider: string;
+    model: string;
+    status: string;
+    resultado: DocumentoAnaliseIa;
+    erro: string | null;
+    created_at: string;
+  };
 }
