@@ -28,6 +28,7 @@ import {
   ChevronDown,
   X,
   Wrench,
+  ClipboardCheck,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabaseClient";
@@ -165,6 +166,13 @@ export default function AppShell({
           icon: MailWarning,
           isActive: pathname?.startsWith("/documentos/cobrancas"),
           isVisible: canAccessCobrancas,
+        },
+        {
+          href: "/documentos/controle-equipamentos",
+          label: "Controle por equipamento",
+          icon: ClipboardCheck,
+          isActive: pathname?.startsWith("/documentos/controle-equipamentos"),
+          isVisible: isAdminOuGestor,
         },
         {
           href: "/documentos/btracker",
