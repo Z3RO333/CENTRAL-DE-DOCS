@@ -19,6 +19,7 @@ import {
   verificarDuplicado,
   baixarEAnalisarArquivo,
   registrarAnaliseIa,
+  processarDocumentoComIa,
 } from "@/lib/documentAnalysisPipeline";
 import { analisarDocumentoComOpenAi } from "@/lib/openAiDocumentAnalysis";
 import type { DocumentoAnaliseIa } from "@/lib/openAiDocumentAnalysis";
@@ -340,5 +341,132 @@ describe("registrarAnaliseIa", () => {
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({ status: "erro", erro: "OCR falhou" }),
     );
+  });
+});
+
+function criarSupabaseFake(options: {
+  registro: Record<string, unknown> | null;
+  duplicado?: boolean;
+  downloadOk?: boolean;
+}) {
+  const updates: Array<{ table: string; payload: Record<string, unknown> }> = [];
+
+  const supabase = {
+    from: (table: string) => {
+      if (table === "formularios") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: options.registro, error: null }),
+            }),
+            // usado por verificarDuplicado: encadeia varios .eq()
+            // cada .eq() retorna o mesmo objeto ate .neq().limit().maybeSingle()
+          }),
+          update: (payload: Record<string, unknown>) => {
+            updates.push({ table, payload });
+            return { eq: async () => ({ data: null, error: null }) };
+          },
+        };
+      }
+      if (table === "documentos_analises_ia") {
+        return {
+          insert: () => ({
+            select: () => ({
+              single: async () => ({
+                data: { id: "analise-1", status: "concluida" },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`Tabela inesperada no teste: ${table}`);
+    },
+    storage: {
+      from: () => ({
+        download: async () =>
+          options.downloadOk === false
+            ? { data: null, error: new Error("falha no download") }
+            : {
+                data: {
+                  type: "application/pdf",
+                  arrayBuffer: async () => new ArrayBuffer(4),
+                },
+                error: null,
+              },
+      }),
+    },
+  } as unknown as SupabaseClient;
+
+  return { supabase, updates };
+}
+
+describe("processarDocumentoComIa", () => {
+  it("ignora tipos fora do escopo automatico", async () => {
+    const { supabase, updates } = criarSupabaseFake({
+      registro: { id: "doc-1", tipo: "orcamentos_internos", dados: null, arquivo_path: "a.pdf", arquivo_assinado_path: null, prestador_id: null },
+    });
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-1");
+
+    expect(resultado.status).toBe("ignorado");
+    expect(updates).toHaveLength(0);
+  });
+
+  it("marca erro quando o documento nao e encontrado", async () => {
+    const { supabase } = criarSupabaseFake({ registro: null });
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-inexistente");
+
+    expect(resultado.status).toBe("erro");
+  });
+
+  it("roda a analise e marca concluida para um documento em escopo", async () => {
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
+      provider: "azure-openai",
+      model: "gpt-5-chat",
+      resultado: resultadoBase(),
+    });
+
+    const { supabase, updates } = criarSupabaseFake({
+      registro: {
+        id: "doc-1",
+        tipo: "notas_fiscais",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/nota.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: null,
+      },
+    });
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-1");
+
+    expect(resultado.status).toBe("concluida");
+    const statusGravados = updates.map((u) => u.payload.status_analise_ia);
+    expect(statusGravados).toEqual(["em_analise", "concluida"]);
+  });
+
+  it("marca erro quando a analise por IA falha (ex.: OCR fora do ar)", async () => {
+    vi.mocked(analisarDocumentoComOpenAi).mockRejectedValueOnce(
+      new Error("Document Intelligence indisponivel"),
+    );
+
+    const { supabase, updates } = criarSupabaseFake({
+      registro: {
+        id: "doc-2",
+        tipo: "registro_laudos",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/laudo.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: null,
+      },
+    });
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-2");
+
+    expect(resultado.status).toBe("erro");
+    expect(resultado.motivo).toBe("Document Intelligence indisponivel");
+    const statusGravados = updates.map((u) => u.payload.status_analise_ia);
+    expect(statusGravados).toEqual(["em_analise", "erro"]);
   });
 });
