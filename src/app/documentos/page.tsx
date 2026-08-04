@@ -180,7 +180,7 @@ const getTipoDescricao = (tipo: string) =>
   tipoLabel[tipo] ?? humanizeTexto(tipo);
 
 function AnaliseIaBadge({ status }: { status: string | null | undefined }) {
-  if (!status) {
+  if (!status || status === "recebido") {
     return null;
   }
   const presentation = getStatusPresentation(status);

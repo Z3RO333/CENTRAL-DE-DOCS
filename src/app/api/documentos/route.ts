@@ -131,7 +131,8 @@ async function anexarAchadosCriticos(
     .in("prioridade", ["emergencial", "critica"]);
 
   if (error) {
-    throw error;
+    console.error("Erro ao buscar achados críticos:", error);
+    return registros;
   }
 
   const resumoPorDocumento = resumirAchadosCriticosPorDocumento(
@@ -682,8 +683,17 @@ export async function PATCH(request: Request) {
       throw updateError;
     }
 
+    const registroComAchado = updated
+      ? (
+          await anexarAchadosCriticos(
+            supabaseAdmin,
+            mapRows([updated as FormularioRow]),
+          )
+        )[0]
+      : null;
+
     return NextResponse.json({
-      registro: updated ? mapRows([updated as FormularioRow])[0] : null,
+      registro: registroComAchado,
     });
   } catch (err) {
     console.error("Erro ao atualizar documento:", err);
