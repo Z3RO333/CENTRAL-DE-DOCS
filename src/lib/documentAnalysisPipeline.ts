@@ -19,7 +19,7 @@ export function deveAnalisarAutomaticamente(tipo: string): boolean {
 
 const TIPOS_COM_EQUIPAMENTO = ["registro_laudos", "notas_fiscais"] as const;
 
-function deveTentarEquipamento(tipo: string): boolean {
+export function deveTentarEquipamento(tipo: string): boolean {
   return (TIPOS_COM_EQUIPAMENTO as readonly string[]).includes(tipo);
 }
 
@@ -208,6 +208,7 @@ type FormularioRow = {
   arquivo_path: string | null;
   arquivo_assinado_path: string | null;
   prestador_id: string | null;
+  equipamento_id: string | null;
 };
 
 export type EquipamentoAtivo = {
@@ -277,7 +278,7 @@ export async function processarDocumentoComIa(
   try {
     const { data: registro, error: registroError } = await supabaseAdmin
       .from("formularios")
-      .select("id,tipo,dados,arquivo_path,arquivo_assinado_path,prestador_id")
+      .select("id,tipo,dados,arquivo_path,arquivo_assinado_path,prestador_id,equipamento_id")
       .eq("id", documentoId)
       .maybeSingle();
 
@@ -340,16 +341,23 @@ export async function processarDocumentoComIa(
       resultado,
     });
 
-    let equipamentoId: string | null = null;
+    let equipamentoId: string | null = row.equipamento_id;
     let equipamentoRequerido = false;
     const lojaId = typeof dados?.loja_id === "string" ? dados.loja_id : null;
 
-    if (deveTentarEquipamento(row.tipo) && lojaId) {
-      const equipamentosAtivos = await buscarEquipamentosAtivosDaLoja(supabaseAdmin, lojaId);
-      if (equipamentosAtivos.length > 0) {
-        equipamentoRequerido = true;
-        const match = encontrarEquipamentoCorrespondente(equipamentosAtivos, resultado);
-        equipamentoId = match?.id ?? null;
+    if (deveTentarEquipamento(row.tipo) && lojaId && !equipamentoId) {
+      const sinalDeEquipamento = Boolean(
+        resultado.equipamento_tipo?.trim() ||
+          resultado.equipamento_numero_serie?.trim() ||
+          resultado.equipamento_identificacao?.trim(),
+      );
+      if (sinalDeEquipamento) {
+        const equipamentosAtivos = await buscarEquipamentosAtivosDaLoja(supabaseAdmin, lojaId);
+        if (equipamentosAtivos.length > 0) {
+          equipamentoRequerido = true;
+          const match = encontrarEquipamentoCorrespondente(equipamentosAtivos, resultado);
+          equipamentoId = match?.id ?? null;
+        }
       }
     }
 

@@ -739,6 +739,76 @@ describe("processarDocumentoComIa", () => {
     const ultimoUpdate = updates[updates.length - 1];
     expect(ultimoUpdate.payload.equipamento_id).toBeUndefined();
   });
+
+  it("mantem concluida quando nao ha nenhum sinal de equipamento, mesmo com equipamentos cadastrados na loja", async () => {
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
+      provider: "azure-openai",
+      model: "gpt-5-chat",
+      resultado: resultadoBase({
+        equipamento_tipo: null,
+        equipamento_identificacao: null,
+        equipamento_numero_serie: null,
+      }),
+    });
+
+    const { supabase, updates } = criarSupabaseFake({
+      registro: {
+        id: "doc-7",
+        tipo: "notas_fiscais",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/nota.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: null,
+        equipamento_id: null,
+      },
+      equipamentosAtivos: [
+        { id: "eq-1", tipo_equipamento: "Gerador", identificacao: null, numero_serie: null },
+      ],
+    });
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-7");
+
+    expect(resultado.status).toBe("concluida");
+    const ultimoUpdate = updates[updates.length - 1];
+    expect(ultimoUpdate.payload.equipamento_id).toBeNull();
+  });
+
+  it("preserva equipamento_id ja vinculado e nao consulta equipamentos ativos novamente", async () => {
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
+      provider: "azure-openai",
+      model: "gpt-5-chat",
+      resultado: resultadoBase({
+        equipamento_tipo: "Gerador",
+        equipamento_identificacao: null,
+        equipamento_numero_serie: null,
+      }),
+    });
+
+    const { supabase, updates } = criarSupabaseFake({
+      registro: {
+        id: "doc-8",
+        tipo: "registro_laudos",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/laudo.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: null,
+        equipamento_id: "eq-existente",
+      },
+      equipamentosAtivos: [
+        { id: "eq-1", tipo_equipamento: "Gerador", identificacao: null, numero_serie: null },
+      ],
+    });
+    const buscarEquipamentosSpy = vi.spyOn(supabase, "from");
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-8");
+
+    expect(resultado.status).toBe("concluida");
+    const ultimoUpdate = updates[updates.length - 1];
+    expect(ultimoUpdate.payload.equipamento_id).toBe("eq-existente");
+    expect(
+      buscarEquipamentosSpy.mock.calls.some(([table]) => table === "equipamentos"),
+    ).toBe(false);
+  });
 });
 
 import { encontrarEquipamentoCorrespondente } from "@/lib/documentAnalysisPipeline";
