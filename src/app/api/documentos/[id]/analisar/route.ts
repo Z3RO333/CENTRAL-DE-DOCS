@@ -13,6 +13,8 @@ import {
   deveTentarEquipamento,
   encontrarEquipamentoCorrespondente,
   registrarAnaliseIa,
+  registrarRecomendacoesCriticas,
+  temAchadoUrgente,
 } from "@/lib/documentAnalysisPipeline";
 
 export const runtime = "nodejs";
@@ -101,9 +103,22 @@ export async function POST(
       }
     }
 
+    const competencia =
+      typeof dadosAtuais?.competencia === "string" ? dadosAtuais.competencia : null;
+
+    await registrarRecomendacoesCriticas(supabaseAdmin, {
+      documentoId: row.id,
+      equipamentoId,
+      lojaId,
+      tipoDocumento: row.tipo,
+      competencia,
+      achados: resultado.recomendacoes_criticas ?? [],
+    });
+
     const statusFinal = determinarStatusFinal(resultado, {
       equipamentoRequerido,
       equipamentoResolvido: equipamentoId !== null,
+      achadoUrgente: temAchadoUrgente(resultado),
     });
 
     const updatePayload: { status_analise_ia: string; equipamento_id?: string | null } = {
