@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 import { ApiHttpError as HttpError, getActorFromRequest } from "@/lib/apiAuth";
-import { analisarDocumentoComOpenAi } from "@/lib/openAiDocumentAnalysis";
+import {
+  baixarEAnalisarArquivo,
+  registrarAnaliseIa,
+} from "@/lib/documentAnalysisPipeline";
 import {
   assertCanEditAsSolicitante,
   assertInternalActor,
@@ -54,17 +57,8 @@ export async function POST(
       throw new HttpError(400, "A análise automática aceita apenas PDF.");
     }
 
-    const { data: fileBlob, error: downloadError } = await supabaseAdmin.storage
-      .from("formularios")
-      .download(path);
-    if (downloadError || !fileBlob) {
-      throw downloadError ?? new Error("Não foi possível baixar o orçamento.");
-    }
-
-    const { provider, model, resultado } = await analisarDocumentoComOpenAi({
-      fileName: path.split("/").pop() || "orcamento.pdf",
-      mimeType: "application/pdf",
-      bytes: await fileBlob.arrayBuffer(),
+    const { provider, model, resultado } = await baixarEAnalisarArquivo(supabaseAdmin, {
+      path,
       tipoDocumento: "orcamentos",
       dadosAtuais: {
         prestador: orcamento.prestador_nome,
@@ -110,16 +104,12 @@ export async function POST(
       alertas: resultado.alertas,
     };
 
-    const { error: insertError } = await supabaseAdmin
-      .from("documentos_analises_ia")
-      .insert({
-        documento_id: id,
-        provider,
-        model,
-        status: "concluida",
-        resultado,
-      });
-    if (insertError) throw insertError;
+    await registrarAnaliseIa(supabaseAdmin, {
+      documentoId: id,
+      provider,
+      model,
+      resultado,
+    });
 
     await logOrcamentoEvent({
       supabaseAdmin,
