@@ -8,6 +8,7 @@ import {
 } from "@/lib/apiAuth";
 import {
   baixarEAnalisarArquivo,
+  determinarStatusFinal,
   registrarAnaliseIa,
 } from "@/lib/documentAnalysisPipeline";
 
@@ -76,7 +77,7 @@ export async function POST(
 
     const { error: statusUpdateError } = await supabaseAdmin
       .from("formularios")
-      .update({ status_analise_ia: "concluida" })
+      .update({ status_analise_ia: determinarStatusFinal(resultado) })
       .eq("id", row.id);
 
     if (statusUpdateError) {

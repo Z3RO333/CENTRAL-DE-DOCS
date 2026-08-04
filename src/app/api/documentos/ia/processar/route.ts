@@ -25,6 +25,14 @@ export async function POST(request: Request) {
 
   try {
     const payload = (await request.json().catch(() => null)) as WebhookPayload | null;
+
+    if (
+      (payload?.type && payload.type !== "INSERT") ||
+      (payload?.table && payload.table !== "formularios")
+    ) {
+      return NextResponse.json({ ok: true, resultado: { status: "ignorado" } });
+    }
+
     const documentoId = payload?.record?.id;
     if (!documentoId) {
       return NextResponse.json(

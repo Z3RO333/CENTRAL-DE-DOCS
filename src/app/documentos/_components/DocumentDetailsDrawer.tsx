@@ -474,7 +474,8 @@ export function DocumentDetailsDrawer({
   const details = payload?.detalhes;
   const timeline = payload?.timeline ?? [];
   const analiseIa = payload?.analise_ia ?? null;
-  const analiseResultado = analiseIa?.resultado ?? null;
+  const analiseResultado =
+    analiseIa && analiseIa.status !== "erro" ? analiseIa.resultado : null;
   const suggestedUpdates = analiseResultado
     ? buildUpdatesFromAnalise(analiseResultado)
     : {};
@@ -755,6 +756,12 @@ export function DocumentDetailsDrawer({
                   ) : null}
                 </div>
 
+                {analiseIa?.status === "erro" && analiseIa.erro ? (
+                  <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {analiseIa.erro}
+                  </div>
+                ) : null}
+
                 {analiseResultado ? (
                   <div className="mt-4 space-y-3 text-sm">
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -874,11 +881,11 @@ export function DocumentDetailsDrawer({
                       {analiseIa?.provider} / {analiseIa?.model}
                     </p>
                   </div>
-                ) : (
+                ) : analiseIa?.status !== "erro" ? (
                   <p className="mt-3 text-sm text-slate-500">
                     Nenhuma analise salva para este documento ainda.
                   </p>
-                )}
+                ) : null}
               </section>
 
               <section className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4">
