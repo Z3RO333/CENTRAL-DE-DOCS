@@ -9,6 +9,7 @@ import {
 import {
   baixarEAnalisarArquivo,
   registrarAnaliseIa,
+  resolveMimeType,
 } from "@/lib/documentAnalysisPipeline";
 
 export const runtime = "nodejs";
@@ -61,6 +62,15 @@ export async function POST(
       throw new HttpError(400, "Documento sem arquivo para analise.");
     }
 
+    const mimeType = resolveMimeType(path, null);
+    if (
+      mimeType !== "application/pdf" &&
+      mimeType !== "image/png" &&
+      mimeType !== "image/jpeg"
+    ) {
+      throw new HttpError(400, `Tipo de arquivo nao suportado: ${mimeType}.`);
+    }
+
     const { provider, model, resultado } = await baixarEAnalisarArquivo(supabaseAdmin, {
       path,
       tipoDocumento: row.tipo,
@@ -74,10 +84,14 @@ export async function POST(
       resultado,
     });
 
-    await supabaseAdmin
+    const { error: statusUpdateError } = await supabaseAdmin
       .from("formularios")
       .update({ status_analise_ia: "concluida" })
       .eq("id", row.id);
+
+    if (statusUpdateError) {
+      console.error("[documentos/analisar] Falha ao atualizar status_analise_ia:", statusUpdateError);
+    }
 
     return NextResponse.json({ analise });
   } catch (err) {
