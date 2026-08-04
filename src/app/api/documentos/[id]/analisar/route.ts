@@ -9,7 +9,6 @@ import {
 import {
   baixarEAnalisarArquivo,
   registrarAnaliseIa,
-  resolveMimeType,
 } from "@/lib/documentAnalysisPipeline";
 
 export const runtime = "nodejs";
@@ -62,15 +61,6 @@ export async function POST(
       throw new HttpError(400, "Documento sem arquivo para analise.");
     }
 
-    const mimeType = resolveMimeType(path, null);
-    if (
-      mimeType !== "application/pdf" &&
-      mimeType !== "image/png" &&
-      mimeType !== "image/jpeg"
-    ) {
-      throw new HttpError(400, `Tipo de arquivo nao suportado: ${mimeType}.`);
-    }
-
     const { provider, model, resultado } = await baixarEAnalisarArquivo(supabaseAdmin, {
       path,
       tipoDocumento: row.tipo,
@@ -98,6 +88,9 @@ export async function POST(
     console.error("[documentos/analisar] Erro:", err);
     if (err instanceof HttpError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    if (err instanceof Error && err.message.startsWith("Tipo de arquivo nao suportado:")) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
     }
     const message =
       err instanceof Error ? err.message : "Nao foi possivel analisar o documento.";
