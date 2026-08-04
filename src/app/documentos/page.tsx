@@ -8,6 +8,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
 import { usePrestadores } from "@/hooks/usePrestadores";
 import { useLojas } from "@/hooks/useLojas";
+import { useEquipamentos } from "@/hooks/useEquipamentos";
 import { DocumentActions } from "./_components/DocumentActions";
 import { DocumentosBatchActions } from "./_components/DocumentosBatchActions";
 import { DocumentDetailsDrawer } from "./_components/DocumentDetailsDrawer";
@@ -34,6 +35,7 @@ type FormularioRecord = {
   assinado_por?: string | null;
   prestador_id?: string | null;
   user_id?: string | null;
+  equipamento_id?: string | null;
 };
 
 type EditField = {
@@ -107,6 +109,7 @@ type DocumentosListState = {
   lojaFilter: string;
   prestadorFilter: string;
   statusFilter: string;
+  statusAnaliseIaFilter: string;
   identificacaoFilter: string;
   anoFilter: string;
   mesFilter: string;
@@ -166,6 +169,16 @@ const formatStatusLabel = (status: string) =>
 
 const getTipoDescricao = (tipo: string) =>
   tipoLabel[tipo] ?? humanizeTexto(tipo);
+
+const STATUS_ANALISE_IA_OPTIONS = [
+  { value: "todos", label: "Todos" },
+  { value: "recebido", label: "Aguardando análise" },
+  { value: "em_analise", label: "Em análise pela IA" },
+  { value: "concluida", label: "Análise concluída" },
+  { value: "necessita_revisao", label: "Necessita revisão" },
+  { value: "erro", label: "Erro na leitura" },
+  { value: "duplicado", label: "Documento duplicado" },
+];
 
 const getEditFields = (tipo: string) => EDIT_FIELDS_BY_TIPO[tipo] ?? [];
 
@@ -420,6 +433,8 @@ export default function DocumentosPage() {
   const [lojaFilter, setLojaFilter] = useState<string>("todos");
   const [prestadorFilter, setPrestadorFilter] = useState<string>("todos");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
+  const [statusAnaliseIaFilter, setStatusAnaliseIaFilter] =
+    useState<string>("todos");
   const [identificacaoFilter, setIdentificacaoFilter] = useState<string>("");
   const [identificacaoDebounced, setIdentificacaoDebounced] =
     useState<string>("");
@@ -458,8 +473,13 @@ export default function DocumentosPage() {
     registro: FormularioRecord;
     values: Record<string, string>;
     lojaId: string;
+    equipamentoId: string;
   } | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  const { equipamentos: equipamentosDaLojaSelecionada } = useEquipamentos({
+    lojaId: editDialog?.lojaId || undefined,
+    enabled: Boolean(editDialog?.lojaId),
+  });
   const [filterOptions, setFilterOptions] = useState<{
     anos: string[];
     status: string[];
@@ -659,6 +679,9 @@ export default function DocumentosPage() {
         if (parsed.statusFilter) {
           setStatusFilter(parsed.statusFilter);
         }
+        if (parsed.statusAnaliseIaFilter) {
+          setStatusAnaliseIaFilter(parsed.statusAnaliseIaFilter);
+        }
         if (typeof parsed.identificacaoFilter === "string") {
           setIdentificacaoFilter(parsed.identificacaoFilter);
         }
@@ -692,6 +715,7 @@ export default function DocumentosPage() {
           lojaFilter: parsed.lojaFilter ?? "todos",
           prestadorFilter: parsed.prestadorFilter ?? "todos",
           statusFilter: parsed.statusFilter ?? "todos",
+          statusAnaliseIaFilter: parsed.statusAnaliseIaFilter ?? "todos",
           identificacaoFilter: parsed.identificacaoFilter ?? "",
           anoFilter: parsed.anoFilter ?? "todos",
           mesFilter: parsed.mesFilter ?? "todos",
@@ -825,6 +849,7 @@ export default function DocumentosPage() {
       lojaFilter,
       prestadorFilter,
       statusFilter,
+      statusAnaliseIaFilter,
       identificacaoFilter,
       anoFilter,
       mesFilter,
@@ -849,6 +874,7 @@ export default function DocumentosPage() {
     lojaFilter,
     prestadorFilter,
     statusFilter,
+    statusAnaliseIaFilter,
     identificacaoFilter,
     anoFilter,
     mesFilter,
@@ -914,6 +940,7 @@ export default function DocumentosPage() {
     lojaFilter,
     prestadorFilter,
     statusFilter,
+    statusAnaliseIaFilter,
     identificacaoDebounced,
     anoFilter,
     mesFilter,
@@ -992,6 +1019,9 @@ export default function DocumentosPage() {
         }
         if (statusFilter !== "todos") {
           params.set("status", statusFilter);
+        }
+        if (statusAnaliseIaFilter !== "todos") {
+          params.set("statusAnaliseIa", statusAnaliseIaFilter);
         }
         if (anoFilter !== "todos") {
           params.set("ano", anoFilter);
@@ -1081,6 +1111,7 @@ export default function DocumentosPage() {
     lojaFilter,
     prestadorFilter,
     statusFilter,
+    statusAnaliseIaFilter,
     anoFilter,
     mesFilter,
     identificacaoDebounced,
@@ -1287,7 +1318,12 @@ export default function DocumentosPage() {
       return acc;
     }, {});
     const lojaId = String(registro.dados?.loja_id ?? "");
-    setEditDialog({ registro, values, lojaId });
+    setEditDialog({
+      registro,
+      values,
+      lojaId,
+      equipamentoId: String(registro.equipamento_id ?? ""),
+    });
   };
 
   const atualizarEdicao = (campo: string, valor: string) => {
@@ -1329,6 +1365,10 @@ export default function DocumentosPage() {
           editDialog.lojaId !==
             String(editDialog.registro.dados?.loja_id ?? "")
             ? { lojaId: editDialog.lojaId }
+            : {}),
+          ...(editDialog.equipamentoId !==
+          String(editDialog.registro.equipamento_id ?? "")
+            ? { equipamentoId: editDialog.equipamentoId }
             : {}),
         }),
       });
@@ -1587,6 +1627,7 @@ export default function DocumentosPage() {
     setLojaFilter("todos");
     setPrestadorFilter("todos");
     setStatusFilter("todos");
+    setStatusAnaliseIaFilter("todos");
     setIdentificacaoFilter("");
     setAnoFilter("todos");
     setMesFilter("todos");
@@ -1839,6 +1880,17 @@ export default function DocumentosPage() {
         onRemove: () => setStatusFilter("todos"),
       });
     }
+    if (statusAnaliseIaFilter !== "todos") {
+      chips.push({
+        key: "status-analise-ia",
+        label: "Status da análise",
+        value:
+          STATUS_ANALISE_IA_OPTIONS.find(
+            (option) => option.value === statusAnaliseIaFilter,
+          )?.label ?? statusAnaliseIaFilter,
+        onRemove: () => setStatusAnaliseIaFilter("todos"),
+      });
+    }
     if (lojaFilter !== "todos") {
       chips.push({
         key: "loja",
@@ -1932,6 +1984,7 @@ export default function DocumentosPage() {
     somenteAssinados,
     somenteDisponiveisLote,
     statusFilter,
+    statusAnaliseIaFilter,
     tipoFilter,
     tipoLaudoFilter,
     userFilter,
@@ -2057,7 +2110,9 @@ export default function DocumentosPage() {
                   value={editDialog.lojaId}
                   onChange={(e) =>
                     setEditDialog((prev) =>
-                      prev ? { ...prev, lojaId: e.target.value } : prev,
+                      prev
+                        ? { ...prev, lojaId: e.target.value, equipamentoId: "" }
+                        : prev,
                     )
                   }
                   className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400 ${
@@ -2071,6 +2126,29 @@ export default function DocumentosPage() {
                     <option key={loja.id} value={loja.id}>
                       {loja.codigo ? `${loja.codigo} — ` : ""}
                       {loja.nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-slate-600 md:col-span-2">
+                Equipamento (opcional)
+                <select
+                  value={editDialog.equipamentoId}
+                  onChange={(e) =>
+                    setEditDialog((prev) =>
+                      prev ? { ...prev, equipamentoId: e.target.value } : prev,
+                    )
+                  }
+                  disabled={!editDialog.lojaId}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                >
+                  <option value="">Nenhum</option>
+                  {equipamentosDaLojaSelecionada.map((equipamento) => (
+                    <option key={equipamento.id} value={equipamento.id}>
+                      {equipamento.tipo_equipamento}
+                      {equipamento.identificacao
+                        ? ` — ${equipamento.identificacao}`
+                        : ""}
                     </option>
                   ))}
                 </select>
@@ -2245,6 +2323,7 @@ export default function DocumentosPage() {
             tipoFilter={tipoFilter}
             tipoLaudoFilter={tipoLaudoFilter}
             statusFilter={statusFilter}
+            statusAnaliseIaFilter={statusAnaliseIaFilter}
             userFilter={userFilter}
             lojaFilter={lojaFilter}
             prestadorFilter={prestadorFilter}
@@ -2274,6 +2353,8 @@ export default function DocumentosPage() {
             onTipoFilterChange={setTipoFilter}
             onTipoLaudoFilterChange={setTipoLaudoFilter}
             onStatusFilterChange={setStatusFilter}
+            statusAnaliseIaOptions={STATUS_ANALISE_IA_OPTIONS}
+            onStatusAnaliseIaFilterChange={setStatusAnaliseIaFilter}
             onUserFilterChange={setUserFilter}
             onLojaFilterChange={setLojaFilter}
             onPrestadorFilterChange={setPrestadorFilter}

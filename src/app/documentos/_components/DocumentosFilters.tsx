@@ -34,6 +34,7 @@ type DocumentosFiltersProps = {
   tipoFilter: string;
   tipoLaudoFilter: string;
   statusFilter: string;
+  statusAnaliseIaFilter: string;
   userFilter: string;
   lojaFilter: string;
   prestadorFilter: string;
@@ -43,6 +44,7 @@ type DocumentosFiltersProps = {
   somenteDisponiveisLote: boolean;
   tipoOptions: FilterOption[];
   statusOptions: FilterOption[];
+  statusAnaliseIaOptions: FilterOption[];
   tipoLaudoOptions: string[];
   colaboradorOptions: FilterOption[];
   lojaOptions: FilterOption[];
@@ -57,6 +59,7 @@ type DocumentosFiltersProps = {
   onTipoFilterChange: (value: string) => void;
   onTipoLaudoFilterChange: (value: string) => void;
   onStatusFilterChange: (value: string) => void;
+  onStatusAnaliseIaFilterChange: (value: string) => void;
   onUserFilterChange: (value: string) => void;
   onLojaFilterChange: (value: string) => void;
   onPrestadorFilterChange: (value: string) => void;
@@ -78,6 +81,7 @@ export function DocumentosFilters({
   tipoFilter,
   tipoLaudoFilter,
   statusFilter,
+  statusAnaliseIaFilter,
   userFilter,
   lojaFilter,
   prestadorFilter,
@@ -87,6 +91,7 @@ export function DocumentosFilters({
   somenteDisponiveisLote,
   tipoOptions,
   statusOptions,
+  statusAnaliseIaOptions,
   tipoLaudoOptions,
   colaboradorOptions,
   lojaOptions,
@@ -101,6 +106,7 @@ export function DocumentosFilters({
   onTipoFilterChange,
   onTipoLaudoFilterChange,
   onStatusFilterChange,
+  onStatusAnaliseIaFilterChange,
   onUserFilterChange,
   onLojaFilterChange,
   onPrestadorFilterChange,
@@ -298,6 +304,23 @@ export function DocumentosFilters({
                     className={inputClassName}
                   >
                     {statusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="text-xs font-semibold text-slate-600">
+                  Status da análise
+                  <select
+                    value={statusAnaliseIaFilter}
+                    onChange={(event) =>
+                      onStatusAnaliseIaFilterChange(event.target.value)
+                    }
+                    className={inputClassName}
+                  >
+                    {statusAnaliseIaOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
