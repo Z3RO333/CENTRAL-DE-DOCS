@@ -35,6 +35,9 @@ export type DocumentoAnaliseIa = {
   confianca_geral: number;
   observacoes: string | null;
   recomendacoes: string[];
+  equipamento_tipo: string | null;
+  equipamento_identificacao: string | null;
+  equipamento_numero_serie: string | null;
 };
 
 type AnalyzeInput = {
@@ -76,6 +79,9 @@ const ANALISE_SCHEMA = {
     "confianca_geral",
     "observacoes",
     "recomendacoes",
+    "equipamento_tipo",
+    "equipamento_identificacao",
+    "equipamento_numero_serie",
   ],
   properties: {
     tipo_documento: {
@@ -148,6 +154,9 @@ const ANALISE_SCHEMA = {
     confianca_geral: { type: "number", minimum: 0, maximum: 1 },
     observacoes: { anyOf: [{ type: "string" }, { type: "null" }] },
     recomendacoes: { type: "array", items: { type: "string" } },
+    equipamento_tipo: { anyOf: [{ type: "string" }, { type: "null" }] },
+    equipamento_identificacao: { anyOf: [{ type: "string" }, { type: "null" }] },
+    equipamento_numero_serie: { anyOf: [{ type: "string" }, { type: "null" }] },
   },
 };
 
@@ -362,7 +371,7 @@ export async function analisarDocumentoComOpenAi(
         {
           role: "system",
           content:
-            "Voce analisa documentos administrativos brasileiros, incluindo orcamentos, propostas comerciais, laudos tecnicos, checklists de manutencao, notas fiscais e contratos. Extraia apenas dados presentes ou fortemente inferiveis no arquivo. Se houver mais de uma loja, competencia ou item, liste todos separadamente. Retorne somente JSON valido, sem markdown. Use competencias sempre como MM/AAAA. Se houver divergencia com os dados atuais, coloque em alertas. Para 'observacoes': extraia o texto literal da secao de observacoes ou comentarios finais do documento. Para 'recomendacoes': extraia como lista de acoes especificas recomendadas ou itens que precisam de atencao; se nao houver, retorne array vazio. IMPORTANTE — Para documentos do tipo 'orcamentos': (1) Classifique tipo_documento como 'orcamentos'. (2) Em 'prestador', extraia a razao social ou nome da empresa que EMITIU o orcamento, nunca o cliente destinatario. (3) Em 'cnpj', extraia o CNPJ dessa empresa emissora. (4) Em 'numero_orcamento', extraia o numero da proposta, cotacao ou orcamento. (5) Em 'valor_total', extraia o total final proposto em reais. (6) Em 'data_validade', extraia a data final de validade no formato AAAA-MM-DD; quando o documento informar apenas uma quantidade de dias, calcule a partir da data de emissao se ela estiver presente. (7) Em 'descricao', resuma objetivamente o servico ou produto oferecido. (8) Nao avalie se o preco esta bom e nao recomende aprovacao ou rejeicao. IMPORTANTE — Para documentos do tipo 'contratos': (1) Classifique tipo_documento como 'contratos', nao como nota fiscal ou laudo. (2) Em 'numero_contrato', extraia o numero ou codigo do contrato. (3) Em 'objeto', extraia a descricao completa do servico contratado. (4) Em 'data_assinatura', extraia a data de assinatura no formato AAAA-MM-DD. (5) Em 'data_vencimento', extraia a data de termino de vigencia; se houver renovacao automatica sem data fixa, deixe null e mencione em alertas. (6) Em 'tipo_servico', classifique o servico numa categoria curta. (7) Em 'prestador', coloque o nome da empresa contratada. (8) Em 'valor_total', extraia o valor total do contrato. (9) Em 'numero_nf' e 'numero_pedido', retorne null para contratos.",
+            "Voce analisa documentos administrativos brasileiros, incluindo orcamentos, propostas comerciais, laudos tecnicos, checklists de manutencao, notas fiscais e contratos. Extraia apenas dados presentes ou fortemente inferiveis no arquivo. Se houver mais de uma loja, competencia ou item, liste todos separadamente. Retorne somente JSON valido, sem markdown. Use competencias sempre como MM/AAAA. Se houver divergencia com os dados atuais, coloque em alertas. Para 'observacoes': extraia o texto literal da secao de observacoes ou comentarios finais do documento. Para 'recomendacoes': extraia como lista de acoes especificas recomendadas ou itens que precisam de atencao; se nao houver, retorne array vazio. IMPORTANTE — Para documentos do tipo 'orcamentos': (1) Classifique tipo_documento como 'orcamentos'. (2) Em 'prestador', extraia a razao social ou nome da empresa que EMITIU o orcamento, nunca o cliente destinatario. (3) Em 'cnpj', extraia o CNPJ dessa empresa emissora. (4) Em 'numero_orcamento', extraia o numero da proposta, cotacao ou orcamento. (5) Em 'valor_total', extraia o total final proposto em reais. (6) Em 'data_validade', extraia a data final de validade no formato AAAA-MM-DD; quando o documento informar apenas uma quantidade de dias, calcule a partir da data de emissao se ela estiver presente. (7) Em 'descricao', resuma objetivamente o servico ou produto oferecido. (8) Nao avalie se o preco esta bom e nao recomende aprovacao ou rejeicao. IMPORTANTE — Para documentos do tipo 'contratos': (1) Classifique tipo_documento como 'contratos', nao como nota fiscal ou laudo. (2) Em 'numero_contrato', extraia o numero ou codigo do contrato. (3) Em 'objeto', extraia a descricao completa do servico contratado. (4) Em 'data_assinatura', extraia a data de assinatura no formato AAAA-MM-DD. (5) Em 'data_vencimento', extraia a data de termino de vigencia; se houver renovacao automatica sem data fixa, deixe null e mencione em alertas. (6) Em 'tipo_servico', classifique o servico numa categoria curta. (7) Em 'prestador', coloque o nome da empresa contratada. (8) Em 'valor_total', extraia o valor total do contrato. (9) Em 'numero_nf' e 'numero_pedido', retorne null para contratos. IMPORTANTE — Para documentos do tipo 'registro_laudos' ou 'notas_fiscais': (1) Em 'equipamento_tipo', extraia o tipo do equipamento mencionado no documento (ex.: Gerador, Ar Condicionado, Elevador), em texto livre, só quando explicitamente identificável; senao retorne null. (2) Em 'equipamento_identificacao', extraia a identificacao ou apelido do equipamento citado (ex.: \"Gerador 01\", \"Unidade 2\"), quando houver; senao null. (3) Em 'equipamento_numero_serie', extraia o numero de serie ou patrimonio do equipamento, quando citado; senao null. (4) Para qualquer outro tipo de documento, sempre retorne null nos tres campos — nao tente adivinhar.",
         },
         {
           role: "user",
