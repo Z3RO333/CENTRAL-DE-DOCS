@@ -19,6 +19,7 @@ type FormularioRow = {
   id: string;
   tipo: string;
   status: string;
+  status_analise_ia?: string | null;
   arquivo_path: string | null;
   arquivo_assinado_path: string | null;
   created_at: string;
@@ -103,7 +104,7 @@ async function getVisibleDocumento(input: {
   let query = supabaseAdmin
     .from("formularios")
     .select(
-      "id,tipo,status,arquivo_path,arquivo_assinado_path,created_at,dados,assinado_por,user_id,prestador_id",
+      "id,tipo,status,status_analise_ia,arquivo_path,arquivo_assinado_path,created_at,dados,assinado_por,user_id,prestador_id",
     )
     .eq("id", input.id);
 

@@ -22,6 +22,7 @@ export type DrawerFormularioRecord = {
   id: string;
   tipo: string;
   status: string;
+  status_analise_ia?: string | null;
   arquivo_path: string;
   arquivo_assinado_path?: string | null;
   created_at: string;
@@ -136,6 +137,16 @@ const statusLabel: Record<string, string> = {
   em_analise: "Em análise",
   revisado: "Revisado",
   assinado: "Assinado",
+};
+
+const statusAnaliseIaLabel: Record<string, { texto: string; classe: string }> = {
+  recebido: { texto: "Aguardando análise", classe: "bg-slate-100 text-slate-700" },
+  aguardando_analise: { texto: "Aguardando análise", classe: "bg-slate-100 text-slate-700" },
+  em_analise: { texto: "Em análise pela IA", classe: "bg-blue-100 text-blue-700" },
+  concluida: { texto: "Análise concluída", classe: "bg-green-100 text-green-700" },
+  necessita_revisao: { texto: "Necessita revisão", classe: "bg-amber-100 text-amber-700" },
+  erro: { texto: "Erro na leitura", classe: "bg-red-100 text-red-700" },
+  duplicado: { texto: "Documento duplicado", classe: "bg-purple-100 text-purple-700" },
 };
 
 const eventLabel: Record<string, string> = {
@@ -700,15 +711,32 @@ export function DocumentDetailsDrawer({
                     </p>
                   </div>
                   {canManageDocuments ? (
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void analisarComIa()}
-                        disabled={analyzing || applyingSuggestions}
-                        className="rounded-full border border-sky-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {analyzing ? "Analisando..." : "Analisar com IA"}
-                      </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          const statusInfo =
+                            statusAnaliseIaLabel[registro?.status_analise_ia ?? "recebido"] ??
+                            statusAnaliseIaLabel.recebido;
+                          return (
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-medium ${statusInfo.classe}`}
+                            >
+                              {statusInfo.texto}
+                            </span>
+                          );
+                        })()}
+                        {(registro?.status_analise_ia === "erro" ||
+                          registro?.status_analise_ia === "necessita_revisao") && (
+                          <button
+                            type="button"
+                            onClick={() => void analisarComIa()}
+                            disabled={analyzing}
+                            className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+                          >
+                            {analyzing ? "Reprocessando..." : "Reprocessar com IA"}
+                          </button>
+                        )}
+                      </div>
                       {analiseResultado ? (
                         <button
                           type="button"
