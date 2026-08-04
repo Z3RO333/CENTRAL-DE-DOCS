@@ -39,6 +39,7 @@ export default function EquipamentosPage() {
   const [formMarca, setFormMarca] = useState("");
   const [formModelo, setFormModelo] = useState("");
   const [formPotencia, setFormPotencia] = useState("");
+  const [formFrequencia, setFormFrequencia] = useState("mensal");
   const [formPrestadorId, setFormPrestadorId] = useState("");
   const [formNumeroSerie, setFormNumeroSerie] = useState("");
   const [formLocalizacao, setFormLocalizacao] = useState("");
@@ -76,6 +77,7 @@ export default function EquipamentosPage() {
     setFormMarca("");
     setFormModelo("");
     setFormPotencia("");
+    setFormFrequencia("mensal");
     setFormPrestadorId("");
     setFormNumeroSerie("");
     setFormLocalizacao("");
@@ -97,6 +99,7 @@ export default function EquipamentosPage() {
     setFormMarca(equipamento.marca ?? "");
     setFormModelo(equipamento.modelo ?? "");
     setFormPotencia(equipamento.potencia ?? "");
+    setFormFrequencia(equipamento.frequencia ?? "mensal");
     setFormPrestadorId(equipamento.prestador_id ?? "");
     setFormNumeroSerie(equipamento.numero_serie ?? "");
     setFormLocalizacao(equipamento.localizacao ?? "");
@@ -127,6 +130,7 @@ export default function EquipamentosPage() {
           marca: formMarca || null,
           modelo: formModelo || null,
           potencia: formPotencia || null,
+          frequencia: formFrequencia as "mensal" | "semestral" | "anual",
           prestador_id: formPrestadorId || null,
           numero_serie: formNumeroSerie || null,
           localizacao: formLocalizacao || null,
@@ -142,6 +146,7 @@ export default function EquipamentosPage() {
           marca: formMarca || null,
           modelo: formModelo || null,
           potencia: formPotencia || null,
+          frequencia: formFrequencia as "mensal" | "semestral" | "anual",
           prestador_id: formPrestadorId || null,
           numero_serie: formNumeroSerie || null,
           localizacao: formLocalizacao || null,
@@ -330,6 +335,7 @@ export default function EquipamentosPage() {
                         .join(" / ") || "—"}
                     </p>
                     <p>{prestador?.nome ?? "—"}</p>
+                    <p className="capitalize">{equipamento.frequencia ?? "mensal"}</p>
                   </div>
                   <div className="mt-3 flex items-center justify-end gap-2">
                     <button
@@ -374,6 +380,7 @@ export default function EquipamentosPage() {
                 <th className="px-5 py-3 text-left">Identificação</th>
                 <th className="px-5 py-3 text-left">Marca/Modelo</th>
                 <th className="px-5 py-3 text-left">Prestador</th>
+                <th className="px-5 py-3 text-left">Frequência</th>
                 <th className="px-5 py-3 text-left">Status</th>
                 <th className="px-5 py-3 text-right">Ações</th>
               </tr>
@@ -381,13 +388,13 @@ export default function EquipamentosPage() {
             <tbody className="divide-y divide-slate-100">
               {equipamentosLoading ? (
                 <tr>
-                  <td className="px-5 py-6 text-center text-slate-500" colSpan={7}>
+                  <td className="px-5 py-6 text-center text-slate-500" colSpan={8}>
                     Carregando equipamentos...
                   </td>
                 </tr>
               ) : visibleEquipamentos.length === 0 ? (
                 <tr>
-                  <td className="px-5 py-6 text-center text-slate-500" colSpan={7}>
+                  <td className="px-5 py-6 text-center text-slate-500" colSpan={8}>
                     Nenhum equipamento encontrado.
                   </td>
                 </tr>
@@ -410,6 +417,9 @@ export default function EquipamentosPage() {
                           .join(" / ") || "—"}
                       </td>
                       <td className="px-5 py-4">{prestador?.nome ?? "—"}</td>
+                      <td className="px-5 py-4 capitalize">
+                        {equipamento.frequencia ?? "mensal"}
+                      </td>
                       <td className="px-5 py-4">
                         <span
                           className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
@@ -553,6 +563,18 @@ export default function EquipamentosPage() {
                     placeholder='Ex.: "150KVA"'
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
                   />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Frequência
+                  <select
+                    value={formFrequencia}
+                    onChange={(event) => setFormFrequencia(event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                  >
+                    <option value="mensal">Mensal</option>
+                    <option value="semestral">Semestral</option>
+                    <option value="anual">Anual</option>
+                  </select>
                 </label>
                 <label className="text-xs font-semibold text-slate-600">
                   Prestador

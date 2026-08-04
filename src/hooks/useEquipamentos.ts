@@ -20,6 +20,7 @@ export type Equipamento = {
   data_desativacao: string | null;
   status: "ativo" | "inativo";
   atributos: Record<string, unknown>;
+  frequencia: "mensal" | "semestral" | "anual";
   origem_importacao: string | null;
   created_at: string;
   updated_at: string;

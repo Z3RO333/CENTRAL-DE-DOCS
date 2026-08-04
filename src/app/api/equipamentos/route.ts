@@ -7,9 +7,10 @@ import {
 } from "@/lib/apiAuth";
 
 const SELECT_COLUMNS =
-  "id,loja_id,tipo_equipamento,identificacao,marca,modelo,numero_serie,potencia,localizacao,prestador_id,documento_tipo_obrigatorio,data_instalacao,data_ativacao,data_desativacao,status,atributos,origem_importacao,created_at,updated_at";
+  "id,loja_id,tipo_equipamento,identificacao,marca,modelo,numero_serie,potencia,localizacao,prestador_id,documento_tipo_obrigatorio,data_instalacao,data_ativacao,data_desativacao,status,atributos,origem_importacao,created_at,updated_at,frequencia";
 
 const STATUS_VALIDOS = ["ativo", "inativo"] as const;
+const FREQUENCIA_VALIDAS = ["mensal", "semestral", "anual"] as const;
 
 type EquipamentoInput = {
   loja_id?: string;
@@ -27,6 +28,7 @@ type EquipamentoInput = {
   data_desativacao?: string | null;
   status?: string;
   atributos?: Record<string, unknown>;
+  frequencia?: string;
 };
 
 function sanitizeText(value: string | null | undefined): string | null {
@@ -101,6 +103,9 @@ export async function POST(request: Request) {
     if (body.status !== undefined && !STATUS_VALIDOS.includes(body.status as never)) {
       throw new HttpError(400, "Status invalido.");
     }
+    if (body.frequencia !== undefined && !FREQUENCIA_VALIDAS.includes(body.frequencia as never)) {
+      throw new HttpError(400, "Frequencia invalida.");
+    }
 
     const { data, error } = await supabaseAdmin
       .from("equipamentos")
@@ -120,6 +125,9 @@ export async function POST(request: Request) {
         data_desativacao: body.data_desativacao || null,
         status: body.status ?? "ativo",
         atributos: body.atributos ?? {},
+        frequencia: FREQUENCIA_VALIDAS.includes(body.frequencia as never)
+          ? body.frequencia
+          : "mensal",
         created_by: user.id,
       })
       .select(SELECT_COLUMNS)
@@ -160,6 +168,9 @@ export async function PATCH(request: Request) {
     if (body.status !== undefined && !STATUS_VALIDOS.includes(body.status as never)) {
       throw new HttpError(400, "Status invalido.");
     }
+    if (body.frequencia !== undefined && !FREQUENCIA_VALIDAS.includes(body.frequencia as never)) {
+      throw new HttpError(400, "Frequencia invalida.");
+    }
 
     const updatePayload: Record<string, unknown> = {};
     const camposTexto: Array<keyof EquipamentoInput> = [
@@ -193,6 +204,9 @@ export async function PATCH(request: Request) {
     }
     if (Object.prototype.hasOwnProperty.call(body, "atributos")) {
       updatePayload.atributos = body.atributos ?? {};
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "frequencia")) {
+      updatePayload.frequencia = body.frequencia;
     }
 
     if (Object.keys(updatePayload).length === 0) {
