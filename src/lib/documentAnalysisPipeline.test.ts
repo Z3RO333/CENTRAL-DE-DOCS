@@ -5,8 +5,10 @@ import {
   resolveFileName,
   resolveMimeType,
   verificarSegredoWebhook,
+  verificarDuplicado,
 } from "@/lib/documentAnalysisPipeline";
 import type { DocumentoAnaliseIa } from "@/lib/openAiDocumentAnalysis";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 function resultadoBase(overrides: Partial<DocumentoAnaliseIa> = {}): DocumentoAnaliseIa {
   return {
@@ -112,5 +114,94 @@ describe("resolveFileName", () => {
 
   it("usa um nome padrao quando o path esta vazio", () => {
     expect(resolveFileName("")).toBe("documento.pdf");
+  });
+});
+
+describe("verificarDuplicado", () => {
+  it("retorna false quando faltam loja, competencia ou prestador", async () => {
+    const supabase = {} as unknown as SupabaseClient;
+
+    expect(
+      await verificarDuplicado(supabase, "doc-1", {
+        tipo: "notas_fiscais",
+        prestador_id: null,
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+      }),
+    ).toBe(false);
+
+    expect(
+      await verificarDuplicado(supabase, "doc-1", {
+        tipo: "notas_fiscais",
+        prestador_id: "prestador-1",
+        dados: { competencia: "07/2026" },
+      }),
+    ).toBe(false);
+  });
+
+  it("retorna true quando ja existe documento concluido com a mesma chave", async () => {
+    const supabase = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              eq: () => ({
+                eq: () => ({
+                  eq: () => ({
+                    neq: () => ({
+                      limit: () => ({
+                        maybeSingle: async () => ({
+                          data: { id: "doc-existente" },
+                          error: null,
+                        }),
+                      }),
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    } as unknown as SupabaseClient;
+
+    expect(
+      await verificarDuplicado(supabase, "doc-1", {
+        tipo: "notas_fiscais",
+        prestador_id: "prestador-1",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+      }),
+    ).toBe(true);
+  });
+
+  it("retorna false quando a busca nao encontra nada", async () => {
+    const supabase = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              eq: () => ({
+                eq: () => ({
+                  eq: () => ({
+                    neq: () => ({
+                      limit: () => ({
+                        maybeSingle: async () => ({ data: null, error: null }),
+                      }),
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    } as unknown as SupabaseClient;
+
+    expect(
+      await verificarDuplicado(supabase, "doc-1", {
+        tipo: "notas_fiscais",
+        prestador_id: "prestador-1",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+      }),
+    ).toBe(false);
   });
 });

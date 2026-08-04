@@ -1,4 +1,5 @@
 import type { DocumentoAnaliseIa } from "@/lib/openAiDocumentAnalysis";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const TIPOS_ANALISE_AUTOMATICA = [
   "notas_fiscais",
@@ -54,4 +55,45 @@ export function resolveMimeType(path: string, fallback?: string | null) {
 
 export function resolveFileName(path: string) {
   return path.split("/").pop() || "documento.pdf";
+}
+
+type FormularioParaDuplicidade = {
+  tipo: string;
+  prestador_id: string | null;
+  dados: Record<string, unknown> | null;
+};
+
+export async function verificarDuplicado(
+  supabaseAdmin: SupabaseClient,
+  documentoId: string,
+  documento: FormularioParaDuplicidade,
+): Promise<boolean> {
+  const lojaId =
+    typeof documento.dados?.loja_id === "string" ? documento.dados.loja_id : null;
+  const competencia =
+    typeof documento.dados?.competencia === "string"
+      ? documento.dados.competencia
+      : null;
+
+  if (!lojaId || !competencia || !documento.prestador_id) {
+    return false;
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("formularios")
+    .select("id")
+    .eq("tipo", documento.tipo)
+    .eq("prestador_id", documento.prestador_id)
+    .eq("dados->>loja_id", lojaId)
+    .eq("dados->>competencia", competencia)
+    .eq("status_analise_ia", "concluida")
+    .neq("id", documentoId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return Boolean(data);
 }
