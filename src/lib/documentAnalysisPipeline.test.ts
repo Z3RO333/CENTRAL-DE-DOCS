@@ -19,6 +19,7 @@ import {
   verificarDuplicado,
   baixarEAnalisarArquivo,
   registrarAnaliseIa,
+  registrarRecomendacoesCriticas,
   processarDocumentoComIa,
   buscarEquipamentosAtivosDaLoja,
   temAchadoUrgente,
@@ -479,6 +480,88 @@ describe("registrarAnaliseIa", () => {
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({ status: "erro", erro: "OCR falhou" }),
     );
+  });
+});
+
+describe("registrarRecomendacoesCriticas", () => {
+  it("nao chama insert quando nao ha achados", async () => {
+    const insert = vi.fn();
+    const supabase = { from: () => ({ insert }) } as unknown as SupabaseClient;
+
+    await registrarRecomendacoesCriticas(supabase, {
+      documentoId: "doc-1",
+      equipamentoId: "eq-1",
+      lojaId: "loja-1",
+      tipoDocumento: "registro_laudos",
+      competencia: "07/2026",
+      achados: [],
+    });
+
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("insere uma linha por achado com equipamento_id e loja_id copiados do documento", async () => {
+    const insert = vi.fn(async () => ({ error: null }));
+    const supabase = { from: () => ({ insert }) } as unknown as SupabaseClient;
+
+    await registrarRecomendacoesCriticas(supabase, {
+      documentoId: "doc-1",
+      equipamentoId: "eq-1",
+      lojaId: "loja-1",
+      tipoDocumento: "registro_laudos",
+      competencia: "07/2026",
+      achados: [
+        recomendacaoCriticaBase({ prioridade: "critica" }),
+        recomendacaoCriticaBase({ prioridade: "moderada" }),
+      ],
+    });
+
+    expect(insert).toHaveBeenCalledTimes(1);
+    const rows = insert.mock.calls[0][0];
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toEqual(
+      expect.objectContaining({
+        documento_id: "doc-1",
+        equipamento_id: "eq-1",
+        loja_id: "loja-1",
+        tipo_documento: "registro_laudos",
+        competencia: "07/2026",
+        prioridade: "critica",
+      }),
+    );
+  });
+
+  it("insere com equipamento_id null quando o documento nao tem equipamento resolvido", async () => {
+    const insert = vi.fn(async () => ({ error: null }));
+    const supabase = { from: () => ({ insert }) } as unknown as SupabaseClient;
+
+    await registrarRecomendacoesCriticas(supabase, {
+      documentoId: "doc-1",
+      equipamentoId: null,
+      lojaId: "loja-1",
+      tipoDocumento: "notas_fiscais",
+      competencia: "07/2026",
+      achados: [recomendacaoCriticaBase()],
+    });
+
+    const rows = insert.mock.calls[0][0];
+    expect(rows[0].equipamento_id).toBeNull();
+  });
+
+  it("propaga erro do supabase", async () => {
+    const insert = vi.fn(async () => ({ error: new Error("falhou") }));
+    const supabase = { from: () => ({ insert }) } as unknown as SupabaseClient;
+
+    await expect(
+      registrarRecomendacoesCriticas(supabase, {
+        documentoId: "doc-1",
+        equipamentoId: null,
+        lojaId: null,
+        tipoDocumento: "notas_fiscais",
+        competencia: null,
+        achados: [recomendacaoCriticaBase()],
+      }),
+    ).rejects.toThrow("falhou");
   });
 });
 

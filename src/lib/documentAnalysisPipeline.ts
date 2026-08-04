@@ -1,6 +1,7 @@
 import {
   analisarDocumentoComOpenAi,
   type DocumentoAnaliseIa,
+  type RecomendacaoCritica,
 } from "@/lib/openAiDocumentAnalysis";
 import { safeParseDados } from "@/lib/documentosApiUtils";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -207,6 +208,52 @@ export async function registrarAnaliseIa(
     erro: string | null;
     created_at: string;
   };
+}
+
+export async function registrarRecomendacoesCriticas(
+  supabaseAdmin: SupabaseClient,
+  params: {
+    documentoId: string;
+    equipamentoId: string | null;
+    lojaId: string | null;
+    tipoDocumento: string;
+    competencia: string | null;
+    achados: RecomendacaoCritica[];
+  },
+): Promise<void> {
+  if (params.achados.length === 0) {
+    return;
+  }
+
+  const rows = params.achados.map((achado) => ({
+    documento_id: params.documentoId,
+    equipamento_id: params.equipamentoId,
+    loja_id: params.lojaId,
+    tipo_documento: params.tipoDocumento,
+    competencia: params.competencia,
+    trecho: achado.trecho,
+    pagina: achado.pagina,
+    problema: achado.problema,
+    componente: achado.componente,
+    recomendacao_tecnica: achado.recomendacao_tecnica,
+    impacto: achado.impacto,
+    acao_necessaria: achado.acao_necessaria,
+    prioridade: achado.prioridade,
+    prazo_dias: achado.prazo_dias,
+    desligar_equipamento: achado.desligar_equipamento,
+    substituir_peca: achado.substituir_peca,
+    precisa_inspecao_presencial: achado.precisa_inspecao_presencial,
+    abrir_ordem_corretiva: achado.abrir_ordem_corretiva,
+    riscos: achado.riscos,
+  }));
+
+  const { error } = await supabaseAdmin
+    .from("documento_recomendacoes_criticas")
+    .insert(rows);
+
+  if (error) {
+    throw error;
+  }
 }
 
 type FormularioRow = {
