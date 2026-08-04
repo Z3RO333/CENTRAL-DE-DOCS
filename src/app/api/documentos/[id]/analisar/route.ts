@@ -106,14 +106,19 @@ export async function POST(
     const competencia =
       typeof dadosAtuais?.competencia === "string" ? dadosAtuais.competencia : null;
 
-    await registrarRecomendacoesCriticas(supabaseAdmin, {
-      documentoId: row.id,
-      equipamentoId,
-      lojaId,
-      tipoDocumento: row.tipo,
-      competencia,
-      achados: resultado.recomendacoes_criticas ?? [],
-    });
+    try {
+      await registrarRecomendacoesCriticas(supabaseAdmin, {
+        documentoId: row.id,
+        equipamentoId,
+        lojaId,
+        tipoDocumento: row.tipo,
+        competencia,
+        achados: resultado.recomendacoes_criticas ?? [],
+      });
+    } catch (err) {
+      // Best-effort: nao deixar uma falha ao registrar mascarar o erro original.
+      console.error("[documentos/analisar] Falha ao registrar recomendacoes_criticas:", err);
+    }
 
     const statusFinal = determinarStatusFinal(resultado, {
       equipamentoRequerido,

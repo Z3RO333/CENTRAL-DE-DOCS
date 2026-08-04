@@ -56,7 +56,10 @@ export function determinarStatusFinal(
   return "concluida";
 }
 
-const PRIORIDADES_URGENTES = new Set(["emergencial", "critica"]);
+const PRIORIDADES_URGENTES = new Set<RecomendacaoCritica["prioridade"]>([
+  "emergencial",
+  "critica",
+]);
 
 export function temAchadoUrgente(resultado: DocumentoAnaliseIa): boolean {
   return (resultado.recomendacoes_criticas ?? []).some((achado) =>
@@ -232,6 +235,15 @@ export async function registrarRecomendacoesCriticas(
     achados: RecomendacaoCritica[];
   },
 ): Promise<void> {
+  const { error: deleteError } = await supabaseAdmin
+    .from("documento_recomendacoes_criticas")
+    .delete()
+    .eq("documento_id", params.documentoId);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
   if (params.achados.length === 0) {
     return;
   }
@@ -430,14 +442,19 @@ export async function processarDocumentoComIa(
     const competencia =
       typeof dados?.competencia === "string" ? dados.competencia : null;
 
-    await registrarRecomendacoesCriticas(supabaseAdmin, {
-      documentoId: row.id,
-      equipamentoId,
-      lojaId,
-      tipoDocumento: row.tipo,
-      competencia,
-      achados: resultado.recomendacoes_criticas ?? [],
-    });
+    try {
+      await registrarRecomendacoesCriticas(supabaseAdmin, {
+        documentoId: row.id,
+        equipamentoId,
+        lojaId,
+        tipoDocumento: row.tipo,
+        competencia,
+        achados: resultado.recomendacoes_criticas ?? [],
+      });
+    } catch (err) {
+      // Best-effort: nao deixar uma falha ao registrar mascarar o erro original.
+      console.error("[processarDocumentoComIa] Falha ao registrar recomendacoes_criticas:", err);
+    }
 
     const statusFinal = determinarStatusFinal(resultado, {
       equipamentoRequerido,

@@ -919,7 +919,9 @@ export function DocumentDetailsDrawer({
                           Achados criticos identificados
                         </p>
                         {analiseResultado.recomendacoes_criticas.map((achado, i) => {
-                          const estilo = PRIORIDADE_ESTILO[achado.prioridade];
+                          const estilo =
+                            PRIORIDADE_ESTILO[achado.prioridade] ??
+                            PRIORIDADE_ESTILO.informativa;
                           const flags = [
                             achado.desligar_equipamento && "Desligar equipamento",
                             achado.substituir_peca && "Substituir peca",
@@ -950,6 +952,19 @@ export function DocumentDetailsDrawer({
                               <p className="mt-1 text-xs text-red-800">
                                 {achado.acao_necessaria}
                               </p>
+                              {achado.recomendacao_tecnica ? (
+                                <p className="mt-1 text-xs text-red-800">
+                                  <span className="font-semibold">
+                                    Recomendacao tecnica:
+                                  </span>{" "}
+                                  {achado.recomendacao_tecnica}
+                                </p>
+                              ) : null}
+                              {achado.trecho ? (
+                                <p className="mt-1 text-[11px] italic text-red-700">
+                                  &ldquo;{achado.trecho}&rdquo;
+                                </p>
+                              ) : null}
                               {flags.length > 0 ? (
                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                   {flags.map((flag) => (
