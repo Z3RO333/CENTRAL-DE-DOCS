@@ -7,6 +7,7 @@ import {
   normalizeIds,
   resolveLimit,
   safeParseDados,
+  resumirAchadosCriticosPorDocumento,
 } from "@/lib/documentosApiUtils";
 import { fixMojibakeText, normalizeDisplayData } from "@/lib/textEncoding";
 
@@ -94,5 +95,51 @@ describe("documentosApiUtils", () => {
 
   it("formatCurrencyBRL retorna null quando valor e null", () => {
     expect(formatCurrencyBRL(null)).toBeNull();
+  });
+});
+
+describe("resumirAchadosCriticosPorDocumento", () => {
+  it("retorna objeto vazio quando nao ha achados", () => {
+    expect(resumirAchadosCriticosPorDocumento([])).toEqual({});
+  });
+
+  it("agrupa um achado por documento", () => {
+    const resultado = resumirAchadosCriticosPorDocumento([
+      { documento_id: "doc-1", problema: "Vazamento no compressor", prioridade: "critica" },
+    ]);
+    expect(resultado).toEqual({
+      "doc-1": { problema: "Vazamento no compressor", prioridade: "critica", total: 1 },
+    });
+  });
+
+  it("quando ha mais de um achado, mantem o de maior prioridade e soma o total", () => {
+    const resultado = resumirAchadosCriticosPorDocumento([
+      { documento_id: "doc-1", problema: "Ruido anormal", prioridade: "critica" },
+      { documento_id: "doc-1", problema: "Vazamento identificado", prioridade: "emergencial" },
+    ]);
+    expect(resultado["doc-1"]).toEqual({
+      problema: "Vazamento identificado",
+      prioridade: "emergencial",
+      total: 2,
+    });
+  });
+
+  it("mantem critica quando so ha achados critica, mesmo com varios", () => {
+    const resultado = resumirAchadosCriticosPorDocumento([
+      { documento_id: "doc-1", problema: "Problema A", prioridade: "critica" },
+      { documento_id: "doc-1", problema: "Problema B", prioridade: "critica" },
+    ]);
+    expect(resultado["doc-1"].prioridade).toBe("critica");
+    expect(resultado["doc-1"].total).toBe(2);
+  });
+
+  it("agrupa documentos diferentes de forma independente", () => {
+    const resultado = resumirAchadosCriticosPorDocumento([
+      { documento_id: "doc-1", problema: "Problema A", prioridade: "critica" },
+      { documento_id: "doc-2", problema: "Problema B", prioridade: "emergencial" },
+    ]);
+    expect(Object.keys(resultado).sort()).toEqual(["doc-1", "doc-2"]);
+    expect(resultado["doc-1"].prioridade).toBe("critica");
+    expect(resultado["doc-2"].prioridade).toBe("emergencial");
   });
 });

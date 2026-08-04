@@ -99,3 +99,44 @@ export const formatCurrencyBRL = (value: number | null): string | null => {
   }
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 };
+
+export type AchadoCriticoResumo = {
+  problema: string;
+  prioridade: "emergencial" | "critica";
+  total: number;
+};
+
+const PRIORIDADE_CRITICA_PESO: Record<string, number> = {
+  emergencial: 2,
+  critica: 1,
+};
+
+export const resumirAchadosCriticosPorDocumento = (
+  achados: Array<{ documento_id: string; problema: string; prioridade: string }>,
+): Record<string, AchadoCriticoResumo> => {
+  const porDocumento = new Map<
+    string,
+    Array<{ problema: string; prioridade: string }>
+  >();
+
+  for (const achado of achados) {
+    const lista = porDocumento.get(achado.documento_id) ?? [];
+    lista.push({ problema: achado.problema, prioridade: achado.prioridade });
+    porDocumento.set(achado.documento_id, lista);
+  }
+
+  const resultado: Record<string, AchadoCriticoResumo> = {};
+  for (const [documentoId, lista] of porDocumento) {
+    const principal = [...lista].sort(
+      (a, b) =>
+        (PRIORIDADE_CRITICA_PESO[b.prioridade] ?? 0) -
+        (PRIORIDADE_CRITICA_PESO[a.prioridade] ?? 0),
+    )[0];
+    resultado[documentoId] = {
+      problema: principal.problema,
+      prioridade: principal.prioridade as "emergencial" | "critica",
+      total: lista.length,
+    };
+  }
+  return resultado;
+};
