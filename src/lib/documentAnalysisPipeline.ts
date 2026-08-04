@@ -28,7 +28,11 @@ const LIMIAR_CONFIANCA_REVISAO = 0.5;
 
 export function determinarStatusFinal(
   resultado: DocumentoAnaliseIa,
-  contexto?: { equipamentoRequerido: boolean; equipamentoResolvido: boolean },
+  contexto?: {
+    equipamentoRequerido: boolean;
+    equipamentoResolvido: boolean;
+    achadoUrgente?: boolean;
+  },
 ): "concluida" | "necessita_revisao" {
   const semLoja = !resultado.lojas || resultado.lojas.length === 0;
   const semCompetencia =
@@ -38,8 +42,15 @@ export function determinarStatusFinal(
     resultado.confianca_geral < LIMIAR_CONFIANCA_REVISAO;
   const semEquipamentoObrigatorio =
     Boolean(contexto?.equipamentoRequerido) && !contexto?.equipamentoResolvido;
+  const achadoUrgente = Boolean(contexto?.achadoUrgente);
 
-  if (semLoja || semCompetencia || confiancaBaixa || semEquipamentoObrigatorio) {
+  if (
+    semLoja ||
+    semCompetencia ||
+    confiancaBaixa ||
+    semEquipamentoObrigatorio ||
+    achadoUrgente
+  ) {
     return "necessita_revisao";
   }
   return "concluida";
@@ -416,9 +427,22 @@ export async function processarDocumentoComIa(
       }
     }
 
+    const competencia =
+      typeof dados?.competencia === "string" ? dados.competencia : null;
+
+    await registrarRecomendacoesCriticas(supabaseAdmin, {
+      documentoId: row.id,
+      equipamentoId,
+      lojaId,
+      tipoDocumento: row.tipo,
+      competencia,
+      achados: resultado.recomendacoes_criticas ?? [],
+    });
+
     const statusFinal = determinarStatusFinal(resultado, {
       equipamentoRequerido,
       equipamentoResolvido: equipamentoId !== null,
+      achadoUrgente: temAchadoUrgente(resultado),
     });
 
     const updatePayload: { status_analise_ia: string; equipamento_id?: string | null } = {

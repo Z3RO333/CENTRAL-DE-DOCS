@@ -187,6 +187,32 @@ describe("determinarStatusFinal com contexto de equipamento", () => {
     });
     expect(resultado).toBe("concluida");
   });
+
+  it("forca necessita_revisao quando ha achado urgente, mesmo com tudo resolvido", () => {
+    const resultado = determinarStatusFinal(resultadoBase(), {
+      equipamentoRequerido: true,
+      equipamentoResolvido: true,
+      achadoUrgente: true,
+    });
+    expect(resultado).toBe("necessita_revisao");
+  });
+
+  it("mantem concluida quando achadoUrgente e false e tudo mais resolvido", () => {
+    const resultado = determinarStatusFinal(resultadoBase(), {
+      equipamentoRequerido: true,
+      equipamentoResolvido: true,
+      achadoUrgente: false,
+    });
+    expect(resultado).toBe("concluida");
+  });
+
+  it("mantem comportamento quando achadoUrgente nao e informado", () => {
+    const resultado = determinarStatusFinal(resultadoBase(), {
+      equipamentoRequerido: false,
+      equipamentoResolvido: false,
+    });
+    expect(resultado).toBe("concluida");
+  });
 });
 
 describe("temAchadoUrgente", () => {
@@ -572,6 +598,7 @@ function criarSupabaseFake(options: {
   equipamentosAtivos?: EquipamentoAtivo[];
 }) {
   const updates: Array<{ table: string; payload: Record<string, unknown> }> = [];
+  const inserts: Array<{ table: string; payload: unknown }> = [];
   let selectCallCount = 0;
 
   const supabase = {
@@ -621,6 +648,14 @@ function criarSupabaseFake(options: {
           }),
         };
       }
+      if (table === "documento_recomendacoes_criticas") {
+        return {
+          insert: (payload: unknown) => {
+            inserts.push({ table, payload });
+            return Promise.resolve({ error: null });
+          },
+        };
+      }
       if (table === "equipamentos") {
         return {
           select: () => ({
@@ -651,7 +686,7 @@ function criarSupabaseFake(options: {
     },
   } as unknown as SupabaseClient;
 
-  return { supabase, updates };
+  return { supabase, updates, inserts };
 }
 
 describe("processarDocumentoComIa", () => {
@@ -798,6 +833,84 @@ describe("processarDocumentoComIa", () => {
     expect(resultado.status).toBe("concluida");
     const ultimoUpdate = updates[updates.length - 1];
     expect(ultimoUpdate.payload.equipamento_id).toBe("eq-1");
+  });
+
+  it("grava recomendacoes_criticas e forca necessita_revisao quando ha achado critica", async () => {
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
+      provider: "azure-openai",
+      model: "gpt-5-chat",
+      resultado: resultadoBase({
+        recomendacoes_criticas: [recomendacaoCriticaBase({ prioridade: "critica" })],
+      }),
+    });
+
+    const { supabase, updates, inserts } = criarSupabaseFake({
+      registro: {
+        id: "doc-5",
+        tipo: "notas_fiscais",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/nota.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: null,
+      },
+    });
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-5");
+
+    expect(resultado.status).toBe("necessita_revisao");
+    const ultimoUpdate = updates[updates.length - 1];
+    expect(ultimoUpdate.payload.status_analise_ia).toBe("necessita_revisao");
+    expect(inserts.filter((i) => i.table === "documento_recomendacoes_criticas")).toHaveLength(1);
+  });
+
+  it("nao forca revisao quando so ha achados de prioridade baixa", async () => {
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
+      provider: "azure-openai",
+      model: "gpt-5-chat",
+      resultado: resultadoBase({
+        recomendacoes_criticas: [recomendacaoCriticaBase({ prioridade: "preventiva" })],
+      }),
+    });
+
+    const { supabase, updates } = criarSupabaseFake({
+      registro: {
+        id: "doc-6",
+        tipo: "notas_fiscais",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/nota.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: null,
+      },
+    });
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-6");
+
+    expect(resultado.status).toBe("concluida");
+    const ultimoUpdate = updates[updates.length - 1];
+    expect(ultimoUpdate.payload.status_analise_ia).toBe("concluida");
+  });
+
+  it("nao insere linhas quando nao ha achados criticos", async () => {
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
+      provider: "azure-openai",
+      model: "gpt-5-chat",
+      resultado: resultadoBase({ recomendacoes_criticas: [] }),
+    });
+
+    const { supabase, inserts } = criarSupabaseFake({
+      registro: {
+        id: "doc-7",
+        tipo: "notas_fiscais",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/nota.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: null,
+      },
+    });
+
+    await processarDocumentoComIa(supabase, "doc-7");
+
+    expect(inserts.filter((i) => i.table === "documento_recomendacoes_criticas")).toHaveLength(0);
   });
 
   it("marca necessita_revisao quando a loja tem equipamentos mas nenhum bate", async () => {
