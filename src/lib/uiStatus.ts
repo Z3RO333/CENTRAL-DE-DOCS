@@ -34,6 +34,9 @@ const STATUS: Record<string, { label: string; tone: StatusTone }> = {
   cancelado: { label: "Cancelado", tone: "neutral" },
   erro: { label: "Erro", tone: "danger" },
   falha: { label: "Falha", tone: "danger" },
+  recebido: { label: "Aguardando análise", tone: "neutral" },
+  necessita_revisao: { label: "Necessita revisão", tone: "warning" },
+  duplicado: { label: "Duplicado", tone: "neutral" },
 };
 
 const humanize = (value: string) =>
