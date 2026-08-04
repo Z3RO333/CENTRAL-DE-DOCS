@@ -21,6 +21,7 @@ const LIMIAR_CONFIANCA_REVISAO = 0.5;
 
 export function determinarStatusFinal(
   resultado: DocumentoAnaliseIa,
+  contexto?: { equipamentoRequerido: boolean; equipamentoResolvido: boolean },
 ): "concluida" | "necessita_revisao" {
   const semLoja = !resultado.lojas || resultado.lojas.length === 0;
   const semCompetencia =
@@ -28,8 +29,10 @@ export function determinarStatusFinal(
   const confiancaBaixa =
     typeof resultado.confianca_geral !== "number" ||
     resultado.confianca_geral < LIMIAR_CONFIANCA_REVISAO;
+  const semEquipamentoObrigatorio =
+    Boolean(contexto?.equipamentoRequerido) && !contexto?.equipamentoResolvido;
 
-  if (semLoja || semCompetencia || confiancaBaixa) {
+  if (semLoja || semCompetencia || confiancaBaixa || semEquipamentoObrigatorio) {
     return "necessita_revisao";
   }
   return "concluida";
@@ -100,6 +103,23 @@ export async function verificarDuplicado(
   }
 
   return Boolean(data);
+}
+
+export async function buscarEquipamentosAtivosDaLoja(
+  supabaseAdmin: SupabaseClient,
+  lojaId: string,
+): Promise<EquipamentoAtivo[]> {
+  const { data, error } = await supabaseAdmin
+    .from("equipamentos")
+    .select("id,tipo_equipamento,identificacao,numero_serie")
+    .eq("loja_id", lojaId)
+    .eq("status", "ativo");
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as EquipamentoAtivo[];
 }
 
 export async function baixarEAnalisarArquivo(

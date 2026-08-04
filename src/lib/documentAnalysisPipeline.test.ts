@@ -20,6 +20,7 @@ import {
   baixarEAnalisarArquivo,
   registrarAnaliseIa,
   processarDocumentoComIa,
+  buscarEquipamentosAtivosDaLoja,
 } from "@/lib/documentAnalysisPipeline";
 import { analisarDocumentoComOpenAi } from "@/lib/openAiDocumentAnalysis";
 import type { DocumentoAnaliseIa } from "@/lib/openAiDocumentAnalysis";
@@ -91,6 +92,74 @@ describe("determinarStatusFinal", () => {
     expect(determinarStatusFinal(resultadoBase({ competencias: [] }))).toBe(
       "necessita_revisao",
     );
+  });
+});
+
+describe("buscarEquipamentosAtivosDaLoja", () => {
+  it("retorna so os equipamentos ativos da loja", async () => {
+    const supabase = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            eq: async () => ({
+              data: [
+                { id: "eq-1", tipo_equipamento: "Gerador", identificacao: "Gerador 01", numero_serie: "SN-1" },
+              ],
+              error: null,
+            }),
+          }),
+        }),
+      }),
+    } as unknown as SupabaseClient;
+
+    const equipamentos = await buscarEquipamentosAtivosDaLoja(supabase, "loja-1");
+    expect(equipamentos).toEqual([
+      { id: "eq-1", tipo_equipamento: "Gerador", identificacao: "Gerador 01", numero_serie: "SN-1" },
+    ]);
+  });
+
+  it("propaga erro do supabase", async () => {
+    const supabase = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            eq: async () => ({ data: null, error: new Error("falhou") }),
+          }),
+        }),
+      }),
+    } as unknown as SupabaseClient;
+
+    await expect(buscarEquipamentosAtivosDaLoja(supabase, "loja-1")).rejects.toThrow("falhou");
+  });
+});
+
+describe("determinarStatusFinal com contexto de equipamento", () => {
+  it("mantem comportamento antigo quando contexto nao e passado", () => {
+    expect(determinarStatusFinal(resultadoBase())).toBe("concluida");
+  });
+
+  it("forca necessita_revisao quando equipamento e requerido mas nao foi resolvido", () => {
+    const resultado = determinarStatusFinal(resultadoBase(), {
+      equipamentoRequerido: true,
+      equipamentoResolvido: false,
+    });
+    expect(resultado).toBe("necessita_revisao");
+  });
+
+  it("mantem concluida quando equipamento e requerido e foi resolvido", () => {
+    const resultado = determinarStatusFinal(resultadoBase(), {
+      equipamentoRequerido: true,
+      equipamentoResolvido: true,
+    });
+    expect(resultado).toBe("concluida");
+  });
+
+  it("nao exige equipamento quando equipamentoRequerido e false", () => {
+    const resultado = determinarStatusFinal(resultadoBase(), {
+      equipamentoRequerido: false,
+      equipamentoResolvido: false,
+    });
+    expect(resultado).toBe("concluida");
   });
 });
 
