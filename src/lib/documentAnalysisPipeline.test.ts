@@ -527,7 +527,7 @@ describe("registrarRecomendacoesCriticas", () => {
   });
 
   it("insere uma linha por achado com equipamento_id e loja_id copiados do documento", async () => {
-    const insert = vi.fn(async () => ({ error: null }));
+    const insert = vi.fn(async (_rows: unknown[]) => ({ error: null }));
     const supabase = { from: () => ({ insert }) } as unknown as SupabaseClient;
 
     await registrarRecomendacoesCriticas(supabase, {
@@ -558,7 +558,7 @@ describe("registrarRecomendacoesCriticas", () => {
   });
 
   it("insere com equipamento_id null quando o documento nao tem equipamento resolvido", async () => {
-    const insert = vi.fn(async () => ({ error: null }));
+    const insert = vi.fn(async (_rows: unknown[]) => ({ error: null }));
     const supabase = { from: () => ({ insert }) } as unknown as SupabaseClient;
 
     await registrarRecomendacoesCriticas(supabase, {
@@ -570,7 +570,7 @@ describe("registrarRecomendacoesCriticas", () => {
       achados: [recomendacaoCriticaBase()],
     });
 
-    const rows = insert.mock.calls[0][0];
+    const rows = insert.mock.calls[0][0] as Array<{ equipamento_id: string | null }>;
     expect(rows[0].equipamento_id).toBeNull();
   });
 
