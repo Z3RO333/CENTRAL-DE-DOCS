@@ -648,7 +648,10 @@ export async function PATCH(request: Request) {
 
         updatePayload.equipamento_id = equipamento.id;
 
-        if (registro.status_analise_ia === "necessita_revisao") {
+        if (
+          lojaIdParaValidar &&
+          registro.status_analise_ia === "necessita_revisao"
+        ) {
           updatePayload.status_analise_ia = "concluida";
         }
       }
