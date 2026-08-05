@@ -542,7 +542,7 @@ export async function PATCH(request: Request) {
 
     const { data: registro, error: registroError } = await supabaseAdmin
       .from("formularios")
-      .select("id,tipo,status,dados,prestador_id")
+      .select("id,tipo,status,dados,prestador_id,status_analise_ia")
       .eq("id", id)
       .maybeSingle();
     if (registroError) {
@@ -566,6 +566,7 @@ export async function PATCH(request: Request) {
       equipamento_id?: string | null;
       status?: string;
       assinado_por?: string | null;
+      status_analise_ia?: string;
     } = {
       dados: dadosAtualizados,
     };
@@ -646,6 +647,10 @@ export async function PATCH(request: Request) {
         }
 
         updatePayload.equipamento_id = equipamento.id;
+
+        if (registro.status_analise_ia === "necessita_revisao") {
+          updatePayload.status_analise_ia = "concluida";
+        }
       }
     }
 
