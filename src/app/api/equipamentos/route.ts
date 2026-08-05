@@ -107,6 +107,27 @@ export async function POST(request: Request) {
       throw new HttpError(400, "Frequencia invalida.");
     }
 
+    const identificacaoNormalizada = sanitizeText(body.identificacao);
+    let queryDuplicidade = supabaseAdmin
+      .from("equipamentos")
+      .select("id", { count: "exact", head: true })
+      .eq("loja_id", lojaId)
+      .eq("tipo_equipamento", tipoEquipamento)
+      .eq("status", "ativo");
+    queryDuplicidade = identificacaoNormalizada
+      ? queryDuplicidade.eq("identificacao", identificacaoNormalizada)
+      : queryDuplicidade.is("identificacao", null);
+    const { count: duplicados, error: duplicidadeError } = await queryDuplicidade;
+    if (duplicidadeError) {
+      throw duplicidadeError;
+    }
+    if (duplicados && duplicados > 0) {
+      throw new HttpError(
+        409,
+        "Ja existe um equipamento ativo com o mesmo tipo e identificacao nesta loja. Use uma identificacao diferente para distinguir os equipamentos.",
+      );
+    }
+
     const { data, error } = await supabaseAdmin
       .from("equipamentos")
       .insert({
