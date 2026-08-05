@@ -45,6 +45,7 @@ export default function EquipamentosPage() {
   const [formLocalizacao, setFormLocalizacao] = useState("");
   const [formDataInstalacao, setFormDataInstalacao] = useState("");
   const [formDataAtivacao, setFormDataAtivacao] = useState("");
+  const [formDocumentoTipoObrigatorio, setFormDocumentoTipoObrigatorio] = useState("");
 
   useEffect(() => {
     if (authLoading || accessLoading) return;
@@ -83,6 +84,7 @@ export default function EquipamentosPage() {
     setFormLocalizacao("");
     setFormDataInstalacao("");
     setFormDataAtivacao("");
+    setFormDocumentoTipoObrigatorio("");
   };
 
   const openCreate = () => {
@@ -105,6 +107,7 @@ export default function EquipamentosPage() {
     setFormLocalizacao(equipamento.localizacao ?? "");
     setFormDataInstalacao(equipamento.data_instalacao ?? "");
     setFormDataAtivacao(equipamento.data_ativacao ?? "");
+    setFormDocumentoTipoObrigatorio(equipamento.documento_tipo_obrigatorio ?? "");
     setEditing(equipamento);
     setFeedback(null);
     setIsCreateOpen(true);
@@ -136,6 +139,7 @@ export default function EquipamentosPage() {
           localizacao: formLocalizacao || null,
           data_instalacao: formDataInstalacao || null,
           data_ativacao: formDataAtivacao || null,
+          documento_tipo_obrigatorio: formDocumentoTipoObrigatorio || null,
         });
         setFeedback({ kind: "success", message: "Equipamento atualizado." });
       } else {
@@ -152,6 +156,7 @@ export default function EquipamentosPage() {
           localizacao: formLocalizacao || null,
           data_instalacao: formDataInstalacao || null,
           data_ativacao: formDataAtivacao || null,
+          documento_tipo_obrigatorio: formDocumentoTipoObrigatorio || null,
         });
         setFeedback({ kind: "success", message: "Equipamento cadastrado." });
       }
@@ -628,6 +633,21 @@ export default function EquipamentosPage() {
                     />
                   </label>
                 </div>
+                <label className="text-xs font-semibold text-slate-600">
+                  Tipo de documento obrigatorio
+                  <select
+                    value={formDocumentoTipoObrigatorio}
+                    onChange={(e) => setFormDocumentoTipoObrigatorio(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                  >
+                    <option value="">Nenhum</option>
+                    <option value="registro_laudos">Registro e Laudos</option>
+                    <option value="notas_fiscais">Notas Fiscais</option>
+                    <option value="retencao_trabalhista">Retencao Trabalhista</option>
+                    <option value="contratos">Contratos</option>
+                    <option value="orcamentos">Orcamentos</option>
+                  </select>
+                </label>
               </div>
 
               <div className="flex justify-end gap-2">
