@@ -22,6 +22,11 @@ import {
 } from "@/lib/apiAuth";
 import { normalizeDisplayData } from "@/lib/textEncoding";
 import { getAprovadorEmails, normalizeEmail } from "@/lib/orcamentosInternos";
+import {
+  determinarStatusFinal,
+  temAchadoUrgente,
+} from "@/lib/documentAnalysisPipeline";
+import type { DocumentoAnaliseIa } from "@/lib/openAiDocumentAnalysis";
 
 type FormularioRow = {
   id: string;
@@ -652,7 +657,30 @@ export async function PATCH(request: Request) {
           lojaIdParaValidar &&
           registro.status_analise_ia === "necessita_revisao"
         ) {
-          updatePayload.status_analise_ia = "concluida";
+          const { data: ultimaAnalise, error: ultimaAnaliseError } =
+            await supabaseAdmin
+              .from("documentos_analises_ia")
+              .select("resultado")
+              .eq("documento_id", registro.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+          if (ultimaAnaliseError) {
+            throw ultimaAnaliseError;
+          }
+
+          const resultado = ultimaAnalise?.resultado as
+            | DocumentoAnaliseIa
+            | null
+            | undefined;
+
+          if (resultado) {
+            updatePayload.status_analise_ia = determinarStatusFinal(resultado, {
+              equipamentoRequerido: true,
+              equipamentoResolvido: true,
+              achadoUrgente: temAchadoUrgente(resultado),
+            });
+          }
         }
       }
     }
