@@ -165,7 +165,6 @@ const statusLabel: Record<string, string> = {
 
 const statusAnaliseIaLabel: Record<string, { texto: string; classe: string }> = {
   recebido: { texto: "Aguardando análise", classe: "bg-slate-100 text-slate-700" },
-  aguardando_analise: { texto: "Aguardando análise", classe: "bg-slate-100 text-slate-700" },
   em_analise: { texto: "Em análise pela IA", classe: "bg-blue-100 text-blue-700" },
   concluida: { texto: "Análise concluída", classe: "bg-green-100 text-green-700" },
   necessita_revisao: { texto: "Necessita revisão", classe: "bg-amber-100 text-amber-700" },
