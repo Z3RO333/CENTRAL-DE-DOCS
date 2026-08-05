@@ -24,6 +24,14 @@ export function deveTentarEquipamento(tipo: string): boolean {
   return (TIPOS_COM_EQUIPAMENTO as readonly string[]).includes(tipo);
 }
 
+export function resolverLojaId(
+  dados: Record<string, unknown> | null | undefined,
+): string | null {
+  return typeof dados?.loja_id === "string" && dados.loja_id.trim()
+    ? dados.loja_id
+    : null;
+}
+
 const LIMIAR_CONFIANCA_REVISAO = 0.5;
 
 export function determinarStatusFinal(
@@ -421,7 +429,7 @@ export async function processarDocumentoComIa(
 
     let equipamentoId: string | null = row.equipamento_id;
     let equipamentoRequerido = false;
-    const lojaId = typeof dados?.loja_id === "string" ? dados.loja_id : null;
+    const lojaId = resolverLojaId(dados);
 
     if (deveTentarEquipamento(row.tipo) && lojaId && !equipamentoId) {
       const sinalDeEquipamento = Boolean(

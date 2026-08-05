@@ -23,6 +23,7 @@ import {
   processarDocumentoComIa,
   buscarEquipamentosAtivosDaLoja,
   temAchadoUrgente,
+  resolverLojaId,
   type EquipamentoAtivo,
 } from "@/lib/documentAnalysisPipeline";
 import { analisarDocumentoComOpenAi } from "@/lib/openAiDocumentAnalysis";
@@ -253,6 +254,33 @@ describe("temAchadoUrgente", () => {
       recomendacoes_criticas: [recomendacaoCriticaBase({ prioridade: "emergencial" })],
     });
     expect(temAchadoUrgente(resultado)).toBe(true);
+  });
+});
+
+describe("resolverLojaId", () => {
+  it("retorna a string quando loja_id e uma string valida", () => {
+    expect(resolverLojaId({ loja_id: "loja-1" })).toBe("loja-1");
+  });
+
+  it("retorna null quando loja_id e string vazia", () => {
+    expect(resolverLojaId({ loja_id: "" })).toBeNull();
+  });
+
+  it("retorna null quando loja_id e so espacos", () => {
+    expect(resolverLojaId({ loja_id: "   " })).toBeNull();
+  });
+
+  it("retorna null quando loja_id nao e string", () => {
+    expect(resolverLojaId({ loja_id: 123 })).toBeNull();
+  });
+
+  it("retorna null quando dados e null ou undefined", () => {
+    expect(resolverLojaId(null)).toBeNull();
+    expect(resolverLojaId(undefined)).toBeNull();
+  });
+
+  it("retorna null quando loja_id nao existe no objeto", () => {
+    expect(resolverLojaId({})).toBeNull();
   });
 });
 

@@ -15,6 +15,7 @@ import {
   registrarAnaliseIa,
   registrarRecomendacoesCriticas,
   temAchadoUrgente,
+  resolverLojaId,
 } from "@/lib/documentAnalysisPipeline";
 
 export const runtime = "nodejs";
@@ -85,7 +86,7 @@ export async function POST(
 
     let equipamentoId: string | null = row.equipamento_id;
     let equipamentoRequerido = false;
-    const lojaId = typeof dadosAtuais?.loja_id === "string" ? dadosAtuais.loja_id : null;
+    const lojaId = resolverLojaId(dadosAtuais);
 
     if (deveTentarEquipamento(row.tipo) && lojaId && !equipamentoId) {
       const sinalDeEquipamento = Boolean(
