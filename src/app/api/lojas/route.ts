@@ -248,6 +248,20 @@ export async function DELETE(request: Request) {
       throw new HttpError(400, "Informe a loja para remover.");
     }
 
+    const { count: totalEquipamentos, error: countError } = await supabaseAdmin
+      .from("equipamentos")
+      .select("id", { count: "exact", head: true })
+      .eq("loja_id", id);
+    if (countError) {
+      throw countError;
+    }
+    if (totalEquipamentos && totalEquipamentos > 0) {
+      throw new HttpError(
+        409,
+        `Esta loja possui ${totalEquipamentos} equipamento(s) cadastrado(s). Remova ou transfira os equipamentos antes de excluir a loja.`,
+      );
+    }
+
     const { error } = await supabaseAdmin.from("lojas").delete().eq("id", id);
     if (error) {
       throw error;
