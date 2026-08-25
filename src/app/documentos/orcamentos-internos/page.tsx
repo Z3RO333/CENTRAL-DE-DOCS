@@ -528,7 +528,7 @@ export default function OrcamentosInternosPage() {
         </div>
       )}
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(360px,0.85fr)_minmax(0,1.5fr)]">
+      <section className="grid gap-5 2xl:grid-cols-[minmax(320px,380px)_minmax(0,1fr)] 2xl:items-start">
         <OrcamentoIntakeForm
           gestores={gestores}
           draftToResume={draftToResume}
@@ -579,7 +579,7 @@ export default function OrcamentosInternosPage() {
             </button>
           </div>
 
-          <div className="mt-4 grid gap-2 rounded-xl bg-slate-50 p-3 md:grid-cols-4">
+          <div className="mt-4 grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-4">
             <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               Status
               <select
@@ -661,31 +661,42 @@ export default function OrcamentosInternosPage() {
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1080px] text-left text-sm">
+                <table className="w-full min-w-[760px] table-fixed text-left text-sm">
                   <caption className="sr-only">Orçamentos internos e status de aprovação</caption>
+                  <colgroup>
+                    <col className="w-[28%]" />
+                    <col className="w-[19%]" />
+                    <col className="w-[11%]" />
+                    <col className="w-[19%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[10%]" />
+                  </colgroup>
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
-                      <th className="px-4 py-3">Orçamento</th>
-                      <th className="px-4 py-3">Fornecedor</th>
-                      <th className="px-4 py-3 text-right">Valor</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Gestor</th>
-                      <th className="px-4 py-3 text-right">Ações</th>
+                      <th className="px-5 py-3.5">Orçamento</th>
+                      <th className="px-5 py-3.5">Fornecedor</th>
+                      <th className="px-5 py-3.5 text-right">Valor</th>
+                      <th className="px-5 py-3.5">Status</th>
+                      <th className="px-5 py-3.5">Gestor</th>
+                      <th className="px-5 py-3.5 text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {orcamentos.map((orcamento) => {
                       return (
-                        <tr key={orcamento.id} className="align-top">
-                          <td className="px-4 py-3">
+                        <tr
+                          key={orcamento.id}
+                          className="align-top transition-colors hover:bg-slate-50/70"
+                        >
+                          <td className="px-5 py-4">
                             <p className="font-semibold text-slate-900">
                               {orcamento.numero_orcamento || orcamento.id.slice(0, 8)}
                             </p>
-                            <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">
                               {orcamento.descricao}
                             </p>
                           </td>
-                          <td className="px-4 py-3 text-xs text-slate-600">
+                          <td className="px-5 py-4 text-xs text-slate-600">
                             <p className="font-semibold text-slate-800">
                               {orcamento.prestador_nome || "Não identificado"}
                             </p>
@@ -695,16 +706,16 @@ export default function OrcamentosInternosPage() {
                               </p>
                             ) : null}
                           </td>
-                          <td className="px-4 py-3 text-right text-xs font-semibold text-slate-700">
+                          <td className="px-5 py-4 text-right text-xs font-semibold text-slate-700">
                             {formatCurrency(orcamento.valor_total)}
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-5 py-4">
                             <StatusBadge status={orcamento.status} />
                           </td>
-                          <td className="px-4 py-3 text-xs text-slate-600">
+                          <td className="px-5 py-4 text-xs text-slate-600">
                             {orcamento.gestor_nome || orcamento.gestor_email || "--"}
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-5 py-4">
                             <div className="flex justify-end gap-2">
                               <button
                                 type="button"
