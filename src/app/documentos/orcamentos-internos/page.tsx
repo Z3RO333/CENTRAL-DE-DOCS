@@ -362,6 +362,11 @@ export default function OrcamentosInternosPage() {
       const pages = pdfDoc.getPages();
       const page = pages[pages.length - 1];
 
+      const logoBytes = await fetch("/bemol-logo.png").then((res) => res.arrayBuffer());
+      const logoImage = await pdfDoc.embedPng(logoBytes);
+      const logoHeight = 32;
+      const logoWidth = logoImage.width * (logoHeight / logoImage.height);
+
       const displayName =
         formatPersonName({
           name: (user.user_metadata?.name as string | undefined) ?? null,
@@ -379,8 +384,16 @@ export default function OrcamentosInternosPage() {
       const offsetMinutes = pad(Math.abs(offsetMinutesTotal) % 60);
       const dadosLabel = `Dados: ${approvedAt.getFullYear()}.${pad(approvedAt.getMonth() + 1)}.${pad(approvedAt.getDate())} ${pad(approvedAt.getHours())}:${pad(approvedAt.getMinutes())}:${pad(approvedAt.getSeconds())} ${offsetSign}${offsetHours}'${offsetMinutes}'`;
 
-      const stampX = 48;
       const stampBaseY = 54;
+      const logoX = 48;
+      page.drawImage(logoImage, {
+        x: logoX,
+        y: stampBaseY,
+        width: logoWidth,
+        height: logoHeight,
+      });
+
+      const stampX = logoX + logoWidth + 12;
       page.drawText("Assinado de forma digital por", {
         x: stampX,
         y: stampBaseY + 24,
