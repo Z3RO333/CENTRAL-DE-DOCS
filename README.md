@@ -1,75 +1,77 @@
-# Central de Documentos
+# Central Inteligente de Documentos
 
-Aplicação interna em Next.js para envio, revisão, assinatura e consulta de documentos. O sistema usa Supabase para autenticação, banco e armazenamento, além de integrações opcionais com Azure OpenAI, Azure Document Intelligence, SendGrid e BTracker.
+Plataforma Full-Stack para envio, revisão, assinatura, consulta e organização de documentos, com automações e recursos de inteligência artificial.
 
-## Requisitos
+## Visão geral
 
-- Node.js 22
-- npm
-- Projeto Supabase com as migrations deste repositório aplicadas
+A aplicação foi criada para substituir fluxos manuais de documentos por um processo digital centralizado, com autenticação, armazenamento seguro, validações de arquivos, automações e integrações com serviços de IA.
 
-## Configuração local
+## Principais funcionalidades
 
-1. Instale as dependências:
+- Upload e consulta de documentos
+- Fluxos de revisão e assinatura
+- Autenticação e controle de acesso
+- Armazenamento seguro de arquivos
+- Validação server-side de PDFs e imagens
+- Integrações com IA para leitura e análise de documentos
+- Automação de notificações e processos administrativos
+- Histórico e organização centralizada
+- Deploy automatizado via CI/CD
 
-   ```bash
-   npm ci
-   ```
+## Stack principal
 
-2. Copie o arquivo de exemplo e preencha as credenciais do ambiente:
+- Next.js
+- React
+- TypeScript / JavaScript
+- Supabase Auth
+- PostgreSQL
+- Supabase Storage
+- Azure OpenAI
+- Azure Document Intelligence
+- GitHub Actions
+- Azure
+- Vitest
 
-   ```bash
-   cp .env.example .env.local
-   ```
+## Destaques técnicos
 
-3. Inicie o ambiente de desenvolvimento:
+- políticas de Row Level Security no banco e Storage
+- validação de arquivos pelo conteúdo binário, não apenas pela extensão
+- operações privilegiadas isoladas no servidor
+- integrações com serviços de inteligência artificial
+- migrations versionadas para evolução do banco
+- pipeline de CI/CD com lint, testes e build antes do deploy
+- arquitetura separada entre interface, regras de negócio e integrações
 
-   ```bash
-   npm run dev
-   ```
+## Objetivo
 
-O app ficará disponível em `http://localhost:3000`.
-
-## Comandos de qualidade
-
-```bash
-npm run lint      # ESLint e regras do React/Next.js
-npm test          # testes unitários com Vitest
-npm run build     # build de produção e verificação TypeScript
-```
-
-Antes de abrir um pull request, execute os três comandos.
-
-## Variáveis de ambiente
-
-As variáveis obrigatórias e opcionais estão documentadas em `.env.example`. Nunca versione `.env`, `.env.local`, chaves de serviço ou tokens do BTracker.
-
-O limite dos uploads originais é controlado por `MAX_DOCUMENT_UPLOAD_MB` e assume 15 MB quando não configurado. PDF, PNG e JPEG são validados no servidor pelo conteúdo binário, não apenas pela extensão.
-
-## Banco e Storage
-
-As alterações de banco ficam em `supabase/migrations`. Aplique migrations novas no ambiente de homologação antes da produção e valide as políticas de RLS tanto nas tabelas quanto no bucket `formularios`.
-
-Operações administrativas do servidor usam `SUPABASE_SERVICE_ROLE_KEY`; essa variável jamais deve ser exposta com prefixo `NEXT_PUBLIC_`.
-
-## Implantação no Azure
-
-O deploy de produção é feito pelo GitHub Actions em `.github/workflows/master_formscentral.yml` quando há push na branch `master` ou execução manual do workflow.
-
-O pipeline:
-
-1. instala dependências com Node.js 22;
-2. executa lint, testes e build;
-3. monta o bundle standalone do Next.js;
-4. publica no Azure Web App `FORMSCENTRAL`.
-
-Os segredos devem ser configurados em **GitHub → Settings → Secrets and variables → Actions**. O workflow de cobrança agendada também exige `CRON_SECRET`.
+Digitalizar o ciclo de vida de documentos e reduzir tarefas manuais, criando uma experiência mais segura, rastreável e preparada para automações e inteligência artificial.
 
 ## Estrutura principal
 
-- `src/app`: páginas e rotas da API
-- `src/components`: componentes compartilhados
-- `src/hooks`: estado e acesso do cliente
-- `src/lib`: regras de negócio e integrações
-- `supabase/migrations`: evolução do banco e políticas RLS
-- `.github/workflows`: deploy e automações agendadas
+```text
+src/app          # páginas, layouts e APIs
+src/components   # componentes reutilizáveis
+src/hooks        # estado e comportamento do cliente
+src/lib          # regras de negócio e integrações
+supabase         # migrations e políticas de segurança
+.github          # pipelines de CI/CD
+```
+
+## Execução local
+
+```bash
+npm ci
+npm run dev
+```
+
+Validação:
+
+```bash
+npm run lint
+npm test
+npm run build
+```
+
+## Segurança
+
+Credenciais, tokens, dados reais, endpoints privados e informações sensíveis de ambientes corporativos não devem ser versionados ou expostos publicamente.
