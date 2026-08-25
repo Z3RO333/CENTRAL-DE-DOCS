@@ -716,9 +716,18 @@ export default function OrcamentosInternosPage() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => void baixarArquivo(orcamento, false)}
+                                onClick={() =>
+                                  void baixarArquivo(
+                                    orcamento,
+                                    Boolean(orcamento.arquivo_assinado_path),
+                                  )
+                                }
                                 className="rounded-full border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"
-                                aria-label="Baixar original"
+                                aria-label={
+                                  orcamento.arquivo_assinado_path
+                                    ? "Baixar assinado"
+                                    : "Baixar original"
+                                }
                               >
                                 <Download className="h-4 w-4" />
                               </button>
