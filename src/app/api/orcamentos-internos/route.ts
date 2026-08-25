@@ -184,6 +184,38 @@ export async function POST(request: Request) {
     const submit = Boolean(body.submit);
     validateOrcamentoInput(body, submit ? "submit" : "draft");
 
+    let solicitanteId = actor.realUserId;
+    let solicitanteEmail = actor.realEmail;
+    const solicitanteIdInformado = normalizeText(body.solicitanteId) || null;
+    if (solicitanteIdInformado && solicitanteIdInformado !== actor.realUserId) {
+      const aprovadores = await getAprovadorEmails(supabaseAdmin);
+      const actorEmail = normalizeEmail(actor.realEmail);
+      const actorEhGestor = Boolean(actorEmail && aprovadores.has(actorEmail));
+      if (!actorEhGestor) {
+        throw new HttpError(
+          403,
+          "Somente gestores podem enviar orçamentos em nome de outro administrador.",
+        );
+      }
+
+      const { data: acessoAlvo, error: acessoAlvoError } = await supabaseAdmin
+        .from("documentos_acesso")
+        .select("user_id,email")
+        .eq("scope", "admin")
+        .eq("user_id", solicitanteIdInformado)
+        .limit(1)
+        .maybeSingle();
+      if (acessoAlvoError) {
+        throw acessoAlvoError;
+      }
+      if (!acessoAlvo) {
+        throw new HttpError(400, "Administrador selecionado é inválido.");
+      }
+
+      solicitanteId = acessoAlvo.user_id as string;
+      solicitanteEmail = normalizeEmail(acessoAlvo.email as string | null);
+    }
+
     const principal = getArquivoPrincipal(body.arquivos ?? []);
     if (!principal?.path) {
       throw new HttpError(400, "Arquivo principal não informado.");
@@ -250,8 +282,8 @@ export async function POST(request: Request) {
       .from("orcamentos_internos")
       .insert({
         id,
-        solicitante_id: actor.realUserId,
-        solicitante_email: actor.realEmail,
+        solicitante_id: solicitanteId,
+        solicitante_email: solicitanteEmail,
         loja_id: lojaId,
         loja_nome: lojaNome,
         area_solicitante: normalizeText(body.areaSolicitante),

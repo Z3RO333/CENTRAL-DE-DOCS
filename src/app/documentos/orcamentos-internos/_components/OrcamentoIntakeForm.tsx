@@ -4,10 +4,15 @@ import { useEffect, useState } from "react";
 import { FileSearch, LoaderCircle, Save, Send, Sparkles, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
-import type { GestorOption, OrcamentoInterno } from "../_lib/orcamentosTypes";
+import type {
+  ColaboradorOption,
+  GestorOption,
+  OrcamentoInterno,
+} from "../_lib/orcamentosTypes";
 import { uploadDocumentFile } from "@/lib/documentUpload";
 
 type FormValues = {
+  solicitanteId: string;
   prestadorId: string;
   prestadorNome: string;
   fornecedorCnpj: string;
@@ -36,6 +41,7 @@ type AnalisePayload = {
 
 type Props = {
   gestores: GestorOption[];
+  colaboradores: ColaboradorOption[];
   draftToResume: OrcamentoInterno | null;
   onUpsert: (orcamento: OrcamentoInterno) => void;
   onSubmitted: (orcamento: OrcamentoInterno) => void;
@@ -43,6 +49,7 @@ type Props = {
 };
 
 const EMPTY_VALUES: FormValues = {
+  solicitanteId: "",
   prestadorId: "",
   prestadorNome: "",
   fornecedorCnpj: "",
@@ -64,6 +71,7 @@ async function getToken() {
 
 export function OrcamentoIntakeForm({
   gestores,
+  colaboradores,
   draftToResume,
   onUpsert,
   onSubmitted,
@@ -90,6 +98,7 @@ export function OrcamentoIntakeForm({
       draftToResume.arquivo_original_path.split("/").pop() || "orcamento.pdf",
     );
     setValues({
+      solicitanteId: "",
       prestadorId: draftToResume.prestador_id ?? "",
       prestadorNome: draftToResume.prestador_nome,
       fornecedorCnpj: draftToResume.fornecedor_cnpj ?? "",
@@ -194,6 +203,7 @@ export function OrcamentoIntakeForm({
         },
         body: JSON.stringify({
           submit: false,
+          solicitanteId: values.solicitanteId || null,
           arquivos: [
             {
               path: uploadedPath,
@@ -339,6 +349,24 @@ export function OrcamentoIntakeForm({
           {error ?? success}
         </div>
       )}
+
+      {!draftId && colaboradores.length > 0 ? (
+        <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Enviar em nome de
+          <select
+            value={values.solicitanteId}
+            onChange={(event) => updateValue("solicitanteId", event.target.value)}
+            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs normal-case tracking-normal text-slate-800"
+          >
+            <option value="">Eu mesmo</option>
+            {colaboradores.map((colaborador) => (
+              <option key={colaborador.id} value={colaborador.id}>
+                {colaborador.name ?? colaborador.email}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       {!draftId ? (
         <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">

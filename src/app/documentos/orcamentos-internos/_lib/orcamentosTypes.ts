@@ -7,6 +7,12 @@ export type GestorOption = {
   role: "admin" | "gerente";
 };
 
+export type ColaboradorOption = {
+  id: string;
+  email: string;
+  name: string | null;
+};
+
 export type OrcamentoInterno = {
   id: string;
   solicitante_id: string;

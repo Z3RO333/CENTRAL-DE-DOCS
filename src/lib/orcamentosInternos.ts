@@ -38,6 +38,7 @@ export type OrcamentoInternoArquivoInput = {
 };
 
 export type OrcamentoInternoInput = {
+  solicitanteId?: string | null;
   lojaId?: string | null;
   areaSolicitante?: string;
   prestadorId?: string | null;

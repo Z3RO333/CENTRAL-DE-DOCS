@@ -30,7 +30,11 @@ import { uploadDocumentFile } from "@/lib/documentUpload";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { OrcamentoIntakeForm } from "./_components/OrcamentoIntakeForm";
-import type { GestorOption, OrcamentoInterno } from "./_lib/orcamentosTypes";
+import type {
+  ColaboradorOption,
+  GestorOption,
+  OrcamentoInterno,
+} from "./_lib/orcamentosTypes";
 
 type UploadedFileSummary = {
   path: string;
@@ -156,6 +160,7 @@ export default function OrcamentosInternosPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [principalIndex, setPrincipalIndex] = useState(0);
   const [gestores, setGestores] = useState<GestorOption[]>([]);
+  const [colaboradores, setColaboradores] = useState<ColaboradorOption[]>([]);
   const [draftToResume, setDraftToResume] = useState<OrcamentoInterno | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailPayload | null>(null);
@@ -195,10 +200,23 @@ export default function OrcamentosInternosPage() {
         const payload = (await gestoresRes.json()) as { gestores?: GestorOption[] };
         setGestores(payload.gestores ?? []);
       }
+      if (isAprovadorInterno) {
+        const colaboradoresRes = await fetch("/api/orcamentos-internos/colaboradores", {
+          headers,
+        });
+        if (colaboradoresRes.ok) {
+          const payload = (await colaboradoresRes.json()) as {
+            colaboradores?: ColaboradorOption[];
+          };
+          setColaboradores(payload.colaboradores ?? []);
+        }
+      } else {
+        setColaboradores([]);
+      }
     } catch (err) {
       console.error("Erro ao carregar opções de orçamento:", err);
     }
-  }, []);
+  }, [isAprovadorInterno]);
 
   const loadOrcamentos = useCallback(async () => {
     if (!user) return;
@@ -531,6 +549,7 @@ export default function OrcamentosInternosPage() {
       <section className="grid gap-5 2xl:grid-cols-[minmax(320px,380px)_minmax(0,1fr)] 2xl:items-start">
         <OrcamentoIntakeForm
           gestores={gestores}
+          colaboradores={colaboradores}
           draftToResume={draftToResume}
           onResumeHandled={() => setDraftToResume(null)}
           onUpsert={(orcamento) => {
