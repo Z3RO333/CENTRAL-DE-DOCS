@@ -142,10 +142,7 @@ export async function GET(
     const actorRealEmail = normalizeEmail(actor.realEmail);
     const actorIsAprovador =
       actorRealEmail !== null && aprovadores.has(actorRealEmail);
-    const isGestor =
-      orcamento.gestor_id === actor.realUserId ||
-      (actorRealEmail !== null && actorRealEmail === normalizeEmail(orcamento.gestor_email));
-    if (isGestor) {
+    if (actorIsAprovador) {
       await logOrcamentoEvent({
         supabaseAdmin,
         documentoId: id,
@@ -171,7 +168,7 @@ export async function GET(
         ["aguardando_aprovacao", "em_analise_gestor", "reenviado"].includes(
           orcamento.status,
         ) &&
-        (actor.realIsAdmin || (actorIsAprovador && isGestor)),
+        (actor.realIsAdmin || actorIsAprovador),
     });
   } catch (err) {
     console.error("Erro ao carregar orçamento interno:", err);
@@ -317,8 +314,6 @@ export async function PATCH(
           descricao: body.descricao ?? current.descricao,
           valorTotal: body.valorTotal ?? current.valor_total,
           dataValidade: body.dataValidade ?? current.data_validade,
-          gestorEmail: body.gestorEmail ?? current.gestor_email,
-          gestorId: body.gestorId ?? current.gestor_id,
           arquivos:
             body.arquivos && body.arquivos.length > 0
               ? body.arquivos
@@ -363,12 +358,6 @@ export async function PATCH(
         ),
       ]);
 
-      const gestorEmailValidado =
-        normalizeEmail(body.gestorEmail) ?? normalizeEmail(current.gestor_email);
-      if (!gestorEmailValidado || !aprovadores.has(gestorEmailValidado)) {
-        throw new HttpError(400, "Selecione um gestor aprovador válido.");
-      }
-
       const nextStatus: OrcamentoInternoStatus =
         action === "reenviar" ? "reenviado" : "aguardando_aprovacao";
       const nextVersion =
@@ -399,13 +388,6 @@ export async function PATCH(
           : current.data_validade,
         numero_referencia:
           normalizeText(body.numeroReferencia) || current.numero_referencia,
-        gestor_id: Object.prototype.hasOwnProperty.call(body, "gestorId")
-          ? normalizeText(body.gestorId) || null
-          : current.gestor_id,
-        gestor_email: gestorEmailValidado,
-        gestor_nome: Object.prototype.hasOwnProperty.call(body, "gestorNome")
-          ? normalizeText(body.gestorNome) || null
-          : current.gestor_nome,
         observacoes: normalizeText(body.observacoes) || current.observacoes,
         arquivo_original_path: principal.path.trim(),
         status: nextStatus,
@@ -455,8 +437,6 @@ export async function PATCH(
           descricao: updates.descricao,
           valor: updates.valor_total,
           data_validade: updates.data_validade,
-          gestor_email: updates.gestor_email,
-          gestor_nome: updates.gestor_nome,
         },
       });
       await logOrcamentoEvent({
@@ -470,7 +450,7 @@ export async function PATCH(
         actorEmail: actor.realEmail,
         from,
         to: nextStatus,
-        metadata: { gestor_email: updates.gestor_email, notification: "gestor" },
+        metadata: { notification: "aprovadores" },
       });
       return NextResponse.json({ orcamento: mapOrcamento(data as OrcamentoInternoRow) });
     }
@@ -487,12 +467,18 @@ export async function PATCH(
         .update({
           status: nextStatus,
           ultima_justificativa: justificativa,
+          gestor_id: actor.realUserId,
+          gestor_email: actor.realEmail ?? "",
+          gestor_nome: null,
         })
         .eq("id", id)
         .eq("status", from)
         .select("*")
         .single();
-      if (error || !data) throw error ?? new Error("Falha ao solicitar ajuste.");
+      if (error) throw error;
+      if (!data) {
+        throw new HttpError(409, "Este orçamento já foi decidido por outro gestor.");
+      }
       await updateFormularioStatus({ supabaseAdmin, id, status: nextStatus });
       await logOrcamentoEvent({
         supabaseAdmin,
@@ -521,12 +507,18 @@ export async function PATCH(
           status: nextStatus,
           rejeitado_em: new Date().toISOString(),
           ultima_justificativa: justificativa,
+          gestor_id: actor.realUserId,
+          gestor_email: actor.realEmail ?? "",
+          gestor_nome: null,
         })
         .eq("id", id)
         .eq("status", from)
         .select("*")
         .single();
-      if (error || !data) throw error ?? new Error("Falha ao rejeitar.");
+      if (error) throw error;
+      if (!data) {
+        throw new HttpError(409, "Este orçamento já foi decidido por outro gestor.");
+      }
       await updateFormularioStatus({ supabaseAdmin, id, status: nextStatus });
       await logOrcamentoEvent({
         supabaseAdmin,
@@ -581,12 +573,18 @@ export async function PATCH(
           arquivo_assinado_path: signedPath,
           aprovado_em: now,
           ultima_justificativa: null,
+          gestor_id: actor.realUserId,
+          gestor_email: actor.realEmail ?? "",
+          gestor_nome: null,
         })
         .eq("id", id)
         .eq("status", from)
         .select("*")
         .single();
-      if (error || !data) throw error ?? new Error("Falha ao aprovar.");
+      if (error) throw error;
+      if (!data) {
+        throw new HttpError(409, "Este orçamento já foi decidido por outro gestor.");
+      }
       await updateFormularioStatus({
         supabaseAdmin,
         id,
