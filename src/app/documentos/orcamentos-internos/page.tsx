@@ -184,7 +184,6 @@ export default function OrcamentosInternosPage() {
   const [colaboradorFilter, setColaboradorFilter] = useState("todos");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
-  const [reassignEmail, setReassignEmail] = useState("");
 
   const canAccess = modules.documentos;
 
@@ -303,7 +302,6 @@ export default function OrcamentosInternosPage() {
       const payload = (await response.json()) as DetailPayload;
       if (!response.ok) throw new Error(payload.error ?? "Falha ao carregar detalhes.");
       setDetail(payload);
-      setReassignEmail(payload.orcamento.gestor_email ?? "");
       setOrcamentos((current) =>
         current.map((item) => (item.id === payload.orcamento.id ? payload.orcamento : item)),
       );
@@ -569,7 +567,6 @@ export default function OrcamentosInternosPage() {
 
       <section className="grid gap-5 2xl:grid-cols-[minmax(320px,380px)_minmax(0,1fr)] 2xl:items-start">
         <OrcamentoIntakeForm
-          gestores={gestores}
           colaboradores={colaboradores}
           draftToResume={draftToResume}
           onResumeHandled={() => setDraftToResume(null)}
@@ -640,7 +637,7 @@ export default function OrcamentosInternosPage() {
               </select>
             </label>
             <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Gestor
+              Decidido por
               <select
                 value={gestorFilter}
                 onChange={(event) => setGestorFilter(event.target.value)}
@@ -722,7 +719,7 @@ export default function OrcamentosInternosPage() {
                       <th className="px-5 py-3.5">Fornecedor</th>
                       <th className="px-5 py-3.5 text-right">Valor</th>
                       <th className="px-5 py-3.5">Status</th>
-                      <th className="px-5 py-3.5">Gestor</th>
+                      <th className="px-5 py-3.5">Decidido por</th>
                       <th className="px-5 py-3.5 text-right">Ações</th>
                     </tr>
                   </thead>
@@ -857,7 +854,7 @@ export default function OrcamentosInternosPage() {
                       ["Valor", formatCurrency(selectedDetail.valor_total)],
                       ["Validade", selectedDetail.data_validade || "--"],
                       ["Solicitante", selectedDetail.solicitante_email ?? selectedDetail.solicitante_id],
-                      ["Gestor", selectedDetail.gestor_nome || selectedDetail.gestor_email || "--"],
+                      ["Decidido por", selectedDetail.gestor_nome || selectedDetail.gestor_email || "--"],
                       ["Enviado em", formatDateTime(selectedDetail.enviado_em)],
                       ["Aprovado em", formatDateTime(selectedDetail.aprovado_em)],
                     ].map(([label, value]) => (
@@ -973,48 +970,6 @@ export default function OrcamentosInternosPage() {
                     Ver original
                   </button>
                 </div>
-                {isAdmin ? (
-                  <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
-                    <select
-                      value={reassignEmail}
-                      onChange={(event) => setReassignEmail(event.target.value)}
-                      className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800"
-                      aria-label="Novo gestor aprovador"
-                    >
-                      <option value="">Selecione um gestor</option>
-                      {gestores.map((gestor) => (
-                        <option key={gestor.email} value={gestor.email}>
-                          {gestor.name
-                            ? `${gestor.name} (${gestor.email})`
-                            : gestor.email}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={Boolean(actionLoading) || !reassignEmail}
-                      onClick={() => {
-                        const gestor = gestores.find(
-                          (item) => item.email === reassignEmail,
-                        );
-                        void patchAction(
-                          selectedDetail.id,
-                          {
-                            action: "reatribuir_gestor",
-                            gestorEmail: reassignEmail,
-                            gestorId: gestor?.id ?? null,
-                            gestorNome: gestor?.name ?? null,
-                          },
-                          "Gestor reatribuído.",
-                        );
-                      }}
-                      className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      Reatribuir gestor
-                    </button>
-                  </div>
-                ) : null}
                 <div className="flex flex-wrap justify-end gap-2 text-xs">
                   {selectedDetail.status === "rascunho" &&
                   selectedDetail.solicitante_id === user.id ? (
