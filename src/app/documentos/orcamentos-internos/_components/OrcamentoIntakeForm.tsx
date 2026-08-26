@@ -1,28 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileSearch, LoaderCircle, Save, Send, Sparkles, X } from "lucide-react";
+import { LoaderCircle, Sparkles, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
-import type {
-  ColaboradorOption,
-  GestorOption,
-  OrcamentoInterno,
-} from "../_lib/orcamentosTypes";
+import type { ColaboradorOption, OrcamentoInterno } from "../_lib/orcamentosTypes";
 import { uploadDocumentFile } from "@/lib/documentUpload";
-
-type FormValues = {
-  solicitanteId: string;
-  prestadorId: string;
-  prestadorNome: string;
-  fornecedorCnpj: string;
-  numeroOrcamento: string;
-  valorTotal: string;
-  dataValidade: string;
-  descricao: string;
-  gestorEmail: string;
-  observacoes: string;
-};
+import {
+  EMPTY_REVIEW_VALUES,
+  OrcamentoReviewCard,
+  type ReviewValues,
+} from "./OrcamentoReviewCard";
 
 type AnalisePayload = {
   sugestao?: {
@@ -39,26 +27,23 @@ type AnalisePayload = {
   error?: string;
 };
 
+type BulkDraft = {
+  orcamentoId: string;
+  fileName: string;
+  values: ReviewValues;
+  confidence: number | null;
+  alerts: string[];
+  busy: "analyzing" | "saving" | "submitting" | null;
+  error: string | null;
+  success: string | null;
+};
+
 type Props = {
-  gestores: GestorOption[];
   colaboradores: ColaboradorOption[];
   draftToResume: OrcamentoInterno | null;
   onUpsert: (orcamento: OrcamentoInterno) => void;
   onSubmitted: (orcamento: OrcamentoInterno) => void;
   onResumeHandled: () => void;
-};
-
-const EMPTY_VALUES: FormValues = {
-  solicitanteId: "",
-  prestadorId: "",
-  prestadorNome: "",
-  fornecedorCnpj: "",
-  numeroOrcamento: "",
-  valorTotal: "",
-  dataValidade: "",
-  descricao: "",
-  gestorEmail: "",
-  observacoes: "",
 };
 
 async function getToken() {
@@ -69,8 +54,24 @@ async function getToken() {
   return token;
 }
 
+function sugestaoToValues(
+  sugestao: NonNullable<AnalisePayload["sugestao"]>,
+  current: ReviewValues,
+): ReviewValues {
+  return {
+    ...current,
+    prestadorId: sugestao.prestadorId ?? "",
+    prestadorNome: sugestao.prestadorNome || current.prestadorNome,
+    fornecedorCnpj: sugestao.fornecedorCnpj || current.fornecedorCnpj,
+    numeroOrcamento: sugestao.numeroOrcamento || current.numeroOrcamento,
+    valorTotal:
+      sugestao.valorTotal === null ? current.valorTotal : String(sugestao.valorTotal),
+    dataValidade: sugestao.dataValidade ?? current.dataValidade,
+    descricao: sugestao.descricao || current.descricao,
+  };
+}
+
 export function OrcamentoIntakeForm({
-  gestores,
   colaboradores,
   draftToResume,
   onUpsert,
@@ -78,16 +79,26 @@ export function OrcamentoIntakeForm({
   onResumeHandled,
 }: Props) {
   const { user } = useAuth();
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [fileInputKey, setFileInputKey] = useState(0);
+  const [solicitanteId, setSolicitanteId] = useState("");
+
   const [draftId, setDraftId] = useState<string | null>(null);
   const [attachedFileName, setAttachedFileName] = useState("");
-  const [values, setValues] = useState<FormValues>(EMPTY_VALUES);
+  const [values, setValues] = useState<ReviewValues>(EMPTY_REVIEW_VALUES);
   const [confidence, setConfidence] = useState<number | null>(null);
   const [alerts, setAlerts] = useState<string[]>([]);
   const [working, setWorking] = useState<
     "uploading" | "analyzing" | "saving" | "submitting" | null
   >(null);
+
+  const [bulkDrafts, setBulkDrafts] = useState<BulkDraft[]>([]);
+  const [bulkCreating, setBulkCreating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(
+    null,
+  );
+  const [bulkFailed, setBulkFailed] = useState<string[]>([]);
+
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -98,7 +109,6 @@ export function OrcamentoIntakeForm({
       draftToResume.arquivo_original_path.split("/").pop() || "orcamento.pdf",
     );
     setValues({
-      solicitanteId: "",
       prestadorId: draftToResume.prestador_id ?? "",
       prestadorNome: draftToResume.prestador_nome,
       fornecedorCnpj: draftToResume.fornecedor_cnpj ?? "",
@@ -107,10 +117,11 @@ export function OrcamentoIntakeForm({
         draftToResume.valor_total === null ? "" : String(draftToResume.valor_total),
       dataValidade: draftToResume.data_validade ?? "",
       descricao: draftToResume.descricao,
-      gestorEmail: draftToResume.gestor_email,
       observacoes: draftToResume.observacoes ?? "",
     });
-    setFile(null);
+    setSolicitanteId("");
+    setFiles([]);
+    setBulkDrafts([]);
     setConfidence(null);
     setAlerts([]);
     setError(null);
@@ -118,82 +129,26 @@ export function OrcamentoIntakeForm({
     onResumeHandled();
   }, [draftToResume, onResumeHandled]);
 
-  const updateValue = (name: keyof FormValues, value: string) => {
-    setValues((current) => ({ ...current, [name]: value }));
-  };
-
   const resetForm = () => {
-    setFile(null);
+    setFiles([]);
     setFileInputKey((current) => current + 1);
+    setSolicitanteId("");
     setDraftId(null);
     setAttachedFileName("");
-    setValues(EMPTY_VALUES);
+    setValues(EMPTY_REVIEW_VALUES);
     setConfidence(null);
     setAlerts([]);
+    setBulkDrafts([]);
+    setBulkCreating(false);
+    setBulkProgress(null);
+    setBulkFailed([]);
     setError(null);
     setSuccess(null);
   };
 
-  const analyzeDraft = async (id: string) => {
-    setWorking("analyzing");
-    setError(null);
-    setSuccess(null);
+  const uploadAndCreateDraft = async (file: File) => {
+    const uploadData = await uploadDocumentFile(file, "orcamentos_internos/originais");
     try {
-      const token = await getToken();
-      const response = await fetch(`/api/orcamentos-internos/${id}/analisar`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const payload = (await response.json()) as AnalisePayload;
-      if (!response.ok || !payload.sugestao) {
-        throw new Error(payload.error ?? "Não foi possível analisar o orçamento.");
-      }
-      const sugestao = payload.sugestao;
-      setValues((current) => ({
-        ...current,
-        prestadorId: sugestao.prestadorId ?? "",
-        prestadorNome: sugestao.prestadorNome || current.prestadorNome,
-        fornecedorCnpj: sugestao.fornecedorCnpj || current.fornecedorCnpj,
-        numeroOrcamento: sugestao.numeroOrcamento || current.numeroOrcamento,
-        valorTotal:
-          sugestao.valorTotal === null ? current.valorTotal : String(sugestao.valorTotal),
-        dataValidade: sugestao.dataValidade ?? current.dataValidade,
-        descricao: sugestao.descricao || current.descricao,
-      }));
-      setConfidence(sugestao.confianca);
-      setAlerts(sugestao.alertas ?? []);
-      setSuccess("Análise concluída. Confira os dados antes de enviar.");
-    } catch (err) {
-      setError(
-        `${err instanceof Error ? err.message : "A análise automática falhou."} O rascunho foi mantido e os campos podem ser preenchidos manualmente.`,
-      );
-    } finally {
-      setWorking(null);
-    }
-  };
-
-  const createDraftAndAnalyze = async () => {
-    if (!user) return;
-    if (!file) {
-      setError("Selecione o PDF do orçamento.");
-      return;
-    }
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      setError("O orçamento deve ser enviado em PDF.");
-      return;
-    }
-
-    setWorking("uploading");
-    setError(null);
-    setSuccess(null);
-    let uploadedPath: string | null = null;
-    try {
-      const uploadData = await uploadDocumentFile(
-        file,
-        "orcamentos_internos/originais",
-      );
-      uploadedPath = uploadData.path;
-
       const token = await getToken();
       const response = await fetch("/api/orcamentos-internos", {
         method: "POST",
@@ -203,10 +158,10 @@ export function OrcamentoIntakeForm({
         },
         body: JSON.stringify({
           submit: false,
-          solicitanteId: values.solicitanteId || null,
+          solicitanteId: solicitanteId || null,
           arquivos: [
             {
-              path: uploadedPath,
+              path: uploadData.path,
               name: file.name,
               type: "application/pdf",
               size: file.size,
@@ -222,18 +177,63 @@ export function OrcamentoIntakeForm({
       if (!response.ok || !payload.orcamento) {
         throw new Error(payload.error ?? "Não foi possível criar o rascunho.");
       }
-
-      uploadedPath = null;
-      setDraftId(payload.orcamento.id);
-      setAttachedFileName(file.name);
-      setFile(null);
-      setFileInputKey((current) => current + 1);
-      onUpsert(payload.orcamento);
-      await analyzeDraft(payload.orcamento.id);
+      return payload.orcamento;
     } catch (err) {
-      if (uploadedPath) {
-        await supabase.storage.from("formularios").remove([uploadedPath]);
-      }
+      await supabase.storage.from("formularios").remove([uploadData.path]);
+      throw err;
+    }
+  };
+
+  const runAnalysis = async (id: string) => {
+    const token = await getToken();
+    const response = await fetch(`/api/orcamentos-internos/${id}/analisar`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const payload = (await response.json()) as AnalisePayload;
+    if (!response.ok || !payload.sugestao) {
+      throw new Error(payload.error ?? "Não foi possível analisar o orçamento.");
+    }
+    return payload.sugestao;
+  };
+
+  const analyzeDraft = async (id: string) => {
+    setWorking("analyzing");
+    setError(null);
+    setSuccess(null);
+    try {
+      const sugestao = await runAnalysis(id);
+      setValues((current) => sugestaoToValues(sugestao, current));
+      setConfidence(sugestao.confianca);
+      setAlerts(sugestao.alertas ?? []);
+      setSuccess("Análise concluída. Confira os dados antes de enviar.");
+    } catch (err) {
+      setError(
+        `${err instanceof Error ? err.message : "A análise automática falhou."} O rascunho foi mantido e os campos podem ser preenchidos manualmente.`,
+      );
+    } finally {
+      setWorking(null);
+    }
+  };
+
+  const startSingleFlow = async (file: File) => {
+    if (!user) return;
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      setError("O orçamento deve ser enviado em PDF.");
+      return;
+    }
+    setWorking("uploading");
+    setError(null);
+    setSuccess(null);
+    try {
+      const orcamento = await uploadAndCreateDraft(file);
+      setDraftId(orcamento.id);
+      setAttachedFileName(file.name);
+      setFiles([]);
+      setFileInputKey((current) => current + 1);
+      onUpsert(orcamento);
+      await analyzeDraft(orcamento.id);
+    } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível enviar o orçamento.");
       setWorking(null);
     }
@@ -245,12 +245,6 @@ export function OrcamentoIntakeForm({
       setError("Confirme o nome do fornecedor.");
       return;
     }
-    if (submit && !values.gestorEmail) {
-      setError("Selecione o gestor responsável pela aprovação.");
-      return;
-    }
-
-    const gestor = gestores.find((item) => item.email === values.gestorEmail);
     setWorking(submit ? "submitting" : "saving");
     setError(null);
     setSuccess(null);
@@ -271,9 +265,6 @@ export function OrcamentoIntakeForm({
           valorTotal: values.valorTotal || null,
           dataValidade: values.dataValidade || null,
           descricao: values.descricao.trim(),
-          gestorId: gestor?.id ?? null,
-          gestorEmail: values.gestorEmail || null,
-          gestorNome: gestor?.name ?? null,
           observacoes: values.observacoes.trim() || null,
         }),
       });
@@ -298,7 +289,216 @@ export function OrcamentoIntakeForm({
     }
   };
 
-  const busy = working !== null;
+  const startBulkFlow = async (selectedFiles: File[]) => {
+    if (!user) return;
+    setError(null);
+    setSuccess(null);
+    setBulkFailed([]);
+    setBulkCreating(true);
+    setBulkProgress({ current: 0, total: selectedFiles.length });
+
+    const failed: string[] = [];
+    for (let index = 0; index < selectedFiles.length; index += 1) {
+      const file = selectedFiles[index];
+      setBulkProgress({ current: index + 1, total: selectedFiles.length });
+      if (!file.name.toLowerCase().endsWith(".pdf")) {
+        failed.push(`${file.name} (não é PDF)`);
+        continue;
+      }
+      try {
+        const orcamento = await uploadAndCreateDraft(file);
+        onUpsert(orcamento);
+        const entry: BulkDraft = {
+          orcamentoId: orcamento.id,
+          fileName: file.name,
+          values: EMPTY_REVIEW_VALUES,
+          confidence: null,
+          alerts: [],
+          busy: "analyzing",
+          error: null,
+          success: null,
+        };
+        setBulkDrafts((current) => [...current, entry]);
+
+        try {
+          const sugestao = await runAnalysis(orcamento.id);
+          setBulkDrafts((current) =>
+            current.map((item) =>
+              item.orcamentoId === orcamento.id
+                ? {
+                    ...item,
+                    values: sugestaoToValues(sugestao, item.values),
+                    confidence: sugestao.confianca,
+                    alerts: sugestao.alertas ?? [],
+                    busy: null,
+                  }
+                : item,
+            ),
+          );
+        } catch (analyzeErr) {
+          setBulkDrafts((current) =>
+            current.map((item) =>
+              item.orcamentoId === orcamento.id
+                ? {
+                    ...item,
+                    busy: null,
+                    error:
+                      analyzeErr instanceof Error
+                        ? analyzeErr.message
+                        : "A análise automática falhou. Preencha os campos manualmente.",
+                  }
+                : item,
+            ),
+          );
+        }
+      } catch (createErr) {
+        failed.push(
+          `${file.name} (${createErr instanceof Error ? createErr.message : "falha ao enviar"})`,
+        );
+      }
+    }
+
+    setBulkCreating(false);
+    setBulkProgress(null);
+    setFiles([]);
+    setFileInputKey((current) => current + 1);
+    setBulkFailed(failed);
+  };
+
+  const updateBulkDraftValues = (orcamentoId: string, next: ReviewValues) => {
+    setBulkDrafts((current) =>
+      current.map((item) => (item.orcamentoId === orcamentoId ? { ...item, values: next } : item)),
+    );
+  };
+
+  const reanalyzeBulkDraft = async (orcamentoId: string) => {
+    setBulkDrafts((current) =>
+      current.map((item) =>
+        item.orcamentoId === orcamentoId
+          ? { ...item, busy: "analyzing", error: null, success: null }
+          : item,
+      ),
+    );
+    try {
+      const sugestao = await runAnalysis(orcamentoId);
+      setBulkDrafts((current) =>
+        current.map((item) =>
+          item.orcamentoId === orcamentoId
+            ? {
+                ...item,
+                values: sugestaoToValues(sugestao, item.values),
+                confidence: sugestao.confianca,
+                alerts: sugestao.alertas ?? [],
+                busy: null,
+                success: "Análise concluída.",
+              }
+            : item,
+        ),
+      );
+    } catch (err) {
+      setBulkDrafts((current) =>
+        current.map((item) =>
+          item.orcamentoId === orcamentoId
+            ? {
+                ...item,
+                busy: null,
+                error: err instanceof Error ? err.message : "A análise automática falhou.",
+              }
+            : item,
+        ),
+      );
+    }
+  };
+
+  const persistBulkDraft = async (orcamentoId: string, submit: boolean) => {
+    const entry = bulkDrafts.find((item) => item.orcamentoId === orcamentoId);
+    if (!entry) return;
+    if (submit && !entry.values.prestadorNome.trim()) {
+      setBulkDrafts((current) =>
+        current.map((item) =>
+          item.orcamentoId === orcamentoId
+            ? { ...item, error: "Confirme o nome do fornecedor.", success: null }
+            : item,
+        ),
+      );
+      return;
+    }
+    setBulkDrafts((current) =>
+      current.map((item) =>
+        item.orcamentoId === orcamentoId
+          ? { ...item, busy: submit ? "submitting" : "saving", error: null, success: null }
+          : item,
+      ),
+    );
+    try {
+      const token = await getToken();
+      const response = await fetch(`/api/orcamentos-internos/${orcamentoId}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: submit ? "enviar_aprovacao" : "salvar_rascunho",
+          prestadorId: entry.values.prestadorId || null,
+          prestadorNome: entry.values.prestadorNome.trim(),
+          fornecedorCnpj: entry.values.fornecedorCnpj.trim() || null,
+          numeroOrcamento: entry.values.numeroOrcamento.trim(),
+          valorTotal: entry.values.valorTotal || null,
+          dataValidade: entry.values.dataValidade || null,
+          descricao: entry.values.descricao.trim(),
+          observacoes: entry.values.observacoes.trim() || null,
+        }),
+      });
+      const payload = (await response.json()) as {
+        orcamento?: OrcamentoInterno;
+        error?: string;
+      };
+      if (!response.ok || !payload.orcamento) {
+        throw new Error(payload.error ?? "Não foi possível salvar o orçamento.");
+      }
+      onUpsert(payload.orcamento);
+      if (submit) {
+        onSubmitted(payload.orcamento);
+        setBulkDrafts((current) => current.filter((item) => item.orcamentoId !== orcamentoId));
+      } else {
+        setBulkDrafts((current) =>
+          current.map((item) =>
+            item.orcamentoId === orcamentoId
+              ? { ...item, busy: null, success: "Rascunho salvo." }
+              : item,
+          ),
+        );
+      }
+    } catch (err) {
+      setBulkDrafts((current) =>
+        current.map((item) =>
+          item.orcamentoId === orcamentoId
+            ? {
+                ...item,
+                busy: null,
+                error: err instanceof Error ? err.message : "Não foi possível salvar.",
+              }
+            : item,
+        ),
+      );
+    }
+  };
+
+  const handleSend = () => {
+    if (files.length === 0) {
+      setError("Selecione ao menos um PDF de orçamento.");
+      return;
+    }
+    if (files.length === 1) {
+      void startSingleFlow(files[0]);
+    } else {
+      void startBulkFlow(files);
+    }
+  };
+
+  const idle = !draftId && bulkDrafts.length === 0;
+  const busy = working !== null || bulkCreating;
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-100">
@@ -308,10 +508,10 @@ export function OrcamentoIntakeForm({
             Novo orçamento
           </p>
           <p className="mt-1 text-sm font-semibold text-slate-900">
-            Envie o PDF, confira a leitura automática e escolha o gestor
+            Envie o PDF e confira a leitura automática
           </p>
         </div>
-        {draftId ? (
+        {!idle ? (
           <button
             type="button"
             onClick={resetForm}
@@ -319,26 +519,28 @@ export function OrcamentoIntakeForm({
             className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-50"
           >
             <X className="h-3.5 w-3.5" />
-            Outro orçamento
+            {bulkDrafts.length > 0 ? "Novo lote" : "Outro orçamento"}
           </button>
         ) : null}
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2 text-[11px] font-semibold">
-        {["1. PDF", "2. Conferência", "3. Gestor"].map((label, index) => {
-          const active = draftId ? index <= 1 : index === 0;
-          return (
-            <div
-              key={label}
-              className={`rounded-full px-3 py-1.5 text-center ${
-                active ? "bg-sky-50 text-sky-700" : "bg-slate-50 text-slate-400"
-              }`}
-            >
-              {label}
-            </div>
-          );
-        })}
-      </div>
+      {idle || draftId ? (
+        <div className="mt-4 grid grid-cols-2 gap-2 text-[11px] font-semibold">
+          {["1. PDF", "2. Conferência"].map((label, index) => {
+            const active = draftId ? index <= 1 : index === 0;
+            return (
+              <div
+                key={label}
+                className={`rounded-full px-3 py-1.5 text-center ${
+                  active ? "bg-sky-50 text-sky-700" : "bg-slate-50 text-slate-400"
+                }`}
+              >
+                {label}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
 
       {(error || success) && (
         <div
@@ -350,12 +552,18 @@ export function OrcamentoIntakeForm({
         </div>
       )}
 
-      {!draftId && colaboradores.length > 0 ? (
+      {bulkFailed.length > 0 ? (
+        <div className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Alguns arquivos não puderam ser enviados: {bulkFailed.join(", ")}
+        </div>
+      ) : null}
+
+      {idle && colaboradores.length > 0 ? (
         <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-slate-500">
           Enviar em nome de
           <select
-            value={values.solicitanteId}
-            onChange={(event) => updateValue("solicitanteId", event.target.value)}
+            value={solicitanteId}
+            onChange={(event) => setSolicitanteId(event.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs normal-case tracking-normal text-slate-800"
           >
             <option value="">Eu mesmo</option>
@@ -368,192 +576,93 @@ export function OrcamentoIntakeForm({
         </label>
       ) : null}
 
-      {!draftId ? (
+      {idle ? (
         <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
           <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            PDF do orçamento
+            PDF do orçamento (pode selecionar vários)
             <input
               key={fileInputKey}
               type="file"
               accept="application/pdf,.pdf"
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              multiple
+              onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
               className="mt-2 block w-full cursor-pointer text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-sky-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"
             />
           </label>
-          {file ? <p className="mt-2 truncate text-xs text-slate-600">{file.name}</p> : null}
+          {files.length > 0 ? (
+            <ul className="mt-2 space-y-1 text-xs text-slate-600">
+              {files.map((selectedFile, index) => (
+                <li key={`${selectedFile.name}-${index}`} className="truncate">
+                  {selectedFile.name}
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <button
             type="button"
-            onClick={() => void createDraftAndAnalyze()}
-            disabled={!file || busy}
+            onClick={handleSend}
+            disabled={files.length === 0 || busy}
             className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-60"
           >
-            {working === "uploading" || working === "analyzing" ? (
+            {working === "uploading" || working === "analyzing" || bulkCreating ? (
               <LoaderCircle className="h-4 w-4 animate-spin" />
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            {working === "uploading"
-              ? "Enviando PDF..."
-              : working === "analyzing"
-                ? "Identificando fornecedor..."
-                : "Enviar e analisar com IA"}
+            {bulkProgress
+              ? `Processando ${bulkProgress.current} de ${bulkProgress.total}...`
+              : working === "uploading"
+                ? "Enviando PDF..."
+                : working === "analyzing"
+                  ? "Identificando fornecedor..."
+                  : files.length > 1
+                    ? `Enviar e analisar ${files.length} orçamentos`
+                    : "Enviar e analisar com IA"}
           </button>
         </div>
-      ) : (
-        <div className="mt-4 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs">
-            <span className="inline-flex min-w-0 items-center gap-2 font-semibold text-slate-700">
-              <FileSearch className="h-4 w-4 shrink-0" />
-              <span className="truncate">{attachedFileName}</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => void analyzeDraft(draftId)}
-              disabled={busy}
-              className="inline-flex items-center gap-1 font-semibold text-sky-700 disabled:opacity-50"
-            >
-              {working === "analyzing" ? (
-                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="h-3.5 w-3.5" />
-              )}
-              Analisar novamente
-            </button>
-          </div>
+      ) : null}
 
-          {confidence !== null ? (
-            <p className="text-[11px] text-slate-500">
-              Confiança geral da leitura: {Math.round(confidence * 100)}%. Sempre confira os
-              dados antes do envio.
-            </p>
-          ) : null}
-          {alerts.length > 0 ? (
-            <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              {alerts.join(" ")}
-            </div>
-          ) : null}
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="sm:col-span-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Fornecedor identificado *
-              <input
-                value={values.prestadorNome}
-                onChange={(event) =>
-                  setValues((current) => ({
-                    ...current,
-                    prestadorId: "",
-                    prestadorNome: event.target.value,
-                  }))
-                }
-                placeholder="Razão social ou nome da empresa"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              CNPJ
-              <input
-                value={values.fornecedorCnpj}
-                onChange={(event) =>
-                  setValues((current) => ({
-                    ...current,
-                    prestadorId: "",
-                    fornecedorCnpj: event.target.value,
-                  }))
-                }
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Número do orçamento
-              <input
-                value={values.numeroOrcamento}
-                onChange={(event) => updateValue("numeroOrcamento", event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Valor total
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={values.valorTotal}
-                onChange={(event) => updateValue("valorTotal", event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Validade
-              <input
-                type="date"
-                value={values.dataValidade}
-                onChange={(event) => updateValue("dataValidade", event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              />
-            </label>
-            <label className="sm:col-span-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Descrição
-              <textarea
-                value={values.descricao}
-                onChange={(event) => updateValue("descricao", event.target.value)}
-                className="mt-1 min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              />
-            </label>
-            <label className="sm:col-span-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Gestor responsável *
-              <select
-                value={values.gestorEmail}
-                onChange={(event) => updateValue("gestorEmail", event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              >
-                <option value="">Selecione quem avaliará o orçamento</option>
-                {gestores.map((gestor) => (
-                  <option key={gestor.email} value={gestor.email}>
-                    {gestor.name ? `${gestor.name} (${gestor.email})` : gestor.email}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="sm:col-span-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Observações internas
-              <textarea
-                value={values.observacoes}
-                onChange={(event) => updateValue("observacoes", event.target.value)}
-                className="mt-1 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-slate-900"
-              />
-            </label>
-          </div>
-
-          <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
-            <button
-              type="button"
-              onClick={() => void persistDraft(false)}
-              disabled={busy}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-            >
-              {working === "saving" ? (
-                <LoaderCircle className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              Salvar rascunho
-            </button>
-            <button
-              type="button"
-              onClick={() => void persistDraft(true)}
-              disabled={busy || !values.prestadorNome.trim() || !values.gestorEmail}
-              className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-60"
-            >
-              {working === "submitting" ? (
-                <LoaderCircle className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-              Enviar para aprovação
-            </button>
-          </div>
+      {draftId ? (
+        <div className="mt-4">
+          <OrcamentoReviewCard
+            fileName={attachedFileName}
+            values={values}
+            onChange={setValues}
+            confidence={confidence}
+            alerts={alerts}
+            onReanalyze={() => void analyzeDraft(draftId)}
+            onSaveDraft={() => void persistDraft(false)}
+            onSubmit={() => void persistDraft(true)}
+            busy={working}
+            error={null}
+            success={null}
+          />
         </div>
-      )}
+      ) : null}
+
+      {bulkDrafts.length > 0 ? (
+        <div className="mt-4 space-y-4">
+          <p className="text-xs text-slate-500">
+            Revise os dados de cada orçamento e envie individualmente.
+          </p>
+          {bulkDrafts.map((entry) => (
+            <OrcamentoReviewCard
+              key={entry.orcamentoId}
+              fileName={entry.fileName}
+              values={entry.values}
+              onChange={(next) => updateBulkDraftValues(entry.orcamentoId, next)}
+              confidence={entry.confidence}
+              alerts={entry.alerts}
+              onReanalyze={() => void reanalyzeBulkDraft(entry.orcamentoId)}
+              onSaveDraft={() => void persistBulkDraft(entry.orcamentoId, false)}
+              onSubmit={() => void persistBulkDraft(entry.orcamentoId, true)}
+              busy={entry.busy}
+              error={entry.error}
+              success={entry.success}
+            />
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
