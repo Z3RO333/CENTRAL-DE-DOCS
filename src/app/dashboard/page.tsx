@@ -55,6 +55,8 @@ type AtividadeRecente = {
   status: string;
   created_at: string;
   dados: Record<string, unknown> | null;
+  arquivo_path?: string | null;
+  arquivo_assinado_path?: string | null;
 };
 
 const TIPO_LABEL: Record<string, string> = {
@@ -177,6 +179,13 @@ const getDocumentoNome = (registro: AtividadeRecente) => {
     const primeiro = anexos[0] as { nome?: unknown } | null;
     if (primeiro && typeof primeiro.nome === "string" && primeiro.nome.trim()) {
       return fixMojibakeText(primeiro.nome.trim());
+    }
+  }
+  const path = registro.arquivo_assinado_path ?? registro.arquivo_path;
+  if (path) {
+    const nomeArquivo = path.split("/").pop();
+    if (nomeArquivo) {
+      return fixMojibakeText(nomeArquivo);
     }
   }
   return registro.id.slice(0, 8);

@@ -88,6 +88,22 @@ async function getSignedFileUrl(
 
 const getFileNameFromPath = (path: string) => path.split("/").pop() ?? "documento.pdf";
 
+const getOriginalFileName = (registro: FormularioRecord | null) => {
+  const anexos = registro?.dados?.anexos;
+  if (Array.isArray(anexos) && anexos.length > 0) {
+    const primeiro = anexos[0] as { nome?: unknown } | null;
+    if (primeiro && typeof primeiro.nome === "string" && primeiro.nome.trim()) {
+      return primeiro.nome.trim();
+    }
+  }
+  return registro?.arquivo_path ? getFileNameFromPath(registro.arquivo_path) : null;
+};
+
+const buildAssinadoFileName = (nomeOriginal: string) => {
+  const match = nomeOriginal.match(/^(.*)(\.pdf)$/i);
+  return match ? `${match[1]} (assinado)${match[2]}` : `${nomeOriginal} (assinado)`;
+};
+
 const downloadSignedUrlAsBlob = async (signedUrl: string, fileName: string) => {
   const response = await fetch(signedUrl);
   if (!response.ok) {
@@ -258,14 +274,17 @@ export default function AssinaturaDocumentoPage() {
       setPdfAction("download");
       setError(null);
       const signedUrl = await getSignedFileUrl(path);
-      await downloadSignedUrlAsBlob(signedUrl, getFileNameFromPath(path));
+      const nomeOriginal = getOriginalFileName(registro) ?? getFileNameFromPath(path);
+      const isAssinado = Boolean(registro?.arquivo_assinado_path);
+      const fileName = isAssinado ? buildAssinadoFileName(nomeOriginal) : nomeOriginal;
+      await downloadSignedUrlAsBlob(signedUrl, fileName);
     } catch (err) {
       console.error("Erro ao baixar arquivo:", err);
       setError("Não foi possível baixar o PDF. Verifique se o arquivo existe e tente novamente.");
     } finally {
       setPdfAction(null);
     }
-  }, [getArquivoDownloadPath]);
+  }, [getArquivoDownloadPath, registro]);
 
   const copiarLinkTemporario = useCallback(async () => {
     const path = getArquivoVisualizacaoPath();

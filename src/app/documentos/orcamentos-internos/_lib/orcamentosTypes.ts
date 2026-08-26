@@ -33,6 +33,7 @@ export type OrcamentoInterno = {
   gestor_nome: string | null;
   observacoes: string | null;
   arquivo_original_path: string;
+  arquivo_original_nome?: string | null;
   arquivo_assinado_path: string | null;
   status: OrcamentoInternoStatus;
   versao_atual: number;

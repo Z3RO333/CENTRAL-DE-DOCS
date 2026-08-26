@@ -129,7 +129,12 @@ async function getSignedFileUrl(path: string) {
   return data.signedUrl;
 }
 
-async function downloadPath(path: string) {
+function buildAssinadoFileName(nomeOriginal: string) {
+  const match = nomeOriginal.match(/^(.*)(\.pdf)$/i);
+  return match ? `${match[1]} (assinado)${match[2]}` : `${nomeOriginal} (assinado)`;
+}
+
+async function downloadPath(path: string, fileName?: string) {
   const url = await getSignedFileUrl(path);
   const response = await fetch(url);
   if (!response.ok) throw new Error("Não foi possível baixar o arquivo.");
@@ -137,7 +142,7 @@ async function downloadPath(path: string) {
   const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = objectUrl;
-  link.download = path.split("/").pop() ?? "documento.pdf";
+  link.download = fileName ?? path.split("/").pop() ?? "documento.pdf";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -465,14 +470,23 @@ export default function OrcamentosInternosPage() {
     }
   };
 
-  const baixarArquivo = async (orcamento: OrcamentoInterno, signed: boolean) => {
+  const baixarArquivo = async (
+    orcamento: OrcamentoInterno,
+    signed: boolean,
+    nomeOriginal?: string | null,
+  ) => {
     const path = signed ? orcamento.arquivo_assinado_path : orcamento.arquivo_original_path;
     if (!path) {
       setError("Arquivo indisponível.");
       return;
     }
     try {
-      await downloadPath(path);
+      const fileName = nomeOriginal
+        ? signed
+          ? buildAssinadoFileName(nomeOriginal)
+          : nomeOriginal
+        : undefined;
+      await downloadPath(path, fileName);
       const token = await getToken();
       await fetch(`/api/orcamentos-internos/${orcamento.id}`, {
         method: "POST",
@@ -750,6 +764,7 @@ export default function OrcamentosInternosPage() {
                                   void baixarArquivo(
                                     orcamento,
                                     Boolean(orcamento.arquivo_assinado_path),
+                                    orcamento.arquivo_original_nome,
                                   )
                                 }
                                 className="rounded-full border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"
@@ -873,7 +888,15 @@ export default function OrcamentosInternosPage() {
                           <span className="font-semibold">Arquivo assinado disponível</span>
                           <button
                             type="button"
-                            onClick={() => void baixarArquivo(selectedDetail, true)}
+                            onClick={() =>
+                              void baixarArquivo(
+                                selectedDetail,
+                                true,
+                                detail.versoes.find(
+                                  (v) => v.arquivo_path === selectedDetail.arquivo_original_path,
+                                )?.nome_arquivo,
+                              )
+                            }
                             className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 font-semibold"
                           >
                             <Download className="h-3 w-3" />

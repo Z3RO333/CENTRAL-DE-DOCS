@@ -150,8 +150,28 @@ export async function GET(request: Request) {
       throw error;
     }
 
+    const rows = (data as OrcamentoInternoRow[] | null) ?? [];
+    const orcamentoIds = rows.map((row) => row.id);
+    const nomesArquivo = new Map<string, string>();
+    if (orcamentoIds.length > 0) {
+      const { data: versoesData, error: versoesError } = await supabaseAdmin
+        .from("orcamentos_internos_versoes")
+        .select("orcamento_id,arquivo_path,nome_arquivo,principal")
+        .in("orcamento_id", orcamentoIds)
+        .eq("principal", true);
+      if (versoesError) {
+        throw versoesError;
+      }
+      for (const versao of (versoesData as { orcamento_id: string; nome_arquivo: string }[] | null) ?? []) {
+        nomesArquivo.set(versao.orcamento_id, versao.nome_arquivo);
+      }
+    }
+
     return NextResponse.json({
-      orcamentos: ((data as OrcamentoInternoRow[] | null) ?? []).map(mapOrcamento),
+      orcamentos: rows.map((row) => ({
+        ...mapOrcamento(row),
+        arquivo_original_nome: nomesArquivo.get(row.id) ?? null,
+      })),
       total: count ?? 0,
       isAdmin: actor.isAdmin,
     });
