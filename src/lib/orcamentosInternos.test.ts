@@ -113,6 +113,16 @@ describe("fluxo de orçamentos internos", () => {
     ).toThrow("Somente um aprovador");
   });
 
+  it("impede que o solicitante decida o próprio orçamento, mesmo sendo aprovador", () => {
+    expect(() =>
+      assertCanDecide(
+        { ...baseRow, solicitante_id: "aprovador-1" },
+        actor(),
+        new Set(["aprovador1@bemol.com.br"]),
+      ),
+    ).toThrow("Você não pode decidir um orçamento que você mesmo enviou.");
+  });
+
   it("impede decisão em orçamento já encerrado", () => {
     expect(() =>
       assertCanDecide(

@@ -168,7 +168,8 @@ export async function GET(
         ["aguardando_aprovacao", "em_analise_gestor", "reenviado"].includes(
           orcamento.status,
         ) &&
-        (actor.realIsAdmin || actorIsAprovador),
+        (actor.realIsAdmin || actorIsAprovador) &&
+        orcamento.solicitante_id !== actor.realUserId,
     });
   } catch (err) {
     console.error("Erro ao carregar orçamento interno:", err);

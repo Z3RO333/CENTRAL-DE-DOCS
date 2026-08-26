@@ -297,6 +297,12 @@ export function assertCanDecide(
       "Somente um aprovador ou administrador pode decidir este orçamento.",
     );
   }
+  if (row.solicitante_id === actor.realUserId) {
+    throw new HttpError(
+      403,
+      "Você não pode decidir um orçamento que você mesmo enviou.",
+    );
+  }
   if (!DECISAO_STATUS.has(row.status)) {
     throw new HttpError(400, "Este orçamento não está aguardando decisão.");
   }
