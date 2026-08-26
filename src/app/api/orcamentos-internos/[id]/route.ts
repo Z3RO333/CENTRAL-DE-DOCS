@@ -27,6 +27,9 @@ import {
   type OrcamentoInternoVersaoRow,
 } from "@/lib/orcamentosInternos";
 import { type DocumentoAuditEvent } from "@/lib/documentosAudit";
+import { gerarPdfAssinado, resolveAssinadoPorNome } from "@/lib/orcamentoAssinatura";
+
+export const runtime = "nodejs";
 
 function mapOrcamento(row: OrcamentoInternoRow) {
   return {
@@ -198,7 +201,6 @@ export async function PATCH(
     const body = (await request.json()) as OrcamentoInternoInput & {
       action?: OrcamentoInternoAction;
       justificativa?: string;
-      signedFile?: OrcamentoInternoArquivoInput | null;
     };
     const action = body.action;
     if (!action) {
@@ -553,10 +555,19 @@ export async function PATCH(
 
     if (action === "aprovar_assinar") {
       assertCanDecide(current, actor, aprovadores);
-      const signedPath = normalizeText(body.signedFile?.path);
-      if (!signedPath) {
-        throw new HttpError(400, "Informe o arquivo assinado.");
-      }
+
+      const assinadoPorNome = await resolveAssinadoPorNome(supabaseAdmin, {
+        userId: actor.realUserId,
+        email: actor.realEmail,
+      });
+      const signedPath = await gerarPdfAssinado({
+        supabaseAdmin,
+        orcamentoId: id,
+        arquivoOriginalPath: current.arquivo_original_path,
+        assinadoPorNome,
+        assinadoPorUserId: actor.realUserId,
+      });
+
       const nextStatus: OrcamentoInternoStatus = "aprovado_assinado";
       const now = new Date().toISOString();
       const { data, error } = await supabaseAdmin
@@ -574,8 +585,12 @@ export async function PATCH(
         .eq("status", from)
         .select("*")
         .maybeSingle();
-      if (error) throw error;
+      if (error) {
+        await supabaseAdmin.storage.from("formularios").remove([signedPath]);
+        throw error;
+      }
       if (!data) {
+        await supabaseAdmin.storage.from("formularios").remove([signedPath]);
         throw new HttpError(409, "Este orçamento já foi decidido por outro gestor.");
       }
       await updateFormularioStatus({

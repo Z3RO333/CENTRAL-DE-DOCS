@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
   CheckCircle2,
   Download,
@@ -25,7 +24,6 @@ import {
   STATUS_LABEL,
   type OrcamentoInternoStatus,
 } from "@/lib/orcamentosInternosShared";
-import { formatPersonName } from "@/lib/displayName";
 import { uploadDocumentFile } from "@/lib/documentUpload";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
@@ -376,103 +374,11 @@ export default function OrcamentosInternosPage() {
 
   const signAndApprove = async (orcamento: OrcamentoInterno) => {
     if (!user) return;
-    setActionLoading("aprovar_assinar");
-    setError(null);
-    try {
-      const originalUrl = await getSignedFileUrl(orcamento.arquivo_original_path);
-      const originalBytes = await fetch(originalUrl).then((res) => {
-        if (!res.ok) throw new Error("Não foi possível baixar o PDF original.");
-        return res.arrayBuffer();
-      });
-      const pdfDoc = await PDFDocument.load(originalBytes);
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-      const pages = pdfDoc.getPages();
-      const page = pages[pages.length - 1];
-
-      const logoBytes = await fetch("/bemol-logo.png").then((res) => res.arrayBuffer());
-      const logoImage = await pdfDoc.embedPng(logoBytes);
-      const logoHeight = 32;
-      const logoWidth = logoImage.width * (logoHeight / logoImage.height);
-
-      const displayName =
-        formatPersonName({
-          name: (user.user_metadata?.name as string | undefined) ?? null,
-          fullName: (user.user_metadata?.full_name as string | undefined) ?? null,
-          email: user.email ?? null,
-        }) ||
-        user.email ||
-        "Gestor aprovador";
-
-      const approvedAt = new Date();
-      const pad = (value: number) => String(value).padStart(2, "0");
-      const offsetMinutesTotal = -approvedAt.getTimezoneOffset();
-      const offsetSign = offsetMinutesTotal >= 0 ? "+" : "-";
-      const offsetHours = pad(Math.floor(Math.abs(offsetMinutesTotal) / 60));
-      const offsetMinutes = pad(Math.abs(offsetMinutesTotal) % 60);
-      const dadosLabel = `Dados: ${approvedAt.getFullYear()}.${pad(approvedAt.getMonth() + 1)}.${pad(approvedAt.getDate())} ${pad(approvedAt.getHours())}:${pad(approvedAt.getMinutes())}:${pad(approvedAt.getSeconds())} ${offsetSign}${offsetHours}'${offsetMinutes}'`;
-
-      const stampBaseY = 54;
-      const logoX = 48;
-      page.drawImage(logoImage, {
-        x: logoX,
-        y: stampBaseY,
-        width: logoWidth,
-        height: logoHeight,
-      });
-
-      const stampX = logoX + logoWidth + 12;
-      page.drawText("Assinado de forma digital por", {
-        x: stampX,
-        y: stampBaseY + 24,
-        size: 8,
-        font,
-        color: rgb(0.4, 0.45, 0.5),
-      });
-      page.drawText(displayName, {
-        x: stampX,
-        y: stampBaseY + 12,
-        size: 12,
-        font: fontBold,
-        color: rgb(0.1, 0.12, 0.16),
-      });
-      page.drawText(dadosLabel, {
-        x: stampX,
-        y: stampBaseY,
-        size: 8,
-        font,
-        color: rgb(0.4, 0.45, 0.5),
-      });
-
-      const bytes = await pdfDoc.save();
-      const pdfBuffer = new ArrayBuffer(bytes.byteLength);
-      new Uint8Array(pdfBuffer).set(bytes);
-      const blob = new Blob([pdfBuffer], { type: "application/pdf" });
-      const signedPath = `${user.id}/orcamentos_internos/assinados/${orcamento.id}-${Date.now()}.pdf`;
-      const { data, error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(signedPath, blob, { contentType: "application/pdf" });
-      if (uploadError || !data) {
-        throw uploadError ?? new Error("Não foi possível enviar o PDF assinado.");
-      }
-      await patchAction(
-        orcamento.id,
-        {
-          action: "aprovar_assinar",
-          signedFile: {
-            path: data.path ?? signedPath,
-            name: signedPath.split("/").pop(),
-            type: "application/pdf",
-            size: blob.size,
-          },
-        },
-        "Orçamento aprovado e assinado.",
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível assinar.");
-    } finally {
-      setActionLoading(null);
-    }
+    await patchAction(
+      orcamento.id,
+      { action: "aprovar_assinar" },
+      "Orçamento aprovado e assinado.",
+    );
   };
 
   const baixarArquivo = async (
