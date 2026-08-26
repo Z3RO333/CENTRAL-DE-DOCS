@@ -71,12 +71,19 @@ type DetailPayload = {
 
 const STORAGE_BUCKET = "formularios";
 
-const statusOptions: Array<{ value: "todos" | OrcamentoInternoStatus; label: string }> = [
-  { value: "todos", label: "Todos os status" },
-  ...Object.entries(STATUS_LABEL).map(([value, label]) => ({
-    value: value as OrcamentoInternoStatus,
-    label,
-  })),
+const STATUS_GROUPS: Array<{ label: string; statuses: OrcamentoInternoStatus[] }> = [
+  {
+    label: "Precisam de ação",
+    statuses: ["rascunho", "ajuste_solicitado", "reenviado"],
+  },
+  {
+    label: "Em andamento",
+    statuses: ["aguardando_aprovacao", "em_analise_gestor"],
+  },
+  {
+    label: "Encerrados",
+    statuses: ["aprovado_assinado", "rejeitado", "cancelado"],
+  },
 ];
 
 function formatDateTime(value: string | null) {
@@ -620,10 +627,15 @@ export default function OrcamentosInternosPage() {
                 onChange={(event) => setStatusFilter(event.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs normal-case tracking-normal text-slate-800"
               >
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
+                <option value="todos">Todos os status</option>
+                {STATUS_GROUPS.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.statuses.map((status) => (
+                      <option key={status} value={status}>
+                        {STATUS_LABEL[status]}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </label>
@@ -723,7 +735,9 @@ export default function OrcamentosInternosPage() {
                         >
                           <td className="px-5 py-4">
                             <p className="font-semibold text-slate-900">
-                              {orcamento.numero_orcamento || orcamento.id.slice(0, 8)}
+                              {orcamento.numero_orcamento ||
+                                orcamento.arquivo_original_nome ||
+                                orcamento.id.slice(0, 8)}
                             </p>
                             <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">
                               {orcamento.descricao}
@@ -807,7 +821,11 @@ export default function OrcamentosInternosPage() {
                   Detalhes do orçamento
                 </p>
                 <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                  {selectedDetail?.numero_orcamento ?? detailId.slice(0, 8)}
+                  {selectedDetail?.numero_orcamento ||
+                    detail?.versoes.find(
+                      (v) => v.arquivo_path === selectedDetail?.arquivo_original_path,
+                    )?.nome_arquivo ||
+                    detailId.slice(0, 8)}
                 </h2>
               </div>
               <button
