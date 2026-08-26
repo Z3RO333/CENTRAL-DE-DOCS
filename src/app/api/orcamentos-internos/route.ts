@@ -81,18 +81,10 @@ export async function GET(request: Request) {
       .order("updated_at", { ascending: false });
 
     if (!actor.isAdmin && !isAprovador) {
-      const ors: string[] = [];
-      if (actor.userId) {
-        ors.push(`solicitante_id.eq.${actor.userId}`);
-        ors.push(`gestor_id.eq.${actor.userId}`);
-      }
-      if (actor.email) {
-        ors.push(`gestor_email.eq.${actor.email}`);
-      }
-      if (ors.length === 0) {
+      if (!actor.userId) {
         throw new HttpError(403, "Você não possui acesso aos orçamentos internos.");
       }
-      query = query.or(ors.join(","));
+      query = query.eq("solicitante_id", actor.userId);
     }
 
     if (tab === "meus") {
@@ -107,12 +99,6 @@ export async function GET(request: Request) {
         "em_analise_gestor",
         "reenviado",
       ]);
-      const ors: string[] = [];
-      if (actor.realUserId) ors.push(`gestor_id.eq.${actor.realUserId}`);
-      if (actor.realEmail) ors.push(`gestor_email.eq.${actor.realEmail}`);
-      query = query.or(
-        ors.length > 0 ? ors.join(",") : "id.eq.00000000-0000-0000-0000-000000000000",
-      );
     } else if (tab === "todos" && !actor.isAdmin && !isAprovador) {
       throw new HttpError(403, "A visão geral é restrita a administradores e aprovadores.");
     }
@@ -254,15 +240,6 @@ export async function POST(request: Request) {
       ),
     ]);
 
-    const gestorEmail = normalizeEmail(body.gestorEmail);
-    const gestorId = normalizeText(body.gestorId) || null;
-    if (submit) {
-      const aprovadores = await getAprovadorEmails(supabaseAdmin);
-      if (!gestorEmail || !aprovadores.has(gestorEmail)) {
-        throw new HttpError(400, "Selecione um gestor aprovador válido.");
-      }
-    }
-
     const status = submit ? "aguardando_aprovacao" : "rascunho";
     const dados = {
       tipo_interno: true,
@@ -274,8 +251,6 @@ export async function POST(request: Request) {
       descricao: normalizeText(body.descricao),
       valor: parseValorTotal(body.valorTotal),
       data_validade: normalizeText(body.dataValidade),
-      gestor_email: gestorEmail,
-      gestor_nome: normalizeText(body.gestorNome) || null,
       anexos: normalizeArquivos(body.arquivos ?? [], principal.path),
     };
 
@@ -315,9 +290,9 @@ export async function POST(request: Request) {
         valor_total: parseValorTotal(body.valorTotal),
         data_validade: normalizeText(body.dataValidade) || null,
         numero_referencia: normalizeText(body.numeroReferencia) || null,
-        gestor_id: gestorId,
-        gestor_email: gestorEmail ?? "",
-        gestor_nome: normalizeText(body.gestorNome) || null,
+        gestor_id: null,
+        gestor_email: "",
+        gestor_nome: null,
         observacoes: normalizeText(body.observacoes) || null,
         arquivo_original_path: principal.path.trim(),
         status,
