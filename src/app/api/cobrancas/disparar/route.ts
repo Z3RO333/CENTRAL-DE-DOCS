@@ -1,23 +1,12 @@
 import { NextResponse } from "next/server";
 import { processarCobrancas } from "@/lib/cobrancasService";
+import { autorizarRequisicaoCron } from "@/lib/cronAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Protegido por token secreto – configure CRON_SECRET nas variáveis de ambiente
-function autorizarRequisicao(request: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-
-  const authHeader = request.headers.get("authorization");
-  if (authHeader === `Bearer ${secret}`) return true;
-
-  const { searchParams } = new URL(request.url);
-  return searchParams.get("secret") === secret;
-}
-
 export async function POST(request: Request) {
-  if (!autorizarRequisicao(request)) {
+  if (!autorizarRequisicaoCron(request)) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
@@ -44,7 +33,7 @@ export async function POST(request: Request) {
 
 // GET para validação manual (browser/curl). Use ?dryRun=true para simular sem enviar.
 export async function GET(request: Request) {
-  if (!autorizarRequisicao(request)) {
+  if (!autorizarRequisicaoCron(request)) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 

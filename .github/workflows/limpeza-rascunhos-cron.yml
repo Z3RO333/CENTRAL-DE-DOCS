@@ -1,0 +1,43 @@
+name: Limpeza de rascunhos abandonados (agendada)
+
+# Roda uma vez por dia e apaga rascunhos de orçamentos internos sem
+# nenhuma edição há mais de 24h (verificação feita no backend).
+on:
+  schedule:
+    - cron: "0 8 * * *" # 08:00 UTC = 04:00 Manaus (UTC-4).
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Simular sem apagar?"
+        type: boolean
+        default: true
+
+jobs:
+  limpar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar limpeza de rascunhos
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          ENDPOINT: "https://formscentral-frbnd8hxhkhjh5hn.brazilsouth-01.azurewebsites.net/api/orcamentos-internos/limpeza-rascunhos"
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Secret CRON_SECRET não configurado no repositório. Limpeza não executada."
+            exit 1
+          fi
+
+          URL="$ENDPOINT"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            URL="$ENDPOINT?dryRun=true"
+            echo "Execução MANUAL em modo dry-run (nada será apagado)."
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Execução MANUAL REAL (rascunhos abandonados serão apagados)."
+          else
+            echo "Execução agendada (rascunhos abandonados serão apagados)."
+          fi
+
+          code=$(curl -s -o /tmp/resp.json -w '%{http_code}' -X POST -H "Authorization: Bearer $CRON_SECRET" "$URL")
+          echo "HTTP $code"; cat /tmp/resp.json; echo
+          test "$code" = "200"
