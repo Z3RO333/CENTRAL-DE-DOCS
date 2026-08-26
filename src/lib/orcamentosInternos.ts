@@ -25,7 +25,6 @@ export type OrcamentoInternoAction =
   | "aprovar_assinar"
   | "rejeitar"
   | "devolver_sem_decisao"
-  | "reatribuir_gestor"
   | "cancelar"
   | "corrigir_metadados";
 
@@ -178,7 +177,6 @@ export function validateOrcamentoInput(
   const required: Array<[unknown, string]> = [
     [principal?.path, "Anexe o orçamento principal em PDF."],
     [input.prestadorNome, "Confirme o fornecedor identificado no orçamento."],
-    [input.gestorEmail, "Selecione o gestor responsável pela aprovação."],
   ];
 
   const missing = required.find(([value]) => {
@@ -292,15 +290,8 @@ export function assertCanDecide(
   aprovadores: Set<string>,
 ) {
   const actorEmail = normalizeEmail(actor.realEmail);
-  const gestorEmail = normalizeEmail(row.gestor_email);
   const isAprovador = actorEmail !== null && aprovadores.has(actorEmail);
-  const isGestorAtribuido =
-    row.gestor_id === actor.realUserId ||
-    (actorEmail !== null && actorEmail === gestorEmail);
-  if (
-    !actor.realIsAdmin &&
-    (!isAprovador || !isGestorAtribuido)
-  ) {
+  if (!actor.realIsAdmin && !isAprovador) {
     throw new HttpError(
       403,
       "Somente um aprovador ou administrador pode decidir este orçamento.",

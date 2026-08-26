@@ -615,36 +615,6 @@ export async function PATCH(
       return NextResponse.json({ orcamento: mapOrcamento(data as OrcamentoInternoRow) });
     }
 
-    if (action === "reatribuir_gestor") {
-      if (!actor.realIsAdmin) {
-        throw new HttpError(403, "Somente administradores podem reatribuir gestor.");
-      }
-      const gestorEmail = normalizeEmail(body.gestorEmail);
-      if (!gestorEmail && !body.gestorId) {
-        throw new HttpError(400, "Informe o novo gestor.");
-      }
-      const { data, error } = await supabaseAdmin
-        .from("orcamentos_internos")
-        .update({
-          gestor_id: normalizeText(body.gestorId) || null,
-          gestor_email: gestorEmail ?? "",
-          gestor_nome: normalizeText(body.gestorNome) || null,
-        })
-        .eq("id", id)
-        .select("*")
-        .single();
-      if (error || !data) throw error ?? new Error("Falha ao reatribuir.");
-      await logOrcamentoEvent({
-        supabaseAdmin,
-        documentoId: id,
-        eventType: "aprovador_alterado",
-        actorId: actor.realUserId,
-        actorEmail: actor.realEmail,
-        metadata: { gestor_email: gestorEmail, gestor_id: body.gestorId },
-      });
-      return NextResponse.json({ orcamento: mapOrcamento(data as OrcamentoInternoRow) });
-    }
-
     if (action === "cancelar") {
       if (!actor.realIsAdmin) {
         throw new HttpError(403, "Somente administradores podem cancelar solicitações.");

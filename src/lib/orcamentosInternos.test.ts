@@ -28,9 +28,9 @@ const baseRow: OrcamentoInternoRow = {
   valor_total: 100,
   data_validade: null,
   numero_referencia: null,
-  gestor_id: "gestor-1",
-  gestor_email: "gestor@bemol.com.br",
-  gestor_nome: "Gestor",
+  gestor_id: null,
+  gestor_email: "",
+  gestor_nome: null,
   observacoes: null,
   arquivo_original_path: arquivo.path,
   arquivo_assinado_path: null,
@@ -47,11 +47,11 @@ const baseRow: OrcamentoInternoRow = {
 
 function actor(overrides: Partial<Actor> = {}): Actor {
   return {
-    userId: "gestor-1",
-    email: "gestor@bemol.com.br",
+    userId: "aprovador-1",
+    email: "aprovador1@bemol.com.br",
     isAdmin: false,
-    realUserId: "gestor-1",
-    realEmail: "gestor@bemol.com.br",
+    realUserId: "aprovador-1",
+    realEmail: "aprovador1@bemol.com.br",
     realIsAdmin: false,
     isSimulating: false,
     ...overrides,
@@ -59,7 +59,7 @@ function actor(overrides: Partial<Actor> = {}): Actor {
 }
 
 describe("fluxo de orçamentos internos", () => {
-  it("exige fornecedor e gestor ao enviar para aprovação", () => {
+  it("exige fornecedor ao enviar para aprovação", () => {
     expect(() =>
       validateOrcamentoInput({ arquivos: [arquivo] }, "submit"),
     ).toThrow("Confirme o fornecedor");
@@ -69,7 +69,7 @@ describe("fluxo de orçamentos internos", () => {
         { arquivos: [arquivo], prestadorNome: "Fornecedor Teste" },
         "submit",
       ),
-    ).toThrow("Selecione o gestor");
+    ).not.toThrow();
   });
 
   it("aceita rascunho contendo somente o PDF", () => {
@@ -78,23 +78,37 @@ describe("fluxo de orçamentos internos", () => {
     ).not.toThrow();
   });
 
-  it("permite decisão do aprovador atribuído", () => {
-    expect(() =>
-      assertCanDecide(baseRow, actor(), new Set(["gestor@bemol.com.br"])),
-    ).not.toThrow();
-  });
-
-  it("impede que outro aprovador decida o orçamento", () => {
+  it("permite decisão de qualquer aprovador cadastrado", () => {
+    const aprovadores = new Set([
+      "aprovador1@bemol.com.br",
+      "aprovador2@bemol.com.br",
+    ]);
+    expect(() => assertCanDecide(baseRow, actor(), aprovadores)).not.toThrow();
     expect(() =>
       assertCanDecide(
         baseRow,
         actor({
-          userId: "gestor-2",
-          email: "outro@bemol.com.br",
-          realUserId: "gestor-2",
-          realEmail: "outro@bemol.com.br",
+          userId: "aprovador-2",
+          email: "aprovador2@bemol.com.br",
+          realUserId: "aprovador-2",
+          realEmail: "aprovador2@bemol.com.br",
         }),
-        new Set(["gestor@bemol.com.br", "outro@bemol.com.br"]),
+        aprovadores,
+      ),
+    ).not.toThrow();
+  });
+
+  it("impede decisão de quem não está na lista de aprovadores", () => {
+    expect(() =>
+      assertCanDecide(
+        baseRow,
+        actor({
+          userId: "estranho-1",
+          email: "naoaprovador@bemol.com.br",
+          realUserId: "estranho-1",
+          realEmail: "naoaprovador@bemol.com.br",
+        }),
+        new Set(["aprovador1@bemol.com.br", "aprovador2@bemol.com.br"]),
       ),
     ).toThrow("Somente um aprovador");
   });
@@ -104,7 +118,7 @@ describe("fluxo de orçamentos internos", () => {
       assertCanDecide(
         { ...baseRow, status: "aprovado_assinado" },
         actor(),
-        new Set(["gestor@bemol.com.br"]),
+        new Set(["aprovador1@bemol.com.br"]),
       ),
     ).toThrow("não está aguardando decisão");
   });
