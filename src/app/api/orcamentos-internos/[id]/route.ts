@@ -255,15 +255,6 @@ export async function PATCH(
           : current.data_validade,
         numero_referencia:
           normalizeText(body.numeroReferencia) || current.numero_referencia,
-        gestor_id: Object.prototype.hasOwnProperty.call(body, "gestorId")
-          ? normalizeText(body.gestorId) || null
-          : current.gestor_id,
-        gestor_email: Object.prototype.hasOwnProperty.call(body, "gestorEmail")
-          ? normalizeEmail(body.gestorEmail) ?? ""
-          : normalizeEmail(current.gestor_email) ?? "",
-        gestor_nome: Object.prototype.hasOwnProperty.call(body, "gestorNome")
-          ? normalizeText(body.gestorNome) || null
-          : current.gestor_nome,
         observacoes: normalizeText(body.observacoes) || current.observacoes,
       };
       const { data, error } = await supabaseAdmin
@@ -286,8 +277,6 @@ export async function PATCH(
           descricao: updates.descricao,
           valor: updates.valor_total,
           data_validade: updates.data_validade,
-          gestor_email: updates.gestor_email,
-          gestor_nome: updates.gestor_nome,
         },
       });
       await logOrcamentoEvent({
@@ -394,6 +383,9 @@ export async function PATCH(
         versao_atual: nextVersion,
         enviado_em: new Date().toISOString(),
         ultima_justificativa: null,
+        gestor_id: null,
+        gestor_email: "",
+        gestor_nome: null,
       };
       const { data, error } = await supabaseAdmin
         .from("orcamentos_internos")
@@ -474,7 +466,7 @@ export async function PATCH(
         .eq("id", id)
         .eq("status", from)
         .select("*")
-        .single();
+        .maybeSingle();
       if (error) throw error;
       if (!data) {
         throw new HttpError(409, "Este orçamento já foi decidido por outro gestor.");
@@ -514,7 +506,7 @@ export async function PATCH(
         .eq("id", id)
         .eq("status", from)
         .select("*")
-        .single();
+        .maybeSingle();
       if (error) throw error;
       if (!data) {
         throw new HttpError(409, "Este orçamento já foi decidido por outro gestor.");
@@ -580,7 +572,7 @@ export async function PATCH(
         .eq("id", id)
         .eq("status", from)
         .select("*")
-        .single();
+        .maybeSingle();
       if (error) throw error;
       if (!data) {
         throw new HttpError(409, "Este orçamento já foi decidido por outro gestor.");
