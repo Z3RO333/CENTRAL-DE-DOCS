@@ -8,6 +8,7 @@ import {
   TIPO_ORCAMENTO_INTERNO,
   assertCanDecide,
   assertCanEditAsSolicitante,
+  assertCanManageSignedOrcamento,
   assertCanViewOrcamento,
   assertInternalActor,
   getArquivoPrincipal,
@@ -211,6 +212,172 @@ export async function PATCH(
     assertCanViewOrcamento(current, actor, aprovadores);
     const from = current.status;
 
+    if (action === "registrar_numero_pedido") {
+      assertCanManageSignedOrcamento(current, actor);
+      const numeroPedido = normalizeText(body.numeroPedido) || null;
+      if (!numeroPedido) {
+        throw new HttpError(400, "Informe o número do pedido.");
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from("orcamentos_internos")
+        .update({ numero_pedido: numeroPedido })
+        .eq("id", id)
+        .eq("status", "aprovado_assinado")
+        .select("*")
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) {
+        throw new HttpError(409, "O orçamento mudou enquanto o pedido era salvo.");
+      }
+
+      try {
+        await updateFormularioStatus({
+          supabaseAdmin,
+          id,
+          status: current.status,
+          dadosUpdates: { numero_pedido: numeroPedido },
+        });
+      } catch (errorFormulario) {
+        await supabaseAdmin
+          .from("orcamentos_internos")
+          .update({ numero_pedido: current.numero_pedido })
+          .eq("id", id);
+        throw errorFormulario;
+      }
+
+      await logOrcamentoEvent({
+        supabaseAdmin,
+        documentoId: id,
+        eventType: "numero_pedido_registrado",
+        actorId: actor.realUserId,
+        actorEmail: actor.realEmail,
+        from: current.numero_pedido,
+        to: numeroPedido,
+      });
+      return NextResponse.json({
+        orcamento: mapOrcamento(data as OrcamentoInternoRow),
+      });
+    }
+
+    if (action === "substituir_pdf_assinado") {
+      assertCanManageSignedOrcamento(current, actor);
+      const principal = getArquivoPrincipal(body.arquivos ?? []);
+      if (!principal?.path) {
+        throw new HttpError(400, "Envie o novo PDF do orçamento.");
+      }
+      if (!principal.name?.toLowerCase().endsWith(".pdf")) {
+        throw new HttpError(400, "O arquivo substituto deve ser um PDF.");
+      }
+
+      const novoOriginalPath = principal.path.trim();
+      const hasNovoValor = Object.prototype.hasOwnProperty.call(body, "valorTotal");
+      const novoValorTotal = hasNovoValor
+        ? parseValorTotal(body.valorTotal)
+        : current.valor_total;
+      if (hasNovoValor && novoValorTotal === null) {
+        throw new HttpError(400, "Informe um novo valor total válido.");
+      }
+      const assinadoPorNome = await resolveAssinadoPorNome(supabaseAdmin, {
+        userId: actor.realUserId,
+        email: actor.realEmail,
+      });
+      const novoAssinadoPath = await gerarPdfAssinado({
+        supabaseAdmin,
+        orcamentoId: id,
+        arquivoOriginalPath: novoOriginalPath,
+        assinadoPorNome,
+        assinadoPorUserId: actor.realUserId,
+      });
+      const nextVersion = current.versao_atual + 1;
+
+      const { data: versaoCriada, error: versaoError } = await supabaseAdmin
+        .from("orcamentos_internos_versoes")
+        .insert({
+          orcamento_id: id,
+          versao: nextVersion,
+          arquivo_path: novoOriginalPath,
+          arquivo_assinado_path: novoAssinadoPath,
+          nome_arquivo:
+            normalizeText(principal.name) ||
+            novoOriginalPath.split("/").pop() ||
+            "orcamento.pdf",
+          mime_type: normalizeText(principal.type) || "application/pdf",
+          tamanho_bytes:
+            typeof principal.size === "number" ? principal.size : null,
+          principal: true,
+          criado_por: actor.realUserId,
+          criado_por_email: actor.realEmail,
+        })
+        .select("id")
+        .single();
+      if (versaoError || !versaoCriada) {
+        await supabaseAdmin.storage
+          .from("formularios")
+          .remove([novoOriginalPath, novoAssinadoPath]);
+        throw versaoError ?? new Error("Falha ao registrar a nova versão.");
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from("orcamentos_internos")
+        .update({
+          arquivo_original_path: novoOriginalPath,
+          arquivo_assinado_path: novoAssinadoPath,
+          versao_atual: nextVersion,
+          valor_total: novoValorTotal,
+        })
+        .eq("id", id)
+        .eq("status", "aprovado_assinado")
+        .eq("versao_atual", current.versao_atual)
+        .select("*")
+        .maybeSingle();
+      if (error || !data) {
+        await Promise.all([
+          supabaseAdmin
+            .from("orcamentos_internos_versoes")
+            .delete()
+            .eq("id", versaoCriada.id),
+          supabaseAdmin.storage
+            .from("formularios")
+            .remove([novoOriginalPath, novoAssinadoPath]),
+        ]);
+        throw (
+          error ??
+          new HttpError(409, "O orçamento mudou durante a substituição do PDF.")
+        );
+      }
+
+      await updateFormularioStatus({
+        supabaseAdmin,
+        id,
+        status: current.status,
+        arquivoOriginalPath: novoOriginalPath,
+        arquivoAssinadoPath: novoAssinadoPath,
+        assinadoPor: actor.realEmail,
+        ...(hasNovoValor ? { dadosUpdates: { valor: novoValorTotal } } : {}),
+      });
+      await logOrcamentoEvent({
+        supabaseAdmin,
+        documentoId: id,
+        eventType: "orcamento_pdf_substituido",
+        actorId: actor.realUserId,
+        actorEmail: actor.realEmail,
+        metadata: {
+          versao_anterior: current.versao_atual,
+          versao_atual: nextVersion,
+          arquivo_original_anterior: current.arquivo_original_path,
+          arquivo_assinado_anterior: current.arquivo_assinado_path,
+          arquivo_original_atual: novoOriginalPath,
+          arquivo_assinado_atual: novoAssinadoPath,
+          valor_anterior: current.valor_total,
+          valor_atual: novoValorTotal,
+        },
+      });
+      return NextResponse.json({
+        orcamento: mapOrcamento(data as OrcamentoInternoRow),
+      });
+    }
+
     if (action === "salvar_rascunho" || action === "corrigir_metadados") {
       if (action === "corrigir_metadados" && !actor.realIsAdmin) {
         throw new HttpError(403, "Somente administradores podem corrigir metadados.");
@@ -411,6 +578,7 @@ export async function PATCH(
               mime_type: arquivo.type,
               tamanho_bytes: arquivo.size,
               principal: arquivo.principal,
+              arquivo_assinado_path: null,
               criado_por: actor.realUserId,
               criado_por_email: actor.realEmail,
             })),
@@ -600,6 +768,13 @@ export async function PATCH(
         arquivoAssinadoPath: signedPath,
         assinadoPor: actor.realEmail,
       });
+      const { error: versaoAssinadaError } = await supabaseAdmin
+        .from("orcamentos_internos_versoes")
+        .update({ arquivo_assinado_path: signedPath })
+        .eq("orcamento_id", id)
+        .eq("versao", current.versao_atual)
+        .eq("principal", true);
+      if (versaoAssinadaError) throw versaoAssinadaError;
       await logOrcamentoEvent({
         supabaseAdmin,
         documentoId: id,

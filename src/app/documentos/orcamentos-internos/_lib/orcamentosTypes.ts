@@ -28,6 +28,7 @@ export type OrcamentoInterno = {
   valor_total: number | null;
   data_validade: string | null;
   numero_referencia: string | null;
+  numero_pedido: string | null;
   gestor_id: string | null;
   gestor_email: string;
   gestor_nome: string | null;

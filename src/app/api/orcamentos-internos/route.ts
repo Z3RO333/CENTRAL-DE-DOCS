@@ -317,6 +317,7 @@ export async function POST(request: Request) {
             mime_type: arquivo.type,
             tamanho_bytes: arquivo.size,
             principal: arquivo.principal,
+            arquivo_assinado_path: null,
             criado_por: actor.realUserId,
             criado_por_email: actor.realEmail,
           })),

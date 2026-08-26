@@ -48,6 +48,7 @@ type Versao = {
   arquivo_path: string;
   nome_arquivo: string;
   principal: boolean;
+  arquivo_assinado_path: string | null;
   created_at: string;
 };
 
@@ -112,6 +113,8 @@ function humanizeEvent(value: string) {
     documento_baixado: "Documento baixado",
     documento_editado: "Documento editado",
     status_alterado: "Status alterado",
+    numero_pedido_registrado: "Número do pedido registrado",
+    orcamento_pdf_substituido: "PDF substituído e assinado novamente",
   };
   return labels[value] ?? value.split("_").map((p) => p[0]?.toUpperCase() + p.slice(1)).join(" ");
 }
@@ -182,6 +185,9 @@ export default function OrcamentosInternosPage() {
   const [colaboradorFilter, setColaboradorFilter] = useState("todos");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
+  const [numeroPedido, setNumeroPedido] = useState("");
+  const [replacementFile, setReplacementFile] = useState<File | null>(null);
+  const [replacementValor, setReplacementValor] = useState("");
 
   const canAccess = modules.documentos;
 
@@ -300,6 +306,9 @@ export default function OrcamentosInternosPage() {
       const payload = (await response.json()) as DetailPayload;
       if (!response.ok) throw new Error(payload.error ?? "Falha ao carregar detalhes.");
       setDetail(payload);
+      setNumeroPedido(payload.orcamento.numero_pedido ?? "");
+      setReplacementFile(null);
+      setReplacementValor("");
       setOrcamentos((current) =>
         current.map((item) => (item.id === payload.orcamento.id ? payload.orcamento : item)),
       );
@@ -313,7 +322,42 @@ export default function OrcamentosInternosPage() {
   const openDetail = (id: string) => {
     setDetailId(id);
     setJustificativa("");
+    setNumeroPedido("");
+    setReplacementFile(null);
+    setReplacementValor("");
     void loadDetail(id);
+  };
+
+  const replaceSignedPdf = async (orcamento: OrcamentoInterno) => {
+    if (!replacementFile) {
+      setError("Selecione o novo PDF.");
+      return;
+    }
+    setError(null);
+    try {
+      setActionLoading("substituir_pdf_assinado");
+      const upload = await uploadDocumentFile(
+        replacementFile,
+        "orcamentos_internos/substituicoes",
+      );
+      await patchAction(
+        orcamento.id,
+        {
+          action: "substituir_pdf_assinado",
+          arquivos: [{ ...upload, principal: true }],
+          ...(replacementValor.trim()
+            ? { valorTotal: replacementValor.trim() }
+            : {}),
+        },
+        "PDF substituído e assinado novamente. A versão anterior foi preservada.",
+      );
+      setReplacementFile(null);
+      setReplacementValor("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível substituir o PDF.");
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const uploadSelectedFiles = async () => {
@@ -625,7 +669,7 @@ export default function OrcamentosInternosPage() {
                       <th className="px-5 py-3.5">Fornecedor</th>
                       <th className="px-5 py-3.5 text-right">Valor</th>
                       <th className="px-5 py-3.5">Status</th>
-                      <th className="px-5 py-3.5">Decidido por</th>
+                      <th className="px-5 py-3.5">Número do pedido</th>
                       <th className="px-5 py-3.5 text-right">Ações</th>
                     </tr>
                   </thead>
@@ -663,7 +707,7 @@ export default function OrcamentosInternosPage() {
                             <StatusBadge status={orcamento.status} />
                           </td>
                           <td className="px-5 py-4 text-xs text-slate-600">
-                            {orcamento.gestor_nome || orcamento.gestor_email || "--"}
+                            {orcamento.numero_pedido || "--"}
                           </td>
                           <td className="px-5 py-4">
                             <div className="flex justify-end gap-2">
@@ -761,6 +805,7 @@ export default function OrcamentosInternosPage() {
                       ["Validade", selectedDetail.data_validade || "--"],
                       ["Solicitante", selectedDetail.solicitante_email ?? selectedDetail.solicitante_id],
                       ["Decidido por", selectedDetail.gestor_nome || selectedDetail.gestor_email || "--"],
+                      ["Número do pedido", selectedDetail.numero_pedido || "--"],
                       ["Enviado em", formatDateTime(selectedDetail.enviado_em)],
                       ["Aprovado em", formatDateTime(selectedDetail.aprovado_em)],
                     ].map(([label, value]) => (
@@ -794,14 +839,28 @@ export default function OrcamentosInternosPage() {
                           <span className="font-semibold text-slate-700">
                             v{versao.versao} {versao.principal ? "- principal" : ""} · {versao.nome_arquivo}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => void abrirArquivo(versao.arquivo_path)}
-                            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                            Abrir
-                          </button>
+                          <span className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void abrirArquivo(versao.arquivo_path)}
+                              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              Original
+                            </button>
+                            {versao.arquivo_assinado_path ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void abrirArquivo(versao.arquivo_assinado_path)
+                                }
+                                className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-3 py-1 font-semibold text-emerald-700"
+                              >
+                                <Signature className="h-3 w-3" />
+                                Assinado
+                              </button>
+                            ) : null}
+                          </span>
                         </div>
                       ))}
                       {selectedDetail.arquivo_assinado_path ? (
@@ -827,6 +886,95 @@ export default function OrcamentosInternosPage() {
                       ) : null}
                     </div>
                   </section>
+
+                  {isAdmin && selectedDetail.status === "aprovado_assinado" ? (
+                    <section className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">
+                        Administração pós-assinatura
+                      </p>
+                      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="text-xs font-semibold text-slate-700">
+                            Número do pedido
+                            <input
+                              value={numeroPedido}
+                              onChange={(event) => setNumeroPedido(event.target.value)}
+                              placeholder="Ex.: 4500123456"
+                              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            disabled={Boolean(actionLoading) || !numeroPedido.trim()}
+                            onClick={() =>
+                              void patchAction(
+                                selectedDetail.id,
+                                {
+                                  action: "registrar_numero_pedido",
+                                  numeroPedido,
+                                },
+                                "Número do pedido registrado.",
+                              )
+                            }
+                            className="mt-2 rounded-lg bg-sky-700 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                          >
+                            {actionLoading === "registrar_numero_pedido"
+                              ? "Salvando..."
+                              : "Salvar número"}
+                          </button>
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-slate-700">
+                            Substituir PDF aprovado
+                            <input
+                              key={`${selectedDetail.id}-${selectedDetail.updated_at}`}
+                              type="file"
+                              accept="application/pdf,.pdf"
+                              onChange={(event) =>
+                                setReplacementFile(event.target.files?.[0] ?? null)
+                              }
+                              className="mt-1 block w-full text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold"
+                            />
+                          </label>
+                          <label className="mt-2 block text-xs font-semibold text-slate-700">
+                            Novo valor total (opcional)
+                            <input
+                              value={replacementValor}
+                              onChange={(event) =>
+                                setReplacementValor(event.target.value)
+                              }
+                              inputMode="decimal"
+                              placeholder="Ex.: 1.250,00"
+                              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            disabled={Boolean(actionLoading) || !replacementFile}
+                            onClick={async () => {
+                              const confirmed = await confirm({
+                                title: "Substituir PDF aprovado",
+                                description:
+                                  "O novo PDF será assinado novamente. A versão anterior continuará disponível no histórico.",
+                                confirmLabel: "Substituir e assinar",
+                              });
+                              if (confirmed) void replaceSignedPdf(selectedDetail);
+                            }}
+                            className="mt-2 inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                          >
+                            <Signature className="h-4 w-4" />
+                            {actionLoading === "substituir_pdf_assinado"
+                              ? "Substituindo..."
+                              : "Substituir e assinar"}
+                          </button>
+                          <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                            Use quando o fornecedor enviar um novo PDF, por exemplo após
+                            conceder desconto. O arquivo anterior não será apagado.
+                          </p>
+                        </div>
+                      </div>
+                    </section>
+                  ) : null}
 
                   <section className="rounded-2xl border border-slate-100 p-4">
                     <div className="mb-3 flex items-center gap-2">

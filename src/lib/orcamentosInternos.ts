@@ -26,7 +26,9 @@ export type OrcamentoInternoAction =
   | "rejeitar"
   | "devolver_sem_decisao"
   | "cancelar"
-  | "corrigir_metadados";
+  | "corrigir_metadados"
+  | "registrar_numero_pedido"
+  | "substituir_pdf_assinado";
 
 export type OrcamentoInternoArquivoInput = {
   path?: string;
@@ -48,6 +50,7 @@ export type OrcamentoInternoInput = {
   valorTotal?: string | number | null;
   dataValidade?: string | null;
   numeroReferencia?: string | null;
+  numeroPedido?: string | null;
   gestorId?: string | null;
   gestorEmail?: string | null;
   gestorNome?: string | null;
@@ -70,6 +73,7 @@ export type OrcamentoInternoRow = {
   valor_total: number | string | null;
   data_validade: string | null;
   numero_referencia: string | null;
+  numero_pedido: string | null;
   gestor_id: string | null;
   gestor_email: string;
   gestor_nome: string | null;
@@ -98,6 +102,7 @@ export type OrcamentoInternoVersaoRow = {
   principal: boolean;
   criado_por: string | null;
   criado_por_email: string | null;
+  arquivo_assinado_path: string | null;
   created_at: string;
 };
 
@@ -305,6 +310,24 @@ export function assertCanDecide(
   }
   if (!DECISAO_STATUS.has(row.status)) {
     throw new HttpError(400, "Este orçamento não está aguardando decisão.");
+  }
+}
+
+export function assertCanManageSignedOrcamento(
+  row: OrcamentoInternoRow,
+  actor: Actor,
+) {
+  if (!actor.realIsAdmin) {
+    throw new HttpError(
+      403,
+      "Somente administradores podem alterar um orçamento já assinado.",
+    );
+  }
+  if (row.status !== "aprovado_assinado") {
+    throw new HttpError(
+      400,
+      "Esta ação só está disponível depois que o orçamento for aprovado e assinado.",
+    );
   }
 }
 

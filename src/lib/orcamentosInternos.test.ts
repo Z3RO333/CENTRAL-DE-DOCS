@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertCanDecide,
+  assertCanManageSignedOrcamento,
   validateOrcamentoInput,
   type OrcamentoInternoRow,
 } from "@/lib/orcamentosInternos";
@@ -28,6 +29,7 @@ const baseRow: OrcamentoInternoRow = {
   valor_total: 100,
   data_validade: null,
   numero_referencia: null,
+  numero_pedido: null,
   gestor_id: null,
   gestor_email: "",
   gestor_nome: null,
@@ -131,5 +133,23 @@ describe("fluxo de orçamentos internos", () => {
         new Set(["aprovador1@bemol.com.br"]),
       ),
     ).toThrow("não está aguardando decisão");
+  });
+
+  it("permite que administrador gerencie um orçamento assinado", () => {
+    expect(() =>
+      assertCanManageSignedOrcamento(
+        { ...baseRow, status: "aprovado_assinado" },
+        actor({ realIsAdmin: true, isAdmin: true }),
+      ),
+    ).not.toThrow();
+  });
+
+  it("impede alterações pós-assinatura por não administradores", () => {
+    expect(() =>
+      assertCanManageSignedOrcamento(
+        { ...baseRow, status: "aprovado_assinado" },
+        actor(),
+      ),
+    ).toThrow("Somente administradores");
   });
 });
