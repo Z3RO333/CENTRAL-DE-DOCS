@@ -1,26 +1,37 @@
 import { NextResponse } from "next/server";
 import { ApiHttpError as HttpError, getActorFromRequest } from "@/lib/apiAuth";
 import {
-  runDocumentoCopilot,
-  type DocumentoCopilotFilters,
-} from "@/lib/documentosCopilot";
+  runDocumentoCopilotAgent,
+  type DocumentoCopilotAgentMessage,
+} from "@/lib/documentosCopilotAgent";
+import type { DocumentoCopilotFilters } from "@/lib/documentosCopilot";
 
 export async function POST(request: Request) {
   try {
     const actor = await getActorFromRequest(request);
     const body = (await request.json().catch(() => ({}))) as {
-      message?: string;
+      messages?: { role?: string; text?: string }[];
       currentFilters?: DocumentoCopilotFilters;
     };
 
-    const message = typeof body.message === "string" ? body.message : "";
-    if (!message.trim()) {
+    const messages: DocumentoCopilotAgentMessage[] = Array.isArray(body.messages)
+      ? body.messages
+          .filter(
+            (item): item is { role: "user" | "assistant"; text: string } =>
+              (item?.role === "user" || item?.role === "assistant") &&
+              typeof item?.text === "string" &&
+              item.text.trim().length > 0,
+          )
+          .map((item) => ({ role: item.role, text: item.text.trim() }))
+      : [];
+
+    if (messages.length === 0 || messages[messages.length - 1].role !== "user") {
       throw new HttpError(400, "Informe uma pergunta para o copilot.");
     }
 
-    const payload = await runDocumentoCopilot(
+    const payload = await runDocumentoCopilotAgent(
       {
-        message,
+        messages,
         currentFilters: body.currentFilters,
       },
       {
