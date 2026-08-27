@@ -1,6 +1,30 @@
-export type AzureOpenAiChatMessage = {
-  role: "system" | "user" | "assistant";
-  content: string;
+export type AzureOpenAiToolCall = {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
+};
+
+export type AzureOpenAiChatMessage =
+  | { role: "system"; content: string }
+  | { role: "user"; content: string }
+  | { role: "assistant"; content: string | null; tool_calls?: AzureOpenAiToolCall[] }
+  | { role: "tool"; content: string; tool_call_id: string };
+
+export type AzureOpenAiTool = {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+};
+
+export type AzureOpenAiChatResult = {
+  content: string | null;
+  toolCalls: AzureOpenAiToolCall[];
 };
 
 const DEFAULT_AZURE_OPENAI_ENDPOINT =
@@ -9,12 +33,14 @@ const DEFAULT_AZURE_OPENAI_ENDPOINT =
 type CallAzureOpenAiChatInput = {
   messages: AzureOpenAiChatMessage[];
   maxTokens?: number;
+  tools?: AzureOpenAiTool[];
 };
 
 export async function callAzureOpenAiChat({
   messages,
   maxTokens = 700,
-}: CallAzureOpenAiChatInput) {
+  tools,
+}: CallAzureOpenAiChatInput): Promise<AzureOpenAiChatResult> {
   const endpoint =
     process.env.AZURE_OPENAI_ENDPOINT?.trim() ||
     DEFAULT_AZURE_OPENAI_ENDPOINT;
@@ -24,11 +50,14 @@ export async function callAzureOpenAiChat({
     throw new Error("Configure AZURE_OPENAI_API_KEY na sua variável de ambiente.");
   }
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     messages,
     max_completion_tokens: maxTokens,
-    response_format: { type: "json_object" },
   };
+  if (tools && tools.length > 0) {
+    payload.tools = tools;
+    payload.tool_choice = "auto";
+  }
 
   const response = await fetch(endpoint, {
     method: "POST",
@@ -45,6 +74,7 @@ export async function callAzureOpenAiChat({
         choices?: Array<{
           message?: {
             content?: string | null;
+            tool_calls?: AzureOpenAiToolCall[];
           };
         }>;
       }
@@ -57,10 +87,9 @@ export async function callAzureOpenAiChat({
     );
   }
 
-  const content = raw?.choices?.[0]?.message?.content?.trim();
-  if (!content) {
-    throw new Error("Azure OpenAI não retornou conteúdo útil.");
-  }
-
-  return content;
+  const message = raw?.choices?.[0]?.message;
+  return {
+    content: message?.content?.trim() || null,
+    toolCalls: message?.tool_calls ?? [],
+  };
 }
