@@ -7,13 +7,7 @@ import {
   sanitizeId,
 } from "@/lib/documentosApiUtils";
 import { buildDocumentosAccessOr } from "@/lib/documentosAccessFilters";
-import { callAzureOpenAiChat } from "@/lib/azureOpenAi";
-import {
-  getAuthorizedPrestadorIds,
-  getGerenteAccessEntries,
-  hasDocumentosAccess,
-  type GerenteAccessRow,
-} from "@/lib/apiAuth";
+import type { GerenteAccessRow } from "@/lib/apiAuth";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 import { fixMojibakeText, normalizeDisplayData } from "@/lib/textEncoding";
 
@@ -100,11 +94,6 @@ export type DocumentoCopilotResponse = {
   insights: DocumentoCopilotInsights;
 };
 
-export type DocumentoCopilotRequest = {
-  message?: string;
-  currentFilters?: DocumentoCopilotFilters;
-};
-
 type Row = {
   id: string;
   tipo: string;
@@ -128,17 +117,6 @@ type CandidateRow = Row & {
 };
 
 type EntityRow = {
-  id: string;
-  nome: string | null;
-};
-
-type LojaLookupRow = {
-  id: string;
-  nome: string | null;
-  codigo: string | null;
-};
-
-type PrestadorLookupRow = {
   id: string;
   nome: string | null;
 };
@@ -313,21 +291,6 @@ const TIPO_LABELS: Record<string, string> = {
   notas_fiscais: "Notas Fiscais",
   contratos: "Contratos",
   orcamentos: "Orçamentos",
-};
-
-const MONTH_LABELS: Record<string, string> = {
-  "01": "janeiro",
-  "02": "fevereiro",
-  "03": "março",
-  "04": "abril",
-  "05": "maio",
-  "06": "junho",
-  "07": "julho",
-  "08": "agosto",
-  "09": "setembro",
-  "10": "outubro",
-  "11": "novembro",
-  "12": "dezembro",
 };
 
 const formatStatusLabel = (value: string) =>
@@ -525,7 +488,7 @@ const buildAnalyticInsights = (input: {
     } satisfies DocumentoCopilotInsights;
 };
 
-const createEmptyInsights = (): DocumentoCopilotInsights => ({
+export const createEmptyInsights = (): DocumentoCopilotInsights => ({
   totalDocumentos: 0,
   totalLojas: 0,
   totalPrestadores: 0,
@@ -540,91 +503,10 @@ const createEmptyInsights = (): DocumentoCopilotInsights => ({
   observacoes: [],
 });
 
-const buildTemporalReply = (input: {
-  message: string;
-  filters: DocumentoCopilotFilters;
-  insights: DocumentoCopilotInsights;
-  matches: DocumentoCopilotMatch[];
-  total: number;
-}) => {
-  const normalizedMessage = normalizeText(input.message).toLowerCase();
-  const asksMonthlyBreakdown =
-    /(por mês|por mes|mensal|evolu|tendên|tenden|últimos meses|ultimos meses|mês teve mais|mes teve mais)/.test(
-      normalizedMessage,
-    );
-  const asksHighestMonth =
-    /(mês teve mais|mes teve mais|qual mês|qual mes|maior volume|pico)/.test(
-      normalizedMessage,
-    );
-  const hasMonthFilter = typeof input.filters.mes === "string" && input.filters.mes.trim();
-  const monthLabel = hasMonthFilter
-    ? MONTH_LABELS[input.filters.mes as string] ?? input.filters.mes
-    : null;
-
-  if (hasMonthFilter && input.filters.ano) {
-    const totalLabel = input.total === 1 ? "documento" : "documentos";
-    return `Em ${monthLabel} de ${input.filters.ano} encontrei ${input.total} ${totalLabel}.`;
-  }
-
-  if (asksHighestMonth && input.insights.tendenciaMensal.length > 0) {
-    const topMonth = [...input.insights.tendenciaMensal].sort(
-      (a, b) => b.total - a.total || a.label.localeCompare(b.label),
-    )[0];
-    if (topMonth) {
-      const totalLabel = topMonth.total === 1 ? "documento" : "documentos";
-      return `O mês com mais documentos no recorte atual foi ${topMonth.label}, com ${topMonth.total} ${totalLabel}.`;
-    }
-  }
-
-  if (asksMonthlyBreakdown && input.insights.tendenciaMensal.length > 0) {
-    const itens = input.insights.tendenciaMensal
-      .filter((item) => item.total > 0)
-      .map((item) => `${item.label}: ${item.total}`)
-      .join(", ");
-    if (itens) {
-      return `No recorte atual, o volume por mês ficou assim: ${itens}.`;
-    }
-  }
-
-  if (hasMonthFilter && !input.filters.ano) {
-    const currentYear = new Date().getFullYear();
-    const totalLabel = input.total === 1 ? "documento" : "documentos";
-    return `Em ${monthLabel} de ${currentYear} encontrei ${input.total} ${totalLabel}.`;
-  }
-
-  return null;
-};
-
 const buildTextSearchOr = (term: string) =>
   buildDocumentosTextSearchOr(normalizeText(term));
 
-const parseJsonObject = <T,>(raw: string, fallback: T): T => {
-  try {
-    const parsed = JSON.parse(raw) as T;
-    if (parsed && typeof parsed === "object") {
-      return parsed;
-    }
-  } catch {
-    return fallback;
-  }
-  return fallback;
-};
-
-const hasAnyFilter = (filters: DocumentoCopilotFilters) =>
-  Boolean(
-    filters.termo ||
-      filters.tipo ||
-      filters.tipoLaudo ||
-      filters.status ||
-      filters.ano ||
-      filters.mes ||
-      filters.lojaId ||
-      filters.prestadorId ||
-      filters.somenteAssinados ||
-      filters.somenteDisponiveisLote,
-  );
-
-const stripKnownFilters = (filters: DocumentoCopilotFilters) => {
+export const stripKnownFilters = (filters: DocumentoCopilotFilters) => {
   const cleaned: DocumentoCopilotFilters = {};
 
   if (typeof filters.termo === "string" && filters.termo.trim()) {
@@ -662,152 +544,7 @@ const stripKnownFilters = (filters: DocumentoCopilotFilters) => {
   return cleaned;
 };
 
-const extractLojaMention = (message: string) => {
-  const normalized = normalizeText(message).toLowerCase();
-  const match = normalized.match(/\bloja\s+([a-z0-9._-]+)/i);
-  return match?.[1] ?? null;
-};
-
-const findLojaMentionInMessage = (
-  message: string,
-  lojas: LojaLookupRow[],
-): LojaLookupRow | null => {
-  const paddedMessage = ` ${normalizeText(message).toLowerCase()} `;
-  let best: { loja: LojaLookupRow; length: number } | null = null;
-  for (const loja of lojas) {
-    const nome = normalizeText(loja.nome ?? "").toLowerCase().trim();
-    const codigo = normalizeText(loja.codigo ?? "").toLowerCase().trim();
-    if (nome.length >= 3 && paddedMessage.includes(` ${nome} `)) {
-      if (!best || nome.length > best.length) {
-        best = { loja, length: nome.length };
-      }
-    }
-    if (codigo.length >= 2 && paddedMessage.includes(` ${codigo} `)) {
-      if (!best || codigo.length > best.length) {
-        best = { loja, length: codigo.length };
-      }
-    }
-  }
-  return best?.loja ?? null;
-};
-
-const findPrestadorMentionInMessage = (
-  message: string,
-  prestadores: PrestadorLookupRow[],
-): PrestadorLookupRow | null => {
-  const paddedMessage = ` ${normalizeText(message).toLowerCase()} `;
-  let best: { prestador: PrestadorLookupRow; length: number } | null = null;
-  for (const prestador of prestadores) {
-    const nome = normalizeText(prestador.nome ?? "").toLowerCase().trim();
-    if (nome.length >= 4 && paddedMessage.includes(` ${nome} `)) {
-      if (!best || nome.length > best.length) {
-        best = { prestador, length: nome.length };
-      }
-    }
-  }
-  return best?.prestador ?? null;
-};
-
-const applyDeterministicFilters = (
-  filters: DocumentoCopilotFilters,
-  message: string,
-) => {
-  const normalized = normalizeText(message).toLowerCase();
-  const next = { ...filters };
-
-  if (!next.tipo) {
-    if (/\bnotas?\s+fiscais?\b/.test(normalized)) {
-      next.tipo = "notas_fiscais";
-    } else if (/\blaudos?\b|\bregistro\s+e\s+laudos?\b/.test(normalized)) {
-      next.tipo = "registro_laudos";
-    } else if (/\bretencao\s+trabalhista\b/.test(normalized)) {
-      next.tipo = "retencao_trabalhista";
-    }
-  }
-
-  if (!next.status) {
-    const status = normalizeStatusValue(normalized);
-    if (status) {
-      next.status = status;
-    }
-  }
-
-  if (!next.mes) {
-    Object.entries(MONTH_LABELS).some(([value, label]) => {
-      if (normalized.includes(normalizeText(label).toLowerCase())) {
-        next.mes = value;
-        return true;
-      }
-      return false;
-    });
-  }
-
-  if (!next.ano) {
-    const yearMatch = normalized.match(/\b(20\d{2})\b/);
-    if (yearMatch) {
-      next.ano = yearMatch[1];
-    } else if (next.mes) {
-      next.ano = String(new Date().getFullYear());
-    }
-  }
-
-  return next;
-};
-
-const resolveEntityFilters = (input: {
-  filters: DocumentoCopilotFilters;
-  message: string;
-  lojas: LojaLookupRow[];
-  prestadores: PrestadorLookupRow[];
-}) => {
-  const { message, lojas, prestadores } = input;
-  const filters = { ...input.filters };
-  const lojaToken = filters.lojaId?.trim() || extractLojaMention(message);
-
-  if (lojaToken) {
-    const normalizedToken = normalizeText(lojaToken).toLowerCase();
-    const match = lojas.find((loja) => {
-      const values = [loja.id, loja.codigo ?? "", loja.nome ?? ""].map((value) =>
-        normalizeText(value).toLowerCase(),
-      );
-      return values.some((value) => value === normalizedToken);
-    });
-    if (match) {
-      filters.lojaId = match.id;
-    }
-  }
-
-  if (!filters.lojaId) {
-    const mention = findLojaMentionInMessage(message, lojas);
-    if (mention) {
-      filters.lojaId = mention.id;
-    }
-  }
-
-  if (filters.prestadorId) {
-    const normalizedPrestador = normalizeText(filters.prestadorId).toLowerCase();
-    const match = prestadores.find((prestador) => {
-      const values = [prestador.id, prestador.nome ?? ""].map((value) =>
-        normalizeText(value).toLowerCase(),
-      );
-      return values.some((value) => value === normalizedPrestador);
-    });
-    if (match) {
-      filters.prestadorId = match.id;
-    }
-  }
-
-  if (!filters.prestadorId) {
-    const mention = findPrestadorMentionInMessage(message, prestadores);
-    if (mention) {
-      filters.prestadorId = mention.id;
-    }
-  }
-
-  return filters;
-};
-
-const buildSearchSummary = (filters: DocumentoCopilotFilters) => {
+export const buildSearchSummary = (filters: DocumentoCopilotFilters) => {
   const partes: string[] = [];
   if (filters.tipo) {
     partes.push(`tipo ${humanize(filters.tipo)}`);
@@ -843,68 +580,6 @@ const buildSearchSummary = (filters: DocumentoCopilotFilters) => {
   return partes.length > 0
     ? `Critérios usados: ${partes.join(", ")}.`
     : "Sem filtros específicos, usei a intenção principal da pergunta.";
-};
-
-const buildPrompt = (input: {
-  message: string;
-  currentFilters?: DocumentoCopilotFilters;
-  lojas: LojaLookupRow[];
-  prestadores: PrestadorLookupRow[];
-}) => {
-  const currentFilters = input.currentFilters
-    ? stripKnownFilters(input.currentFilters)
-    : {};
-
-  const lojasConhecidas = input.lojas
-    .filter((loja) => loja.nome || loja.codigo)
-    .map((loja) => ({ id: loja.id, nome: loja.nome, codigo: loja.codigo }));
-  const prestadoresConhecidos = input.prestadores
-    .filter((prestador) => prestador.nome)
-    .map((prestador) => ({ id: prestador.id, nome: prestador.nome }));
-
-  return [
-    {
-      role: "system" as const,
-      content: [
-        "Você é um copiloto interno para encontrar documentos em um sistema corporativo.",
-        "Seu trabalho é converter a pergunta do usuário em filtros simples e responder em português brasileiro.",
-        "O usuário pode se referir a lojas e prestadores de forma abstrata ou informal (apelido, nome parcial, código, termos como 'matriz' ou 'CD'), sem dizer explicitamente 'loja X' ou 'prestador Y'.",
-        "Você recebe as listas reais de lojas e prestadores conhecidos nos campos lojasConhecidas e prestadoresConhecidos da mensagem do usuário. Se a pergunta mencionar, mesmo indiretamente, um nome, apelido ou código que corresponda a um item dessas listas, preencha lojaId ou prestadorId com o id EXATO daquele item.",
-        "Nunca invente um id que não esteja nessas listas; se não tiver certeza de qual item corresponde, deixe o campo vazio e peça clarificação.",
-        "Regras: nunca invente documentos, nunca mencione dados fora do conjunto retornado, e nunca peça acesso admin.",
-        "Se faltarem dados para filtrar com confiança, peça uma única pergunta de clarificação curta.",
-        "Retorne sempre JSON válido com as chaves reply, filters e intent.",
-        "Valores válidos de tipo: retencao_trabalhista, registro_laudos, notas_fiscais, contratos, orcamentos.",
-        "Valores válidos de status: pendente, em_analise, revisado, assinado.",
-        "Se o usuário mencionar um tipo de laudo, preencha tipoLaudo.",
-      ].join(" "),
-    },
-    {
-      role: "user" as const,
-      content: JSON.stringify({
-        pergunta: input.message,
-        filtrosAtuais: currentFilters,
-        lojasConhecidas,
-        prestadoresConhecidos,
-        formatoEsperado: {
-          intent: "search|clarify|explain",
-          reply: "texto curto e útil",
-          filters: {
-            termo: "opcional",
-            tipo: "opcional",
-            status: "opcional",
-            tipoLaudo: "opcional",
-            ano: "opcional",
-            mes: "opcional",
-            lojaId: "opcional (id exato de lojasConhecidas)",
-            prestadorId: "opcional (id exato de prestadoresConhecidos)",
-            somenteAssinados: "opcional",
-            somenteDisponiveisLote: "opcional",
-          },
-        },
-      }),
-    },
-  ];
 };
 
 const buildDocumentoCandidatesQuery = (input: {
@@ -948,6 +623,20 @@ const buildDocumentoCandidatesQuery = (input: {
 
   if (!canAccess && accessOr.length > 0) {
     query = query.or(accessOr.join(","));
+  }
+
+  if (filterPrestadores.length === 1) {
+    query = query.eq("prestador_id", filterPrestadores[0]);
+  } else if (filterPrestadores.length > 1) {
+    query = query.in("prestador_id", filterPrestadores);
+  }
+
+  if (filterLojas.length === 1) {
+    query = query.eq("dados->>loja_id", filterLojas[0]);
+  } else if (filterLojas.length > 1) {
+    query = query.or(
+      filterLojas.map((lojaId) => `dados->>loja_id.eq.${lojaId}`).join(","),
+    );
   }
 
   if (filters.tipo) {
@@ -1009,7 +698,7 @@ const buildDocumentoCandidatesQuery = (input: {
   return query;
 };
 
-const queryDocumentoCandidates = async (input: {
+export const queryDocumentoCandidates = async (input: {
   filters: DocumentoCopilotFilters;
   userId: string;
   allowedPrestadores: string[];
@@ -1145,124 +834,3 @@ const queryDocumentoCandidates = async (input: {
     }),
   };
 };
-
-export async function runDocumentoCopilot(
-  request: DocumentoCopilotRequest,
-  auth: {
-    userId: string;
-    email: string | null;
-  },
-) {
-  const supabaseAdmin = createSupabaseAdminClient();
-  const allowedPrestadores = await getAuthorizedPrestadorIds(
-    auth.email,
-    supabaseAdmin,
-  );
-  const gerenteEntries = await getGerenteAccessEntries(
-    auth.userId,
-    auth.email,
-    supabaseAdmin,
-  );
-  const canAccess = await hasDocumentosAccess(
-    auth.userId,
-    auth.email,
-    supabaseAdmin,
-  );
-
-  const { data: lojasData, error: lojasError } = await supabaseAdmin
-    .from("lojas")
-    .select("id,nome,codigo")
-    .limit(2000);
-  if (lojasError) {
-    throw lojasError;
-  }
-  const lojas = (lojasData as LojaLookupRow[] | null) ?? [];
-
-  const { data: prestadoresData, error: prestadoresError } = await supabaseAdmin
-    .from("prestadores")
-    .select("id,nome")
-    .limit(2000);
-  if (prestadoresError) {
-    throw prestadoresError;
-  }
-  const prestadores = (prestadoresData as PrestadorLookupRow[] | null) ?? [];
-
-  const promptMessages = buildPrompt({
-    message: request.message?.trim() || "",
-    currentFilters: request.currentFilters,
-    lojas,
-    prestadores,
-  });
-
-  const raw = await callAzureOpenAiChat({
-    messages: promptMessages,
-    maxTokens: 650,
-  });
-
-  const parsed = parseJsonObject<{
-    reply?: string;
-    intent?: "search" | "clarify" | "explain";
-    filters?: DocumentoCopilotFilters;
-  }>(raw, {});
-
-  let filters = stripKnownFilters(parsed.filters ?? {});
-  const message = request.message?.trim() ?? "";
-  filters = applyDeterministicFilters(filters, message);
-  filters = resolveEntityFilters({
-    filters,
-    message,
-    lojas,
-    prestadores,
-  });
-  const hasParsedFilters = hasAnyFilter(filters);
-  const fallbackTerm = normalizeText(message);
-  if (!filters.termo && fallbackTerm && !hasParsedFilters) {
-    filters.termo = fallbackTerm;
-  }
-
-  const summary = buildSearchSummary(filters);
-  const intent = parsed.intent ?? (filters.termo ? "search" : "clarify");
-
-  if (intent === "clarify" && !hasAnyFilter(filters)) {
-    return {
-      reply:
-        parsed.reply?.trim() ||
-        "Posso procurar por tipo, status, loja, prestador, mês ou um trecho do nome do documento. Me diga um detalhe a mais.",
-      summary,
-      filters,
-      results: [],
-      total: 0,
-      insights: createEmptyInsights(),
-    } satisfies DocumentoCopilotResponse;
-  }
-
-  const { matches, total, insights } = await queryDocumentoCandidates({
-    filters,
-    userId: auth.userId,
-    allowedPrestadores,
-    gerenteEntries,
-    canAccess,
-    supabaseAdmin,
-  });
-  const temporalReply = buildTemporalReply({
-    message,
-    filters,
-    insights,
-    matches,
-    total,
-  });
-
-  return {
-    reply:
-      temporalReply ||
-      parsed.reply?.trim() ||
-      (matches.length > 0
-        ? `Encontrei ${matches.length} documento(s) que parecem corresponder à sua busca.`
-        : "Não encontrei documentos com esses critérios. Posso ajustar a busca se você me disser mais um detalhe."),
-    summary,
-    filters,
-    results: matches,
-    total,
-    insights,
-  } satisfies DocumentoCopilotResponse;
-}
