@@ -134,7 +134,10 @@ describe("runDocumentoCopilotAgent", () => {
         {
           id: "call-loop",
           type: "function",
-          function: { name: "buscar_documentos", arguments: "{}" },
+          function: {
+            name: "buscar_documentos",
+            arguments: JSON.stringify({ tipo: "notas_fiscais" }),
+          },
         },
       ],
     }));

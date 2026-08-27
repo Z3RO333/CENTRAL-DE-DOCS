@@ -21,6 +21,7 @@ import {
   buscarPrestadoresPorNome,
 } from "@/lib/documentosCopilotEntitySearch";
 import {
+  ApiHttpError,
   getAuthorizedPrestadorIds,
   getGerenteAccessEntries,
   hasDocumentosAccess,
@@ -150,6 +151,13 @@ async function executeToolCall(
 
   if (toolCall.function.name === "buscar_documentos") {
     const filters = stripKnownFilters(args as DocumentoCopilotFilters);
+    if (Object.keys(filters).length === 0) {
+      return {
+        content: JSON.stringify({
+          erro: "Nenhum filtro foi informado. Peca ao usuario pelo menos um criterio (tipo, status, loja, prestador, mes/ano ou um trecho de texto) antes de buscar.",
+        }),
+      };
+    }
     const { matches, total, insights } = await queryDocumentoCandidates({
       filters,
       userId: ctx.userId,
@@ -159,6 +167,7 @@ async function executeToolCall(
       supabaseAdmin: ctx.supabaseAdmin,
     });
     const resumoParaModelo = {
+      filtrosAplicados: filters,
       total,
       amostra: matches.slice(0, 5).map((match) => ({
         id: match.id,
@@ -242,7 +251,18 @@ export async function runDocumentoCopilotAgent(
     });
 
     for (const toolCall of result.toolCalls) {
-      const { content, searchOutcome } = await executeToolCall(toolCall, ctx);
+      let content: string;
+      let searchOutcome: SearchOutcome | undefined;
+      try {
+        ({ content, searchOutcome } = await executeToolCall(toolCall, ctx));
+      } catch (err) {
+        if (err instanceof ApiHttpError) {
+          throw err;
+        }
+        content = JSON.stringify({
+          erro: "Nao foi possivel executar essa busca agora. Tente novamente ou ajuste o pedido.",
+        });
+      }
       if (searchOutcome) {
         lastOutcome = searchOutcome;
       }
