@@ -37,15 +37,23 @@ import {
   MAX_AGENT_TOOL_ITERATIONS,
   runDocumentoCopilotAgent,
 } from "@/lib/documentosCopilotAgent";
+import {
+  buscarLojasPorNome,
+  buscarPrestadoresPorNome,
+} from "@/lib/documentosCopilotEntitySearch";
 
 const mockedChat = vi.mocked(callAzureOpenAiChat);
 const mockedQuery = vi.mocked(queryDocumentoCandidates);
+const mockedBuscarLojas = vi.mocked(buscarLojasPorNome);
+const mockedBuscarPrestadores = vi.mocked(buscarPrestadoresPorNome);
 
 const auth = { userId: "user-1", email: "user@empresa.com" };
 
 beforeEach(() => {
   mockedChat.mockReset();
   mockedQuery.mockReset();
+  mockedBuscarLojas.mockReset();
+  mockedBuscarPrestadores.mockReset();
 });
 
 describe("runDocumentoCopilotAgent", () => {
@@ -161,5 +169,74 @@ describe("runDocumentoCopilotAgent", () => {
     const nonSystemMessages = sentMessages.filter((m) => m.role !== "system");
     expect(nonSystemMessages).toHaveLength(10);
     expect(nonSystemMessages[0]).toMatchObject({ content: "mensagem 2" });
+  });
+
+  it("resolve a loja por nome parcial antes de buscar documentos", async () => {
+    mockedChat
+      .mockResolvedValueOnce({
+        content: null,
+        toolCalls: [
+          {
+            id: "call-1",
+            type: "function",
+            function: { name: "buscar_lojas", arguments: JSON.stringify({ query: "avenida" }) },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        content: null,
+        toolCalls: [
+          {
+            id: "call-2",
+            type: "function",
+            function: {
+              name: "buscar_documentos",
+              arguments: JSON.stringify({ lojaId: "loja-302" }),
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ content: "Encontrei os documentos da loja Avenida.", toolCalls: [] });
+
+    mockedBuscarLojas.mockResolvedValueOnce([
+      { id: "loja-302", nome: "302 - Avenida Paulista", codigo: "302" },
+    ]);
+    mockedQuery.mockResolvedValueOnce({ matches: [], total: 0, insights: createEmptyInsights() });
+
+    const result = await runDocumentoCopilotAgent(
+      { messages: [{ role: "user", text: "notas fiscais da loja avenida" }] },
+      auth,
+    );
+
+    expect(mockedBuscarLojas).toHaveBeenCalledWith("avenida", expect.anything());
+    expect(mockedQuery.mock.calls[0][0].filters.lojaId).toBe("loja-302");
+    expect(result.reply).toBe("Encontrei os documentos da loja Avenida.");
+  });
+
+  it("resolve o prestador por nome parcial quando a ferramenta e chamada", async () => {
+    mockedChat
+      .mockResolvedValueOnce({
+        content: null,
+        toolCalls: [
+          {
+            id: "call-1",
+            type: "function",
+            function: { name: "buscar_prestadores", arguments: JSON.stringify({ query: "dinamica" }) },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ content: "Achei o prestador Dinâmica Serviços.", toolCalls: [] });
+
+    mockedBuscarPrestadores.mockResolvedValueOnce([
+      { id: "prestador-1", nome: "Dinâmica Serviços" },
+    ]);
+
+    const result = await runDocumentoCopilotAgent(
+      { messages: [{ role: "user", text: "documentos do prestador dinamica" }] },
+      auth,
+    );
+
+    expect(mockedBuscarPrestadores).toHaveBeenCalledWith("dinamica", expect.anything());
+    expect(result.reply).toBe("Achei o prestador Dinâmica Serviços.");
   });
 });
