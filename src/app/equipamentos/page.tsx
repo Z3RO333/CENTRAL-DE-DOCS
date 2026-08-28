@@ -28,6 +28,7 @@ export default function EquipamentosPage() {
   const { confirm, confirmationDialog } = useConfirmDialog();
 
   const [lojaFilter, setLojaFilter] = useState<string>("todas");
+  const [tipoFilter, setTipoFilter] = useState<string>("todos");
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [editing, setEditing] = useState<Equipamento | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -65,10 +66,12 @@ export default function EquipamentosPage() {
 
   const visibleEquipamentos = useMemo(
     () =>
-      lojaFilter === "todas"
-        ? equipamentos
-        : equipamentos.filter((eq) => eq.loja_id === lojaFilter),
-    [equipamentos, lojaFilter],
+      equipamentos.filter(
+        (eq) =>
+          (lojaFilter === "todas" || eq.loja_id === lojaFilter) &&
+          (tipoFilter === "todos" || eq.tipo_equipamento === tipoFilter),
+      ),
+    [equipamentos, lojaFilter, tipoFilter],
   );
 
   const resetForm = () => {
@@ -278,7 +281,7 @@ export default function EquipamentosPage() {
         </div>
       )}
 
-      <section className="rounded-2xl bg-white p-5 shadow-sm shadow-slate-200">
+      <section className="flex flex-wrap gap-4 rounded-2xl bg-white p-5 shadow-sm shadow-slate-200">
         <label className="text-xs font-semibold text-slate-600">
           Filtrar por loja
           <select
@@ -290,6 +293,21 @@ export default function EquipamentosPage() {
             {lojas.map((loja) => (
               <option key={loja.id} value={loja.id}>
                 {loja.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs font-semibold text-slate-600">
+          Filtrar por tipo
+          <select
+            value={tipoFilter}
+            onChange={(event) => setTipoFilter(event.target.value)}
+            className="mt-2 w-full max-w-xs rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none md:w-auto"
+          >
+            <option value="todos">Todos os tipos</option>
+            {tiposSugeridos.map((tipo) => (
+              <option key={tipo} value={tipo}>
+                {tipo}
               </option>
             ))}
           </select>
