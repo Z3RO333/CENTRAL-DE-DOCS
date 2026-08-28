@@ -357,6 +357,7 @@ export default function EquipamentosPage() {
                         .filter(Boolean)
                         .join(" / ") || "—"}
                     </p>
+                    <p>{equipamento.potencia ?? "—"}</p>
                     <p>{prestador?.nome ?? "—"}</p>
                     <p className="capitalize">{equipamento.frequencia ?? "mensal"}</p>
                   </div>
@@ -394,7 +395,7 @@ export default function EquipamentosPage() {
         </div>
 
         <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="w-full min-w-[840px] text-sm">
             <caption className="sr-only">Equipamentos cadastrados</caption>
             <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>
@@ -402,6 +403,7 @@ export default function EquipamentosPage() {
                 <th className="px-5 py-3 text-left">Tipo</th>
                 <th className="px-5 py-3 text-left">Identificação</th>
                 <th className="px-5 py-3 text-left">Marca/Modelo</th>
+                <th className="px-5 py-3 text-left">Potência</th>
                 <th className="px-5 py-3 text-left">Prestador</th>
                 <th className="px-5 py-3 text-left">Frequência</th>
                 <th className="px-5 py-3 text-left">Status</th>
@@ -411,13 +413,13 @@ export default function EquipamentosPage() {
             <tbody className="divide-y divide-slate-100">
               {equipamentosLoading ? (
                 <tr>
-                  <td className="px-5 py-6 text-center text-slate-500" colSpan={8}>
+                  <td className="px-5 py-6 text-center text-slate-500" colSpan={9}>
                     Carregando equipamentos...
                   </td>
                 </tr>
               ) : visibleEquipamentos.length === 0 ? (
                 <tr>
-                  <td className="px-5 py-6 text-center text-slate-500" colSpan={8}>
+                  <td className="px-5 py-6 text-center text-slate-500" colSpan={9}>
                     Nenhum equipamento encontrado.
                   </td>
                 </tr>
@@ -439,6 +441,7 @@ export default function EquipamentosPage() {
                           .filter(Boolean)
                           .join(" / ") || "—"}
                       </td>
+                      <td className="px-5 py-4">{equipamento.potencia ?? "—"}</td>
                       <td className="px-5 py-4">{prestador?.nome ?? "—"}</td>
                       <td className="px-5 py-4 capitalize">
                         {equipamento.frequencia ?? "mensal"}
