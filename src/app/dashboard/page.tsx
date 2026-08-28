@@ -8,8 +8,6 @@ import {
   BriefcaseBusiness,
   Bot,
   CheckCircle2,
-  ClipboardList,
-  Clock,
   ClipboardSignature,
   Eye,
   FileBadge,
@@ -23,8 +21,6 @@ import {
   Sparkles,
   Store,
   TriangleAlert,
-  CalendarClock,
-  MailWarning,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
@@ -33,21 +29,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { fixMojibakeText } from "@/lib/textEncoding";
 import { formatPersonName } from "@/lib/displayName";
 import { StatusBadge } from "@/components/StatusBadge";
-
-type DocumentosKpis = {
-  pendentes: number;
-  aguardandoAssinatura: number;
-  enviadosHoje: number;
-  enviadosNoMes: number;
-  documentosVencendo: number;
-  pendenciasCriticas: number;
-  notasAguardandoAnalise: number;
-};
-
-type ActionCounts = {
-  cobrancasFalhas: number;
-  orcamentosAguardando: number;
-};
 
 type AtividadeRecente = {
   id: string;
@@ -197,14 +178,8 @@ export default function DashboardPage() {
   const { modules, loading: accessLoading } = useDocumentsAccess();
   const canAccessFormularios = modules.documentos;
 
-  const [kpis, setKpis] = useState<DocumentosKpis | null>(null);
-  const [kpisLoading, setKpisLoading] = useState(true);
   const [atividades, setAtividades] = useState<AtividadeRecente[]>([]);
   const [atividadesLoading, setAtividadesLoading] = useState(true);
-  const [actionCounts, setActionCounts] = useState<ActionCounts>({
-    cobrancasFalhas: 0,
-    orcamentosAguardando: 0,
-  });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -217,7 +192,6 @@ export default function DashboardPage() {
   }, [authLoading, user, accessLoading, canAccessFormularios, router]);
 
   const carregarDados = useCallback(async (signal: AbortSignal) => {
-    setKpisLoading(true);
     setAtividadesLoading(true);
     try {
       const { data: sessionData, error: sessionError } =
@@ -228,48 +202,12 @@ export default function DashboardPage() {
 
       const headers = { Authorization: `Bearer ${token}` };
 
-      const [kpisRes, atividadesRes, cobrancasRes, orcamentosRes] = await Promise.all([
-        fetch("/api/documentos/kpis", { headers, signal }),
-        fetch("/api/documentos?limit=5&offset=0", { headers, signal }),
-        fetch("/api/cobrancas/pendencias", { headers, signal }),
-        fetch("/api/orcamentos-internos?tab=aprovacao&limit=1&offset=0", {
-          headers,
-          signal,
-        }),
-      ]);
+      const atividadesRes = await fetch("/api/documentos?limit=5&offset=0", {
+        headers,
+        signal,
+      });
 
       if (signal.aborted) return;
-
-      if (kpisRes.ok) {
-        const payload = (await kpisRes.json()) as { kpis?: DocumentosKpis };
-        if (payload.kpis) {
-          setKpis({
-            pendentes: payload.kpis.pendentes ?? 0,
-            aguardandoAssinatura: payload.kpis.aguardandoAssinatura ?? 0,
-            enviadosHoje: payload.kpis.enviadosHoje ?? 0,
-            enviadosNoMes: payload.kpis.enviadosNoMes ?? 0,
-            documentosVencendo: payload.kpis.documentosVencendo ?? 0,
-            pendenciasCriticas: payload.kpis.pendenciasCriticas ?? 0,
-            notasAguardandoAnalise: payload.kpis.notasAguardandoAnalise ?? 0,
-          });
-        }
-      }
-
-      const nextActionCounts: ActionCounts = {
-        cobrancasFalhas: 0,
-        orcamentosAguardando: 0,
-      };
-      if (cobrancasRes.ok) {
-        const payload = (await cobrancasRes.json()) as {
-          total_falhas_cobranca?: number;
-        };
-        nextActionCounts.cobrancasFalhas = payload.total_falhas_cobranca ?? 0;
-      }
-      if (orcamentosRes.ok) {
-        const payload = (await orcamentosRes.json()) as { total?: number };
-        nextActionCounts.orcamentosAguardando = payload.total ?? 0;
-      }
-      setActionCounts(nextActionCounts);
 
       if (atividadesRes.ok) {
         const payload = (await atividadesRes.json()) as {
@@ -283,7 +221,6 @@ export default function DashboardPage() {
       }
     } finally {
       if (!signal.aborted) {
-        setKpisLoading(false);
         setAtividadesLoading(false);
       }
     }
@@ -315,80 +252,6 @@ export default function DashboardPage() {
   if (!user) {
     return null;
   }
-
-  const kpiCards = [
-    {
-      label: "Pendências abertas",
-      value: kpis?.pendentes ?? 0,
-      icon: Clock,
-      accent: "bg-amber-50 text-amber-700",
-      href: "/documentos/pendencias",
-    },
-    {
-      label: "Aguardando assinatura",
-      value: kpis?.aguardandoAssinatura ?? 0,
-      icon: Signature,
-      accent: "bg-sky-50 text-sky-700",
-      href: "/documentos?tipo=registro_laudos&somenteDisponiveisLote=true",
-    },
-    {
-      label: "Enviados hoje",
-      value: kpis?.enviadosHoje ?? 0,
-      icon: FilePlus2,
-      accent: "bg-emerald-50 text-emerald-700",
-      href: "/documentos",
-    },
-    {
-      label: "Enviados no mês",
-      value: kpis?.enviadosNoMes ?? 0,
-      icon: ClipboardList,
-      accent: "bg-violet-50 text-violet-700",
-      href: "/dashboard/analises",
-    },
-  ];
-
-  const actionCards = [
-    {
-      label: "Documentos vencendo",
-      description: "Vencimento nos próximos 30 dias",
-      value: kpis?.documentosVencendo ?? 0,
-      icon: CalendarClock,
-      href: "/documentos/contratos",
-      accent: "bg-rose-50 text-rose-700",
-    },
-    {
-      label: "Pendências críticas",
-      description: "Abertas há mais de 7 dias",
-      value: kpis?.pendenciasCriticas ?? 0,
-      icon: TriangleAlert,
-      href: "/documentos/pendencias",
-      accent: "bg-amber-50 text-amber-800",
-    },
-    {
-      label: "Falhas de cobrança",
-      description: "Envios que precisam ser reprocessados",
-      value: actionCounts.cobrancasFalhas,
-      icon: MailWarning,
-      href: "/documentos/cobrancas",
-      accent: "bg-orange-50 text-orange-700",
-    },
-    {
-      label: "Notas aguardando análise",
-      description: "Conservação pendente de verificação",
-      value: kpis?.notasAguardandoAnalise ?? 0,
-      icon: ReceiptText,
-      href: "/documentos/conservacao/notas-fiscais",
-      accent: "bg-sky-50 text-sky-700",
-    },
-    {
-      label: "Orçamentos para aprovar",
-      description: "Aguardando sua decisão",
-      value: actionCounts.orcamentosAguardando,
-      icon: ClipboardSignature,
-      href: "/documentos/orcamentos-internos",
-      accent: "bg-violet-50 text-violet-700",
-    },
-  ];
 
   const nomeCompleto = formatPersonName({
     name: (user.user_metadata?.name as string | undefined) ?? null,
@@ -444,74 +307,6 @@ export default function DashboardPage() {
             </Link>
           </div>
         </div>
-      </section>
-
-      {/* KPIs leves */}
-      <section aria-labelledby="acoes-hoje-title" className="space-y-4">
-        <header>
-          <p className="text-xs font-semibold uppercase tracking-widest text-rose-600">
-            Prioridades
-          </p>
-          <h2 id="acoes-hoje-title" className="text-xl font-semibold text-slate-900">
-            O que exige ação hoje
-          </h2>
-          <p className="mt-1 text-xs text-slate-500">
-            Itens abertos que merecem atenção antes das atividades de rotina.
-          </p>
-        </header>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {actionCards.map((card) => {
-            const Icon = card.icon;
-            return (
-              <Link
-                key={card.label}
-                href={card.href}
-                className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${card.accent}`}>
-                    <Icon className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                  <span className="text-2xl font-semibold text-slate-900">
-                    {kpisLoading ? "—" : card.value}
-                  </span>
-                </div>
-                <h3 className="mt-3 text-sm font-semibold text-slate-900">{card.label}</h3>
-                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{card.description}</p>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {kpiCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <Link
-              key={card.label}
-              href={card.href}
-              className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {card.label}
-                </p>
-                <span
-                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${card.accent}`}
-                >
-                  <Icon className="h-4 w-4" />
-                </span>
-              </div>
-              <p className="mt-3 text-2xl font-semibold text-slate-900">
-                {kpisLoading ? "—" : card.value}
-              </p>
-              <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 group-hover:text-sky-600">
-                Abrir <ArrowRight className="h-3 w-3" />
-              </p>
-            </Link>
-          );
-        })}
       </section>
 
       {/* Módulos */}
