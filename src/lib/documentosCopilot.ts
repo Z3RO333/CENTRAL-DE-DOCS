@@ -55,6 +55,8 @@ export type DocumentoCopilotMatch = {
   prestadorNome: string | null;
   tipoLaudo: string | null;
   observacoes: string | null;
+  arquivoPath: string;
+  arquivoAssinadoPath: string | null;
 };
 
 export type DocumentoCopilotInsightItem = {
@@ -822,6 +824,8 @@ export const queryDocumentoCandidates = async (input: {
       : null,
     tipoLaudo: row.tipoLaudo,
     observacoes: row.observacoes,
+    arquivoPath: row.arquivo_path,
+    arquivoAssinadoPath: row.arquivo_assinado_path,
   }));
 
   return {

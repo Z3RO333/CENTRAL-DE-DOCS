@@ -9,6 +9,10 @@ import type {
   DocumentoCopilotInsights,
   DocumentoCopilotMatch,
 } from "@/lib/documentosCopilot";
+import {
+  getSignedFileUrl,
+  resolveSignedPdfPath,
+} from "../_lib/documentosShared";
 
 export type DocumentosCopilotProps = {
   currentFilters: DocumentoCopilotFilters;
@@ -121,10 +125,12 @@ function AssistantTurnCard({
   turn,
   onApplyFilters,
   onOpenDocumento,
+  openingId,
 }: {
   turn: Extract<ChatTurn, { role: "assistant" }>;
   onApplyFilters: (filters: DocumentoCopilotFilters) => void;
-  onOpenDocumento: (id: string) => void;
+  onOpenDocumento: (item: DocumentoCopilotMatch) => void;
+  openingId: string | null;
 }) {
   const insights = turn.insights;
   const maxStatus = Math.max(...(insights.porStatus.map((item) => item.total) ?? [0]), 1);
@@ -363,10 +369,11 @@ function AssistantTurnCard({
               </div>
               <button
                 type="button"
-                onClick={() => onOpenDocumento(item.id)}
-                className="shrink-0 rounded-full border border-white/15 px-3 py-1 text-[11px] font-semibold text-slate-200 transition hover:bg-white/5"
+                disabled={openingId === item.id}
+                onClick={() => onOpenDocumento(item)}
+                className="shrink-0 rounded-full border border-white/15 px-3 py-1 text-[11px] font-semibold text-slate-200 transition hover:bg-white/5 disabled:opacity-60"
               >
-                Abrir
+                {openingId === item.id ? "Abrindo..." : "Ver arquivo"}
               </button>
             </div>
           ))
@@ -386,6 +393,7 @@ export function DocumentosCopilot({ currentFilters }: DocumentosCopilotProps) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
 
   const getAccessToken = async () => {
     const { data, error: sessionError } = await supabase.auth.getSession();
@@ -458,8 +466,26 @@ export function DocumentosCopilot({ currentFilters }: DocumentosCopilotProps) {
     router.push(buildDocumentosUrl(filters));
   };
 
-  const handleOpenDocumento = (id: string) => {
-    router.push(`/documentos/${id}`);
+  const handleOpenDocumento = async (item: DocumentoCopilotMatch) => {
+    const path =
+      resolveSignedPdfPath(item.arquivoAssinadoPath) ??
+      item.arquivoAssinadoPath ??
+      item.arquivoPath;
+    if (!path) {
+      setError("Arquivo indisponível no momento.");
+      return;
+    }
+    try {
+      setOpeningId(item.id);
+      setError(null);
+      const signedUrl = await getSignedFileUrl(path);
+      window.open(signedUrl, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      console.error("Erro ao abrir documento:", err);
+      setError("Não foi possível abrir o arquivo.");
+    } finally {
+      setOpeningId(null);
+    }
   };
 
   return (
@@ -487,7 +513,8 @@ export function DocumentosCopilot({ currentFilters }: DocumentosCopilotProps) {
                   key={turn.id}
                   turn={turn}
                   onApplyFilters={handleApplyFilters}
-                  onOpenDocumento={handleOpenDocumento}
+                  onOpenDocumento={(item) => void handleOpenDocumento(item)}
+                  openingId={openingId}
                 />
               ),
             )}

@@ -109,6 +109,8 @@ describe("runDocumentoCopilotAgent", () => {
           prestadorNome: null,
           tipoLaudo: null,
           observacoes: null,
+          arquivoPath: "notas_fiscais/nf1.pdf",
+          arquivoAssinadoPath: null,
         },
       ],
       total: 1,
