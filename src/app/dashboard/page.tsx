@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   BriefcaseBusiness,
-  Bot,
   CheckCircle2,
   ClipboardSignature,
   Eye,
@@ -105,14 +104,6 @@ const MODULES: ModuleCard[] = [
     icon: TriangleAlert,
     accent: "bg-rose-50 text-rose-700 border-rose-200",
     cta: "Ver pendências",
-  },
-  {
-    title: "Copiloto",
-    description: "Tire dúvidas sobre regras, prazos e prestadores com a IA.",
-    href: "/copilot",
-    icon: Bot,
-    accent: "bg-indigo-50 text-indigo-700 border-indigo-200",
-    cta: "Abrir copiloto",
   },
 ];
 
