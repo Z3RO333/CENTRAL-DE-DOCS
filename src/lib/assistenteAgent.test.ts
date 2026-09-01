@@ -179,7 +179,7 @@ describe("runAssistenteAgent", () => {
   it("manda o historico persistido (ate 10 mensagens) para o modelo", async () => {
     mockedGetHistorico.mockResolvedValueOnce(
       Array.from({ length: 12 }, (_, i) => ({
-        role: (i % 2 === 0 ? "user" : "assistant") as const,
+        role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
         text: `mensagem ${i}`,
         criado_em: "2026-01-01T00:00:00.000Z",
       })),
