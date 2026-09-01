@@ -131,6 +131,10 @@ async function executarConsultarPendencias(
   const ano = anoNum !== undefined && Number.isFinite(anoNum) ? anoNum : undefined;
   const anoRef = ano ?? anoManaus();
 
+  if (!(await podeAcessarCobrancas(ctx))) {
+    return { content: JSON.stringify({ erro: "Sem acesso a cobranças." }) };
+  }
+
   const rows = await levantarPendencias(ano, ctx.supabaseAdmin);
 
   const totalFaltanteGeral = rows.reduce((acc, r) => acc + r.total_faltante, 0);
@@ -144,7 +148,7 @@ async function executarConsultarPendencias(
   const insights: AssistenteInsights = {
     totais: [
       { key: "totalFornecedores", label: "Fornecedores", valor: totalPrestadores },
-      { key: "totalLojasPendentes", label: "Lojas pendentes", valor: rows.length },
+      { key: "totalLojasPendentes", label: "Lojas pendentes", valor: porLoja.size },
       { key: "totalFaltante", label: "Documentos faltantes", valor: totalFaltanteGeral },
     ],
     isTruncated: false,
@@ -167,7 +171,7 @@ async function executarConsultarPendencias(
   const resumoParaModelo = {
     ano: anoRef,
     totalFornecedores: totalPrestadores,
-    totalLojasPendentes: rows.length,
+    totalLojasPendentes: porLoja.size,
     totalDocumentosFaltantes: totalFaltanteGeral,
     amostra: Array.from(porPrestador.entries())
       .sort((a, b) => b[1].total - a[1].total)

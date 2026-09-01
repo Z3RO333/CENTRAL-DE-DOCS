@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Bot, LoaderCircle, Send, Sparkles, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { useDocumentsAccess } from "@/hooks/useDocumentsAccess";
+import { useIsAprovadorInterno } from "@/hooks/useIsAprovadorInterno";
 import { formatCurrencyBRL } from "@/lib/documentosApiUtils";
 import {
   getSignedFileUrl,
@@ -53,6 +55,10 @@ function detectarDominioDaRota(pathname: string | null): AssistenteDominioId | n
 export default function AssistenteWidget() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { isAdmin } = useDocumentsAccess();
+  const { isAprovadorInterno } = useIsAprovadorInterno();
+  const canAccessCobrancas = isAdmin || isAprovadorInterno;
+  const chips = CHIPS.filter((chip) => chip.dominio !== "cobrancas" || canAccessCobrancas);
   const [isOpen, setIsOpen] = useState(false);
   const [historicoCarregado, setHistoricoCarregado] = useState(false);
   const [message, setMessage] = useState("");
@@ -213,7 +219,7 @@ export default function AssistenteWidget() {
           <div ref={bodyRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
             {turns.length === 0 && (
               <div className="flex flex-wrap gap-2">
-                {CHIPS.map((chip) => (
+                {chips.map((chip) => (
                   <button
                     key={chip.dominio}
                     type="button"

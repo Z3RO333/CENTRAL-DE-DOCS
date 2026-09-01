@@ -108,12 +108,20 @@ describe("dominioCobrancas.executarTool consultar_pendencias_cobranca", () => {
   ];
 
   it("chama levantarPendencias com o ano informado", async () => {
-    await dominioCobrancas.executarTool("consultar_pendencias_cobranca", { ano: "2025" }, makeCtx());
+    await dominioCobrancas.executarTool(
+      "consultar_pendencias_cobranca",
+      { ano: "2025" },
+      makeCtx({ isAdmin: true }),
+    );
     expect(mockedPendencias).toHaveBeenCalledWith(2025, expect.anything());
   });
 
   it("usa o ano padrao (undefined) quando nao informado ou invalido", async () => {
-    await dominioCobrancas.executarTool("consultar_pendencias_cobranca", { ano: "abc" }, makeCtx());
+    await dominioCobrancas.executarTool(
+      "consultar_pendencias_cobranca",
+      { ano: "abc" },
+      makeCtx({ isAdmin: true }),
+    );
     expect(mockedPendencias).toHaveBeenCalledWith(undefined, expect.anything());
   });
 
@@ -122,7 +130,7 @@ describe("dominioCobrancas.executarTool consultar_pendencias_cobranca", () => {
     const result = await dominioCobrancas.executarTool(
       "consultar_pendencias_cobranca",
       {},
-      makeCtx(),
+      makeCtx({ isAdmin: true }),
     );
     expect(result.outcome).toBeDefined();
     const outcome = result.outcome!;
@@ -141,13 +149,13 @@ describe("dominioCobrancas.executarTool consultar_pendencias_cobranca", () => {
     const result = await dominioCobrancas.executarTool(
       "consultar_pendencias_cobranca",
       {},
-      makeCtx(),
+      makeCtx({ isAdmin: true }),
     );
     const insights = result.outcome!.insights;
     expect(insights.totais).toEqual(
       expect.arrayContaining([
         { key: "totalFornecedores", label: "Fornecedores", valor: 2 },
-        { key: "totalLojasPendentes", label: "Lojas pendentes", valor: 3 },
+        { key: "totalLojasPendentes", label: "Lojas pendentes", valor: 2 },
         { key: "totalFaltante", label: "Documentos faltantes", valor: 3 },
       ]),
     );
@@ -160,13 +168,24 @@ describe("dominioCobrancas.executarTool consultar_pendencias_cobranca", () => {
     const result = await dominioCobrancas.executarTool(
       "consultar_pendencias_cobranca",
       {},
-      makeCtx(),
+      makeCtx({ isAdmin: true }),
     );
     const resumo = JSON.parse(result.content) as {
       amostra: { emails_contato: string[] }[];
     };
     expect(resumo.amostra[0].emails_contato[0]).not.toBe("contato@fornecedora.com");
     expect(resumo.amostra[0].emails_contato[0]).toContain("@fornecedora.com");
+  });
+
+  it("bloqueia usuario sem acesso mesmo se chamado diretamente", async () => {
+    const result = await dominioCobrancas.executarTool(
+      "consultar_pendencias_cobranca",
+      {},
+      makeCtx(),
+    );
+    expect(mockedPendencias).not.toHaveBeenCalled();
+    const resumo = JSON.parse(result.content) as { erro?: string };
+    expect(resumo.erro).toBe("Sem acesso a cobranças.");
   });
 });
 
