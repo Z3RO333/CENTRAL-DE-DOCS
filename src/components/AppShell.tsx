@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   FileText,
-  Bot,
   LogOut,
   UserRound,
   BarChart3,
@@ -37,6 +36,7 @@ import { useIsAprovadorInterno } from "@/hooks/useIsAprovadorInterno";
 import { SimulacaoControl, SimulacaoBanner } from "@/components/SimulacaoControl";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { useAccessibleDialog } from "@/hooks/useAccessibleDialog";
+import AssistenteWidget from "@/components/AssistenteWidget";
 
 export default function AppShell({
   children,
@@ -180,13 +180,6 @@ export default function AppShell({
           icon: FileCheck2,
           isActive: pathname?.startsWith("/documentos/btracker"),
           isVisible: isAdmin,
-        },
-        {
-          href: "/copilot",
-          label: "Copiloto",
-          icon: Bot,
-          isActive: pathname?.startsWith("/copilot"),
-          isVisible: canAccessDocuments,
         },
       ],
     },
@@ -716,6 +709,8 @@ export default function AppShell({
           </div>
         </div>
       ) : null}
+
+      {isAuthenticated && !isLoading ? <AssistenteWidget /> : null}
     </div>
   );
 }
