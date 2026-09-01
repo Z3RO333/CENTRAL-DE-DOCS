@@ -710,7 +710,7 @@ export default function AppShell({
         </div>
       ) : null}
 
-      {isAuthenticated && !isLoading ? <AssistenteWidget /> : null}
+      {showNav && isAuthenticated && !isLoading ? <AssistenteWidget /> : null}
     </div>
   );
 }

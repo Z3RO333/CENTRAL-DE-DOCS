@@ -39,8 +39,6 @@ const ROUTE_DOMINIO: { prefix: string; dominio: AssistenteDominioId }[] = [
 
 const CHIPS: { dominio: AssistenteDominioId; label: string; pergunta: string }[] = [
   { dominio: "documentos", label: "Documentos", pergunta: "Buscar documentos" },
-  { dominio: "orcamentos", label: "Orçamentos", pergunta: "Consultar meus orçamentos" },
-  { dominio: "cobrancas", label: "Cobranças", pergunta: "Ver pendências de cobrança" },
 ];
 
 function detectarDominioDaRota(pathname: string | null): AssistenteDominioId | null {
@@ -191,7 +189,7 @@ export default function AssistenteWidget() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+    <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
       {isOpen && (
         <div className="flex max-h-[70vh] w-[380px] max-w-[92vw] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-400/20">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
@@ -236,6 +234,27 @@ export default function AssistenteWidget() {
               ) : (
                 <div key={turn.id} className="space-y-2 rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
                   <p>{turn.reply}</p>
+                  {turn.summary && (
+                    <p className="text-xs text-slate-500">{turn.summary}</p>
+                  )}
+                  {Object.keys(turn.filters).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {Object.entries(turn.filters)
+                        .filter(
+                          ([, value]) =>
+                            (typeof value === "string" && value.length > 0) ||
+                            value === true,
+                        )
+                        .map(([key, value]) => (
+                          <span
+                            key={key}
+                            className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] font-medium text-slate-600"
+                          >
+                            {key}: {String(value)}
+                          </span>
+                        ))}
+                    </div>
+                  )}
                   {turn.filtrosUrl && turn.results.length > 0 && (
                     <a
                       href={turn.filtrosUrl}
@@ -244,13 +263,22 @@ export default function AssistenteWidget() {
                       Aplicar na tela
                     </a>
                   )}
-                  {turn.insights.totais.length > 0 && (
+                  {turn.total > 0 && turn.insights.totais.length > 0 && (
                     <div className="grid grid-cols-2 gap-2 pt-1">
                       {turn.insights.totais.map((item) => (
                         <div key={item.key} className="rounded-xl bg-white px-2 py-1.5 text-center">
                           <p className="text-[10px] uppercase text-slate-400">{item.label}</p>
                           <p className="text-sm font-semibold text-slate-800">{item.valor}</p>
                         </div>
+                      ))}
+                    </div>
+                  )}
+                  {(turn.insights.porStatus.length > 0 || turn.insights.porLoja.length > 0) && (
+                    <div className="space-y-1 pt-1 text-xs text-slate-600">
+                      {[...turn.insights.porStatus, ...turn.insights.porLoja].map((item) => (
+                        <p key={item.key}>
+                          {item.label} — {item.total}
+                        </p>
                       ))}
                     </div>
                   )}
