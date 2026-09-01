@@ -30,6 +30,7 @@ export type AssistenteInsightTotal = {
   key: string;
   label: string;
   valor: number;
+  formato?: "moeda";
 };
 
 export type AssistenteInsights = {

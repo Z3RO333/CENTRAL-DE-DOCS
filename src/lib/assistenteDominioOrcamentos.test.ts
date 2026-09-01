@@ -173,7 +173,9 @@ describe("dominioOrcamentos.executarTool buscar_orcamentos", () => {
       },
     ]);
     expect(outcome.insights.totais).toEqual(
-      expect.arrayContaining([{ key: "valorTotal", label: "Valor total", valor: 150.5 }]),
+      expect.arrayContaining([
+        { key: "valorTotal", label: "Valor total", valor: 150.5, formato: "moeda" },
+      ]),
     );
     void calls;
   });

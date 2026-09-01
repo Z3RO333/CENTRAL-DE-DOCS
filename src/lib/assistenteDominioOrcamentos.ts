@@ -291,7 +291,12 @@ async function executarBuscarOrcamentos(
       { key: "totalOrcamentos", label: "Orçamentos", valor: total },
       { key: "totalAguardandoAprovacao", label: "Aguardando aprovação", valor: totalAguardando },
       { key: "totalAprovados", label: "Aprovados", valor: totalAprovados },
-      { key: "valorTotal", label: "Valor total", valor: Number(valorTotalSoma.toFixed(2)) },
+      {
+        key: "valorTotal",
+        label: "Valor total",
+        valor: Number(valorTotalSoma.toFixed(2)),
+        formato: "moeda",
+      },
     ],
     isTruncated,
     porStatus,

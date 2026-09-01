@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Bot, LoaderCircle, Send, Sparkles, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { formatCurrencyBRL } from "@/lib/documentosApiUtils";
 import {
   getSignedFileUrl,
   resolveSignedPdfPath,
@@ -269,7 +270,9 @@ export default function AssistenteWidget() {
                       {turn.insights.totais.map((item) => (
                         <div key={item.key} className="rounded-xl bg-white px-2 py-1.5 text-center">
                           <p className="text-[10px] uppercase text-slate-400">{item.label}</p>
-                          <p className="text-sm font-semibold text-slate-800">{item.valor}</p>
+                          <p className="text-sm font-semibold text-slate-800">
+                            {item.formato === "moeda" ? formatCurrencyBRL(item.valor) : item.valor}
+                          </p>
                         </div>
                       ))}
                     </div>
