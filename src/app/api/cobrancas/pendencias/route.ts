@@ -1,21 +1,11 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
 import { getActorFromRequest, ApiHttpError as HttpError } from "@/lib/apiAuth";
-import { anoManaus, levantarPendencias } from "@/lib/cobrancasService";
+import { anoManaus, levantarPendencias, mascararEmail } from "@/lib/cobrancasService";
 import { isAprovadorInterno } from "@/lib/orcamentosInternos";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function mascararEmail(email: string): string {
-  const [local, domain] = email.split("@");
-  if (!local) return email;
-  if (!domain || local.length <= 2) return `${local[0] ?? "*"}***@${domain ?? ""}`;
-  const visivel = local.slice(0, 2);
-  const fim = local.slice(-1);
-  const asteriscos = "*".repeat(Math.max(local.length - 3, 3));
-  return `${visivel}${asteriscos}${fim}@${domain}`;
-}
 
 export async function GET(request: Request) {
   try {

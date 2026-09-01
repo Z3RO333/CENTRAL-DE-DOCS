@@ -22,6 +22,16 @@ function emailsExternos(usuarios: string[] | null): string[] {
     .filter((e) => !e.toLowerCase().endsWith(DOMINIO_INTERNO));
 }
 
+export function mascararEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!local) return email;
+  if (!domain || local.length <= 2) return `${local[0] ?? "*"}***@${domain ?? ""}`;
+  const visivel = local.slice(0, 2);
+  const fim = local.slice(-1);
+  const asteriscos = "*".repeat(Math.max(local.length - 3, 3));
+  return `${visivel}${asteriscos}${fim}@${domain}`;
+}
+
 function partesDataManaus(date = new Date()): { ano: number; mes: number } {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: TIMEZONE_MANAUS,

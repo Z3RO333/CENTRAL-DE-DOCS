@@ -5,6 +5,7 @@ import {
   calcularMesLimite,
   diaManaus,
   levantarPendencias,
+  mascararEmail,
 } from "@/lib/cobrancasService";
 
 describe("calcularMesLimite", () => {
@@ -96,5 +97,19 @@ describe("levantarPendencias", () => {
     expect(pendencia.total_faltante).toBe(3);
     expect(pendencia.total_esperado).toBe(6);
     expect(pendencia.prestador_emails).toEqual(["externo@example.com"]);
+  });
+});
+
+describe("mascararEmail", () => {
+  it("mascara o e-mail mantendo os 2 primeiros e o ultimo caractere do local-part", () => {
+    expect(mascararEmail("joaosilva@empresa.com")).toBe("jo******a@empresa.com");
+  });
+
+  it("usa fallback quando o local-part tem 2 caracteres ou menos", () => {
+    expect(mascararEmail("ab@empresa.com")).toBe("a***@empresa.com");
+  });
+
+  it("devolve o email original quando nao ha local-part (formato invalido)", () => {
+    expect(mascararEmail("@empresa.com")).toBe("@empresa.com");
   });
 });
