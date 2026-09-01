@@ -41,6 +41,7 @@ const ROUTE_DOMINIO: { prefix: string; dominio: AssistenteDominioId }[] = [
 const CHIPS: { dominio: AssistenteDominioId; label: string; pergunta: string }[] = [
   { dominio: "documentos", label: "Documentos", pergunta: "Buscar documentos" },
   { dominio: "orcamentos", label: "Orçamentos", pergunta: "Consultar meus orçamentos" },
+  { dominio: "cobrancas", label: "Cobranças", pergunta: "Ver pendências de cobrança" },
 ];
 
 function detectarDominioDaRota(pathname: string | null): AssistenteDominioId | null {

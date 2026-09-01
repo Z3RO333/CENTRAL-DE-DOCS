@@ -16,6 +16,7 @@ import {
 } from "@/lib/documentosCopilotEntitySearch";
 import { dominioDocumentos } from "@/lib/assistenteDominioDocumentos";
 import { dominioOrcamentos } from "@/lib/assistenteDominioOrcamentos";
+import { dominioCobrancas } from "@/lib/assistenteDominioCobrancas";
 import {
   createEmptyAssistenteInsights,
   type AssistenteContext,
@@ -29,7 +30,7 @@ import {
 export const MAX_AGENT_TOOL_ITERATIONS = 5;
 const MAX_HISTORY_MESSAGES = 10;
 
-const DOMINIOS_REGISTRADOS: AssistenteDominio[] = [dominioDocumentos, dominioOrcamentos];
+const DOMINIOS_REGISTRADOS: AssistenteDominio[] = [dominioDocumentos, dominioOrcamentos, dominioCobrancas];
 
 const INTRO_PROMPT =
   "Você é um assistente virtual interno do sistema. Nunca invente documentos, IDs ou dados fora do que as ferramentas devolveram. " +
