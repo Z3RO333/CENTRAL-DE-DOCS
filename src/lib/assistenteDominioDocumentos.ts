@@ -2,6 +2,7 @@ import type { AzureOpenAiTool } from "@/lib/azureOpenAi";
 import {
   DOCUMENTO_COPILOT_STATUS,
   DOCUMENTO_COPILOT_TYPES,
+  buildSearchSummary,
   queryDocumentoCandidates,
   stripKnownFilters,
   type DocumentoCopilotFilters,
@@ -94,23 +95,6 @@ function buildDocumentosUrl(filters: DocumentoCopilotFilters): string {
   }
   params.set("source", "assistente");
   return `/documentos?${params.toString()}`;
-}
-
-function buildSearchSummary(filters: DocumentoCopilotFilters): string {
-  const partes: string[] = [];
-  if (filters.tipo) partes.push(`tipo ${filters.tipo}`);
-  if (filters.status) partes.push(`status ${filters.status}`);
-  if (filters.tipoLaudo) partes.push(`tipo de laudo "${filters.tipoLaudo}"`);
-  if (filters.ano) partes.push(`ano ${filters.ano}`);
-  if (filters.mes) partes.push(`mês ${filters.mes}`);
-  if (filters.lojaId) partes.push(`loja ${filters.lojaId}`);
-  if (filters.prestadorId) partes.push(`prestador ${filters.prestadorId}`);
-  if (filters.termo) partes.push(`termo "${filters.termo}"`);
-  if (filters.somenteAssinados) partes.push("somente assinados");
-  if (filters.somenteDisponiveisLote) partes.push("disponíveis para lote");
-  return partes.length > 0
-    ? `Critérios usados: ${partes.join(", ")}.`
-    : "Sem filtros específicos, usei a intenção principal da pergunta.";
 }
 
 function buildResultItem(match: DocumentoCopilotMatch): AssistenteResultItem {

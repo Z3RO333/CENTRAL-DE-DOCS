@@ -105,6 +105,24 @@ describe("dominioDocumentos.executarTool buscar_documentos", () => {
       expect.arrayContaining([{ key: "totalDocumentos", label: "Documentos", valor: 1 }]),
     );
   });
+
+  it("humaniza tipo e status no resumo, como o buildSearchSummary de producao", async () => {
+    mockedQuery.mockResolvedValueOnce({
+      matches: [],
+      total: 0,
+      insights: createEmptyInsights(),
+    });
+
+    const result = await dominioDocumentos.executarTool(
+      "buscar_documentos",
+      { tipo: "notas_fiscais", status: "pendente" },
+      makeCtx(),
+    );
+
+    expect(result.outcome!.summary).toBe(
+      "Critérios usados: tipo Notas Fiscais, status Pendente.",
+    );
+  });
 });
 
 describe("dominioDocumentos.descricaoPrompt", () => {
