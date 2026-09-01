@@ -1093,8 +1093,24 @@ describe("runAssistenteAgent", () => {
         { id: "call-loop", type: "function", function: { name: "ferramenta_teste", arguments: "{}" } },
       ],
     }));
+    const executarTool = vi.fn(async () => ({
+      content: JSON.stringify({ total: 0 }),
+      outcome: {
+        dominio: "documentos" as const,
+        filters: {},
+        filtrosUrl: null,
+        summary: "Sem filtros aplicados.",
+        results: [],
+        total: 0,
+        insights: createEmptyAssistenteInsights(),
+      },
+    }));
 
-    const result = await runAssistenteAgent({ pergunta: "documentos" }, auth, [fakeDominio()]);
+    const result = await runAssistenteAgent(
+      { pergunta: "documentos" },
+      auth,
+      [fakeDominio({ executarTool })],
+    );
 
     expect(mockedChat).toHaveBeenCalledTimes(MAX_AGENT_TOOL_ITERATIONS);
     expect(result.reply).toContain("Não encontrei resultados");
