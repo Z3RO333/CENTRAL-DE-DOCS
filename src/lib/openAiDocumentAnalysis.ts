@@ -295,7 +295,9 @@ async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function extrairTextoComDocumentIntelligence(input: AnalyzeInput) {
+async function extrairTextoComDocumentIntelligence(
+  input: AnalyzeInput,
+): Promise<{ texto: string; paginas: number | null }> {
   const config = getAzureDocumentIntelligenceConfig();
   const response = await fetch(getAnalyzeUrl(config), {
     method: "POST",
@@ -349,23 +351,22 @@ async function extrairTextoComDocumentIntelligence(input: AnalyzeInput) {
     }
 
     if (result?.status === "succeeded") {
+      const paginas = result.analyzeResult?.pages?.length ?? null;
       const content = result.analyzeResult?.content?.trim();
       if (content) {
-        return content;
+        return { texto: content, paginas };
       }
 
-      const lines = result.analyzeResult?.pages
-        ?.flatMap((page) => page.lines ?? [])
+      const linhas = (result.analyzeResult?.pages ?? [])
+        .flatMap((page) => page.lines ?? [])
         .map((line) => line.content)
-        .filter((line): line is string => Boolean(line?.trim()))
-        .join("\n")
-        .trim();
+        .filter((valor): valor is string => Boolean(valor && valor.trim()));
 
-      if (!lines) {
+      if (linhas.length === 0) {
         throw new Error("OCR concluido, mas nenhum texto foi extraido.");
       }
 
-      return lines;
+      return { texto: linhas.join("\n"), paginas };
     }
 
     if (result?.status === "failed") {
@@ -426,12 +427,19 @@ function parseJsonObject(text: string): DocumentoAnaliseIa {
 
 export async function analisarDocumentoComOpenAi(
   input: AnalyzeInput,
-): Promise<{ provider: string; model: string; resultado: DocumentoAnaliseIa }> {
+): Promise<{
+  provider: string;
+  model: string;
+  resultado: DocumentoAnaliseIa;
+  textoExtraido: string | null;
+  paginas: number | null;
+}> {
   const { apiKey, deployment, url } = getAzureOpenAiConfig();
-  const textoExtraido =
+  const extraido =
     input.mimeType === "application/pdf"
       ? await extrairTextoComDocumentIntelligence(input)
       : null;
+  const textoExtraido = extraido?.texto ?? null;
   const filePart = textoExtraido ? null : resolveAzureContentPart(input);
 
   const response = await fetch(url, {
@@ -485,5 +493,7 @@ export async function analisarDocumentoComOpenAi(
     provider: "azure-openai",
     model: deployment,
     resultado: parseJsonObject(extractAzureOutputText(raw)),
+    textoExtraido,
+    paginas: extraido?.paginas ?? null,
   };
 }

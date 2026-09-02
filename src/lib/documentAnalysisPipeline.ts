@@ -5,6 +5,7 @@ import {
 } from "@/lib/openAiDocumentAnalysis";
 import { safeParseDados } from "@/lib/documentosApiUtils";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
 
 export const TIPOS_ANALISE_AUTOMATICA = [
   "notas_fiscais",
@@ -184,13 +185,18 @@ export async function baixarEAnalisarArquivo(
     throw new Error(`Tipo de arquivo nao suportado: ${mimeType}.`);
   }
 
-  return analisarDocumentoComOpenAi({
+  const bytes = await fileBlob.arrayBuffer();
+  const arquivoHash = createHash("sha256").update(Buffer.from(bytes)).digest("hex");
+
+  const analise = await analisarDocumentoComOpenAi({
     fileName: resolveFileName(params.path),
     mimeType,
-    bytes: await fileBlob.arrayBuffer(),
+    bytes,
     dadosAtuais: params.dadosAtuais ?? null,
     tipoDocumento: params.tipoDocumento,
   });
+
+  return { ...analise, arquivoHash };
 }
 
 export async function registrarAnaliseIa(

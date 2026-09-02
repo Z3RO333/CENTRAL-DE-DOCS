@@ -61,6 +61,19 @@ function resultadoBase(overrides: Partial<DocumentoAnaliseIa> = {}): DocumentoAn
   };
 }
 
+function analiseBase(
+  overrides: Partial<Awaited<ReturnType<typeof analisarDocumentoComOpenAi>>> = {},
+) {
+  return {
+    provider: "azure-openai",
+    model: "gpt-5-chat",
+    resultado: resultadoBase(),
+    textoExtraido: "texto extraido do documento",
+    paginas: 1,
+    ...overrides,
+  };
+}
+
 function recomendacaoCriticaBase(
   overrides: Partial<RecomendacaoCritica> = {},
 ): RecomendacaoCritica {
@@ -427,11 +440,9 @@ describe("baixarEAnalisarArquivo", () => {
       storage: { from: () => ({ download }) },
     } as unknown as SupabaseClient;
 
-    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
-      provider: "azure-openai",
-      model: "gpt-5-chat",
-      resultado: resultadoBase(),
-    });
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce(
+      analiseBase({ resultado: resultadoBase() }),
+    );
 
     const resultado = await baixarEAnalisarArquivo(supabase, {
       path: "pasta/nota.pdf",
@@ -786,11 +797,9 @@ describe("processarDocumentoComIa", () => {
   });
 
   it("roda a analise e marca concluida para um documento em escopo", async () => {
-    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
-      provider: "azure-openai",
-      model: "gpt-5-chat",
-      resultado: resultadoBase(),
-    });
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce(
+      analiseBase({ resultado: resultadoBase() }),
+    );
 
     const { supabase, updates } = criarSupabaseFake({
       registro: {
@@ -880,15 +889,13 @@ describe("processarDocumentoComIa", () => {
   });
 
   it("vincula equipamento quando ha match confiavel para registro_laudos", async () => {
-    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
-      provider: "azure-openai",
-      model: "gpt-5-chat",
-      resultado: resultadoBase({
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce(
+      analiseBase({ resultado: resultadoBase({
         equipamento_tipo: "Gerador",
         equipamento_identificacao: null,
         equipamento_numero_serie: null,
-      }),
-    });
+      }) }),
+    );
 
     const { supabase, updates } = criarSupabaseFake({
       registro: {
@@ -912,13 +919,11 @@ describe("processarDocumentoComIa", () => {
   });
 
   it("grava recomendacoes_criticas e forca necessita_revisao quando ha achado critica", async () => {
-    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
-      provider: "azure-openai",
-      model: "gpt-5-chat",
-      resultado: resultadoBase({
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce(
+      analiseBase({ resultado: resultadoBase({
         recomendacoes_criticas: [recomendacaoCriticaBase({ prioridade: "critica" })],
-      }),
-    });
+      }) }),
+    );
 
     const { supabase, updates, inserts } = criarSupabaseFake({
       registro: {
@@ -940,13 +945,11 @@ describe("processarDocumentoComIa", () => {
   });
 
   it("nao forca revisao quando so ha achados de prioridade baixa", async () => {
-    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
-      provider: "azure-openai",
-      model: "gpt-5-chat",
-      resultado: resultadoBase({
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce(
+      analiseBase({ resultado: resultadoBase({
         recomendacoes_criticas: [recomendacaoCriticaBase({ prioridade: "preventiva" })],
-      }),
-    });
+      }) }),
+    );
 
     const { supabase, updates } = criarSupabaseFake({
       registro: {
@@ -967,11 +970,9 @@ describe("processarDocumentoComIa", () => {
   });
 
   it("nao insere linhas quando nao ha achados criticos", async () => {
-    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
-      provider: "azure-openai",
-      model: "gpt-5-chat",
-      resultado: resultadoBase({ recomendacoes_criticas: [] }),
-    });
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce(
+      analiseBase({ resultado: resultadoBase({ recomendacoes_criticas: [] }) }),
+    );
 
     const { supabase, inserts } = criarSupabaseFake({
       registro: {
@@ -990,15 +991,13 @@ describe("processarDocumentoComIa", () => {
   });
 
   it("marca necessita_revisao quando a loja tem equipamentos mas nenhum bate", async () => {
-    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
-      provider: "azure-openai",
-      model: "gpt-5-chat",
-      resultado: resultadoBase({
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce(
+      analiseBase({ resultado: resultadoBase({
         equipamento_tipo: "Subestacao",
         equipamento_identificacao: null,
         equipamento_numero_serie: null,
-      }),
-    });
+      }) }),
+    );
 
     const { supabase, updates } = criarSupabaseFake({
       registro: {
@@ -1022,15 +1021,13 @@ describe("processarDocumentoComIa", () => {
   });
 
   it("nao tenta match de equipamento quando a loja nao tem nenhum cadastrado", async () => {
-    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
-      provider: "azure-openai",
-      model: "gpt-5-chat",
-      resultado: resultadoBase({
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce(
+      analiseBase({ resultado: resultadoBase({
         equipamento_tipo: null,
         equipamento_identificacao: null,
         equipamento_numero_serie: null,
-      }),
-    });
+      }) }),
+    );
 
     const { supabase, updates } = criarSupabaseFake({
       registro: {
@@ -1050,11 +1047,9 @@ describe("processarDocumentoComIa", () => {
   });
 
   it("nao tenta match de equipamento para tipos fora de escopo mesmo com equipamentos cadastrados", async () => {
-    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
-      provider: "azure-openai",
-      model: "gpt-5-chat",
-      resultado: resultadoBase(),
-    });
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce(
+      analiseBase({ resultado: resultadoBase() }),
+    );
 
     const { supabase, updates } = criarSupabaseFake({
       registro: {
@@ -1078,15 +1073,13 @@ describe("processarDocumentoComIa", () => {
   });
 
   it("mantem concluida quando nao ha nenhum sinal de equipamento, mesmo com equipamentos cadastrados na loja", async () => {
-    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
-      provider: "azure-openai",
-      model: "gpt-5-chat",
-      resultado: resultadoBase({
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce(
+      analiseBase({ resultado: resultadoBase({
         equipamento_tipo: null,
         equipamento_identificacao: null,
         equipamento_numero_serie: null,
-      }),
-    });
+      }) }),
+    );
 
     const { supabase, updates } = criarSupabaseFake({
       registro: {
@@ -1111,15 +1104,13 @@ describe("processarDocumentoComIa", () => {
   });
 
   it("preserva equipamento_id ja vinculado e nao consulta equipamentos ativos novamente", async () => {
-    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce({
-      provider: "azure-openai",
-      model: "gpt-5-chat",
-      resultado: resultadoBase({
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce(
+      analiseBase({ resultado: resultadoBase({
         equipamento_tipo: "Gerador",
         equipamento_identificacao: null,
         equipamento_numero_serie: null,
-      }),
-    });
+      }) }),
+    );
 
     const { supabase, updates } = criarSupabaseFake({
       registro: {
