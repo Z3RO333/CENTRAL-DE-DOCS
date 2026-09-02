@@ -1,0 +1,235 @@
+export type TaxonomiaSeedTermo = {
+  termo: string;
+  categoria: string;
+  tipo: "assunto" | "equipamento";
+  sinonimos: string[];
+};
+
+// Semente inicial da taxonomia de assuntos/equipamentos de manutencao.
+// "equipamento" = ativo fisico especifico citado em documentos (ex.: gerador,
+// elevador). "assunto" = categoria de servico mais ampla, nao um ativo unico.
+// Cresce em producao via taxonomia_sugestoes -> aprovacao de admin, nunca
+// editando esta lista diretamente para termos aprendidos depois do deploy.
+export const TAXONOMIA_SEED: TaxonomiaSeedTermo[] = [
+  {
+    termo: "gerador",
+    categoria: "Gerador / nobreak",
+    tipo: "equipamento",
+    sinonimos: [
+      "grupo gerador",
+      "motogerador",
+      "gmg",
+      "alternador",
+      "motor diesel",
+      "teste de carga",
+      "banco de carga",
+      "nobreak",
+      "ups",
+      "ats",
+      "transferencia automatica",
+      "combustivel",
+      "oleo diesel",
+    ],
+  },
+  {
+    termo: "ar condicionado",
+    categoria: "Ar condicionado / climatizacao",
+    tipo: "equipamento",
+    sinonimos: [
+      "climatizacao",
+      "split",
+      "fancoil",
+      "chiller",
+      "condensadora",
+      "evaporadora",
+      "gas refrigerante",
+      "compressor",
+      "dutos de ar",
+      "vrf",
+      "cassete",
+    ],
+  },
+  {
+    termo: "elevador",
+    categoria: "Elevadores / escadas rolantes",
+    tipo: "equipamento",
+    sinonimos: [
+      "casa de maquinas",
+      "cabine do elevador",
+      "botoeira",
+      "cabo de tracao",
+      "freio do elevador",
+      "governador de velocidade",
+      "poco do elevador",
+    ],
+  },
+  {
+    termo: "escada rolante",
+    categoria: "Elevadores / escadas rolantes",
+    tipo: "equipamento",
+    sinonimos: ["esteira rolante", "degraus", "corrimao", "trilho"],
+  },
+  {
+    termo: "subestacao",
+    categoria: "Subestacao",
+    tipo: "equipamento",
+    sinonimos: [
+      "transformador",
+      "disjuntor",
+      "quadro de distribuicao",
+      "media tensao",
+      "baixa tensao",
+      "cabine primaria",
+      "para-raio",
+      "aterramento",
+    ],
+  },
+  {
+    termo: "extintor",
+    categoria: "Extintores / combate a incendio",
+    tipo: "equipamento",
+    sinonimos: [
+      "combate a incendio",
+      "sistema de incendio",
+      "hidrante",
+      "mangueira de incendio",
+      "sprinkler",
+      "alarme de incendio",
+      "deteccao de fumaca",
+      "brigada de incendio",
+      "recarga de extintor",
+    ],
+  },
+  {
+    termo: "refrigeracao",
+    categoria: "Refrigeracao",
+    tipo: "equipamento",
+    sinonimos: [
+      "camara fria",
+      "geladeira industrial",
+      "freezer",
+      "compressor de refrigeracao",
+      "unidade condensadora",
+    ],
+  },
+  {
+    termo: "controle de pragas",
+    categoria: "Controle de pragas / dedetizacao",
+    tipo: "equipamento",
+    sinonimos: ["dedetizacao", "desratizacao", "descupinizacao", "praga urbana", "inseticida"],
+  },
+  {
+    termo: "plataforma de acessibilidade",
+    categoria: "Portas automaticas / sensores",
+    tipo: "equipamento",
+    sinonimos: ["plataforma elevatoria", "acessibilidade", "cadeirante"],
+  },
+  {
+    termo: "monta cargas",
+    categoria: "Elevadores / escadas rolantes",
+    tipo: "equipamento",
+    sinonimos: ["montacargas", "elevador de carga"],
+  },
+  {
+    termo: "poco artesiano",
+    categoria: "Hidraulica",
+    tipo: "equipamento",
+    sinonimos: ["poco semi-artesiano", "captacao de agua", "bomba submersa"],
+  },
+  {
+    termo: "balancas",
+    categoria: "Balancas / calibracao",
+    tipo: "assunto",
+    sinonimos: ["calibracao", "afericao", "pesagem"],
+  },
+  {
+    termo: "cftv",
+    categoria: "CFTV / seguranca patrimonial",
+    tipo: "assunto",
+    sinonimos: ["camera de seguranca", "monitoramento", "seguranca patrimonial", "alarme"],
+  },
+  {
+    termo: "comunicacao visual",
+    categoria: "Comunicacao visual / fachada",
+    tipo: "assunto",
+    sinonimos: ["fachada", "letreiro", "placa", "banner"],
+  },
+  {
+    termo: "eletrica",
+    categoria: "Eletrica",
+    tipo: "assunto",
+    sinonimos: ["instalacao eletrica", "quadro eletrico", "disjuntores", "fiacao", "curto-circuito"],
+  },
+  {
+    termo: "exaustao",
+    categoria: "Exaustao / ventilacao",
+    tipo: "assunto",
+    sinonimos: ["ventilacao", "coifa", "dutos de exaustao", "exaustor"],
+  },
+  {
+    termo: "gas",
+    categoria: "Gas / GLP",
+    tipo: "assunto",
+    sinonimos: ["glp", "botijao", "tubulacao de gas", "vazamento de gas"],
+  },
+  {
+    termo: "hidraulica",
+    categoria: "Hidraulica",
+    tipo: "assunto",
+    sinonimos: ["encanamento", "vazamento", "tubulacao", "caixa dagua", "bomba dagua"],
+  },
+  {
+    termo: "iluminacao",
+    categoria: "Iluminacao",
+    tipo: "assunto",
+    sinonimos: ["lampada", "luminaria", "refletor", "sensor de presenca"],
+  },
+  {
+    termo: "limpeza e conservacao",
+    categoria: "Limpeza e conservacao",
+    tipo: "assunto",
+    sinonimos: ["conservacao", "faxina", "higienizacao"],
+  },
+  {
+    termo: "manutencao civil",
+    categoria: "Manutencao civil",
+    tipo: "assunto",
+    sinonimos: ["reforma", "alvenaria", "reparo estrutural", "infiltracao"],
+  },
+  {
+    termo: "pintura",
+    categoria: "Pintura / reparos",
+    tipo: "assunto",
+    sinonimos: ["reparo", "retoque", "repintura"],
+  },
+  {
+    termo: "portas automaticas",
+    categoria: "Portas automaticas / sensores",
+    tipo: "assunto",
+    sinonimos: ["catraca", "roleta", "portao automatico"],
+  },
+  {
+    termo: "rede",
+    categoria: "Rede / TI / PDV",
+    tipo: "assunto",
+    sinonimos: ["ti", "pdv", "cabeamento", "roteador", "switch", "ponto de venda"],
+  },
+  {
+    termo: "residuos",
+    categoria: "Residuos / reciclagem",
+    tipo: "assunto",
+    sinonimos: ["reciclagem", "coleta seletiva", "descarte"],
+  },
+  {
+    termo: "sinalizacao",
+    categoria: "Sinalizacao / comunicacao interna",
+    tipo: "assunto",
+    sinonimos: ["comunicacao interna", "placa de sinalizacao"],
+  },
+  {
+    termo: "termografia",
+    categoria: "Eletrica",
+    tipo: "assunto",
+    sinonimos: ["inspecao termografica", "camera termica", "termovisao"],
+  },
+];
