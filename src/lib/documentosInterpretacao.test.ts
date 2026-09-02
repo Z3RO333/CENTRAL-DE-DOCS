@@ -85,4 +85,11 @@ describe("interpretarConsulta", () => {
     expect(result.consultaSemantica).toBe("minha pergunta");
     expect(result.ordenar).toBe("relevancia");
   });
+
+  it("retorna fallback quando callAzureOpenAiChat lanca erro", async () => {
+    vi.mocked(callAzureOpenAiChat).mockRejectedValueOnce(new Error("rate limit"));
+    const result = await interpretarConsulta("minha pergunta", TERMOS);
+    expect(result.consultaSemantica).toBe("minha pergunta");
+    expect(result.ordenar).toBe("relevancia");
+  });
 });

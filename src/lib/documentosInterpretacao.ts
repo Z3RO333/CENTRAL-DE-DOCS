@@ -36,15 +36,19 @@ export async function interpretarConsulta(
   pergunta: string,
   termosDisponiveis: string[],
 ): Promise<ConsultaInterpretada> {
-  const result = await callAzureOpenAiChat({
-    messages: [
-      { role: "system", content: promptSistema(termosDisponiveis) },
-      { role: "user", content: pergunta },
-    ],
-    maxTokens: 500,
-  });
-
-  const resposta = result.content ?? "";
+  let resposta = "";
+  try {
+    const result = await callAzureOpenAiChat({
+      messages: [
+        { role: "system", content: promptSistema(termosDisponiveis) },
+        { role: "user", content: pergunta },
+      ],
+      maxTokens: 500,
+    });
+    resposta = result.content ?? "";
+  } catch {
+    return { consultaSemantica: pergunta, ordenar: "relevancia" };
+  }
 
   let parsed: Partial<ConsultaInterpretada> = {};
   try {
