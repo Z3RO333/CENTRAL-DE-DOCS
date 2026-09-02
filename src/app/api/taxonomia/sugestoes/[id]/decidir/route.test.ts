@@ -173,6 +173,8 @@ describe("POST /api/taxonomia/sugestoes/[id]/decidir", () => {
     });
     const insertSinonimo = chamadas.find((c) => c.tabela === "taxonomia_sinonimos" && c.metodo === "insert");
     expect(insertSinonimo?.payload).toMatchObject({ termo_id: "termo-novo-1", variacao: "termovisao" });
+    const updateSugestao = chamadas.find((c) => c.tabela === "taxonomia_sugestoes" && c.metodo === "update");
+    expect(updateSugestao?.payload).toMatchObject({ status: "aprovada" });
   });
 
   it("aprovar_novo sem categoria devolve 400", async () => {
