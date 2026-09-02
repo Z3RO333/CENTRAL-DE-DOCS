@@ -211,26 +211,24 @@ export async function buscarDocumentosConteudo(
   // Ruling 1: expand query text with taxonomy synonyms when assunto is set
   let consultaTexto = consulta.consultaSemantica;
   if (consulta.assunto) {
-    const { data: termoRow } = (await supabaseAdmin
-      .from("taxonomia_termos")
-      .select("id")
-      .eq("termo", consulta.assunto)
-      .maybeSingle()) as { data: { id: string } | null; error: unknown };
-
-    if (termoRow?.id) {
-      const { data: sinRows } = (await supabaseAdmin
-        .from("taxonomia_sinonimos")
-        .select("variacao")
-        .eq("termo_id", termoRow.id)) as {
-        data: { variacao: string }[] | null;
-        error: unknown;
-      };
-
-      const variacoes = [
-        consulta.assunto,
-        ...((sinRows ?? []) as { variacao: string }[]).map((s) => s.variacao),
-      ];
-      consultaTexto = variacoes.join(" ") + " " + consulta.consultaSemantica;
+    try {
+      const { data: termoRow, error: termoErr } = await supabaseAdmin
+        .from("taxonomia_termos")
+        .select("id")
+        .eq("termo", consulta.assunto!)
+        .maybeSingle();
+      if (termoErr) throw termoErr;
+      if (termoRow?.id) {
+        const { data: sinRows, error: sinErr } = await supabaseAdmin
+          .from("taxonomia_sinonimos")
+          .select("variacao")
+          .eq("termo_id", termoRow.id);
+        if (sinErr) throw sinErr;
+        const variacoes = [consulta.assunto!, ...(sinRows ?? []).map((s: { variacao: string }) => s.variacao)];
+        consultaTexto = variacoes.join(" ") + " " + consulta.consultaSemantica;
+      }
+    } catch {
+      // Best-effort: taxonomy expansion failed, continue with original text
     }
   }
 

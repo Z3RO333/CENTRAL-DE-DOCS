@@ -190,6 +190,21 @@ describe("buscarDocumentosConteudo", () => {
     expect(resultado.confianca).toBe("alta"); // doc-1 score > 2x doc-2 score
   });
 
+  it("retorna lista vazia com confianca baixa quando Stage 1 nao encontra documentos", async () => {
+    const supabase = makeSupabase([], []); // Stage 1 returns no IDs
+
+    const resultado = await buscarDocumentosConteudo(
+      paramsBase,
+      supabase as never,
+      "qualquer"
+    );
+
+    expect(resultado.documentos).toHaveLength(0);
+    expect(resultado.confianca).toBe("baixa");
+    expect(resultado.recorteExcedido).toBe(false);
+    expect(supabase.rpc).not.toHaveBeenCalled(); // RPC not called when no IDs
+  });
+
   it("nao quebra quando assunto esta definido e taxonomia retorna vazio", async () => {
     const supabase = makeSupabase(
       ["doc-1"],
