@@ -1,7 +1,7 @@
 -- Busca semantica (Fase 1): texto extraido dos documentos e trechos vetorizados.
 -- Acesso exclusivamente via supabaseAdmin na camada de API (padrao do projeto).
 
-create extension if not exists vector;
+create extension if not exists vector with schema extensions;
 
 create table public.documento_conteudo (
   documento_id uuid primary key references public.formularios(id) on delete cascade,
