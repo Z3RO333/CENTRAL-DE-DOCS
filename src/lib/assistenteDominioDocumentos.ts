@@ -1,4 +1,6 @@
 import type { AzureOpenAiTool } from "@/lib/azureOpenAi";
+import { interpretarConsulta } from "@/lib/documentosInterpretacao";
+import { buscarDocumentosConteudo } from "@/lib/documentosRecuperacao";
 import {
   DOCUMENTO_COPILOT_STATUS,
   DOCUMENTO_COPILOT_TYPES,
@@ -15,13 +17,14 @@ import {
   hasDocumentosAccess,
   type GerenteAccessRow,
 } from "@/lib/apiAuth";
-import type {
-  AssistenteContext,
-  AssistenteDominio,
-  AssistenteInsights,
-  AssistenteResultItem,
-  AssistenteSearchOutcome,
-  AssistenteToolResult,
+import {
+  createEmptyAssistenteInsights,
+  type AssistenteContext,
+  type AssistenteDominio,
+  type AssistenteInsights,
+  type AssistenteResultItem,
+  type AssistenteSearchOutcome,
+  type AssistenteToolResult,
 } from "@/lib/assistenteTypes";
 
 const TOOLS: AzureOpenAiTool[] = [
@@ -46,6 +49,24 @@ const TOOLS: AzureOpenAiTool[] = [
           somenteDisponiveisLote: { type: "boolean" },
         },
         required: [],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "buscar_documentos_conteudo",
+      description:
+        "Busca documentos pelo CONTEÚDO (texto de laudos, contratos, relatórios) usando busca semântica e textual. Use para perguntas sobre assuntos técnicos, equipamentos, problemas encontrados ou qualquer consulta sobre O QUE está escrito no documento. NÃO use para listagens por metadados (ex.: 'todas as NFs de março') — para isso use buscar_documentos.",
+      parameters: {
+        type: "object" as const,
+        properties: {
+          pergunta: {
+            type: "string",
+            description: "A pergunta em linguagem natural sobre o conteúdo dos documentos",
+          },
+        },
+        required: ["pergunta"],
       },
     },
   },
@@ -175,6 +196,115 @@ async function executarBuscarDocumentos(
   return { content: JSON.stringify(resumoParaModelo), outcome };
 }
 
+async function executarBuscarDocumentosConteudo(
+  args: Record<string, unknown>,
+  ctx: AssistenteContext,
+): Promise<AssistenteToolResult> {
+  const pergunta = typeof args.pergunta === "string" ? args.pergunta : "";
+  if (!pergunta.trim()) {
+    return { content: JSON.stringify({ erro: "Informe uma pergunta para buscar pelo conteúdo." }) };
+  }
+
+  // Load taxonomy terms
+  const { data: termosData } = await ctx.supabaseAdmin
+    .from("taxonomia_termos")
+    .select("termo")
+    .eq("ativo", true);
+  const termosDisponiveis = (termosData ?? []).map((t: { termo: string }) => t.termo);
+
+  // Interpret the question
+  const consulta = await interpretarConsulta(pergunta, termosDisponiveis);
+
+  // Resolve lojaTermo → lojaId (best-effort)
+  let lojaId: string | undefined;
+  if (consulta.lojaTermo) {
+    const { data: lojas } = await ctx.supabaseAdmin
+      .from("lojas")
+      .select("id")
+      .ilike("nome", `%${consulta.lojaTermo}%`)
+      .limit(1);
+    lojaId = (lojas as Array<{ id: string }> | null)?.[0]?.id;
+  }
+
+  const { allowedPrestadores, gerenteEntries, canAccess } = await getDocumentosAccessInfo(ctx);
+
+  const resultado = await buscarDocumentosConteudo(
+    {
+      consulta,
+      lojaId,
+      userId: ctx.userId,
+      allowedPrestadores,
+      gerenteEntries,
+      canAccess,
+      filterPrestadores: [],
+      filterLojas: [],
+    },
+    ctx.supabaseAdmin,
+    pergunta,
+  );
+
+  // Enrich with metadata (titulo, abrirArquivoPath)
+  let metadataMap = new Map<string, { titulo: string; abrirArquivoPath: string | null }>();
+  if (resultado.documentos.length > 0) {
+    const ids = resultado.documentos.map((d) => d.documentoId);
+    const { data: forms } = await ctx.supabaseAdmin
+      .from("formularios")
+      .select("id, tipo, dados, arquivo_path")
+      .in("id", ids);
+    for (const f of (forms ?? []) as Array<{
+      id: string; tipo: string; dados: Record<string, unknown>; arquivo_path: string | null;
+    }>) {
+      const lojaNome = typeof f.dados?.["loja_nome"] === "string" ? f.dados["loja_nome"] : "";
+      const competencia = typeof f.dados?.["competencia"] === "string" ? f.dados["competencia"] : "";
+      const titulo = [f.tipo, lojaNome, competencia].filter(Boolean).join(" — ");
+      metadataMap.set(f.id, { titulo, abrirArquivoPath: f.arquivo_path });
+    }
+  }
+
+  const outcome: AssistenteSearchOutcome = {
+    dominio: "documentos",
+    filters: resultado.filtrosAplicados,
+    filtrosUrl: null,
+    summary: resultado.recorteExcedido
+      ? resultado.sugestaoRefinamento ?? "Muitos documentos. Refine a busca."
+      : resultado.documentos.length === 0
+        ? "Nenhum documento encontrado para essa consulta."
+        : `Encontrei ${resultado.documentos.length} documento(s) relevante(s).`,
+    results: resultado.documentos.map((d) => {
+      const meta = metadataMap.get(d.documentoId);
+      return {
+        id: d.documentoId,
+        titulo: meta?.titulo ?? d.documentoId,
+        subtitulo: d.trecho.slice(0, 120),
+        abrirArquivoPath: meta?.abrirArquivoPath ?? null,
+        justificativa: d.justificativa,
+        trechoCitado: d.trecho,
+        pagina: d.pagina ?? undefined,
+      };
+    }),
+    total: resultado.documentos.length,
+    insights: createEmptyAssistenteInsights(),
+    confianca: resultado.confianca,
+    sugestaoRefinamento: resultado.sugestaoRefinamento,
+  };
+
+  const resumoParaModelo = {
+    confianca: resultado.confianca,
+    recorteExcedido: resultado.recorteExcedido,
+    sugestaoRefinamento: resultado.sugestaoRefinamento,
+    filtrosAplicados: resultado.filtrosAplicados,
+    total: resultado.documentos.length,
+    amostra: resultado.documentos.slice(0, 5).map((d) => ({
+      documentoId: d.documentoId,
+      trecho: d.trecho.slice(0, 200),
+      justificativa: d.justificativa,
+      pagina: d.pagina,
+    })),
+  };
+
+  return { content: JSON.stringify(resumoParaModelo), outcome };
+}
+
 export const dominioDocumentos: AssistenteDominio = {
   id: "documentos",
   tools: TOOLS,
@@ -195,11 +325,18 @@ export const dominioDocumentos: AssistenteDominio = {
         );
       }
     }
+    partes.push(
+      "Use buscar_documentos_conteudo para perguntas sobre o CONTEÚDO dos documentos: assuntos técnicos, equipamentos, laudos, problemas. Use buscar_documentos para LISTAR ou FILTRAR por metadados.",
+      "Exemplos: 'laudo do gerador da Matriz' → buscar_documentos_conteudo. 'notas fiscais de março' → buscar_documentos.",
+    );
     return partes.join(" ");
   },
   executarTool: async (nome, args, ctx) => {
     if (nome === "buscar_documentos") {
       return executarBuscarDocumentos(args, ctx);
+    }
+    if (nome === "buscar_documentos_conteudo") {
+      return executarBuscarDocumentosConteudo(args, ctx);
     }
     return { content: JSON.stringify({ erro: `Ferramenta desconhecida: ${nome}` }) };
   },

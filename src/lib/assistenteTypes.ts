@@ -50,6 +50,13 @@ export type AssistenteResultItem = {
   url?: string | null;
   /** path de storage para abrir o arquivo assinado direto, quando aplicável */
   abrirArquivoPath?: string | null;
+  justificativa?: string;
+  trechoCitado?: string;
+  pagina?: number;
+  competencia?: string;
+  unidade?: string;
+  equipamento?: string;
+  resumo?: string;
 };
 
 export type AssistenteSearchOutcome = {
@@ -60,6 +67,8 @@ export type AssistenteSearchOutcome = {
   results: AssistenteResultItem[];
   total: number;
   insights: AssistenteInsights;
+  confianca?: "alta" | "media" | "baixa";
+  sugestaoRefinamento?: string;
 };
 
 export type AssistenteToolResult = {
