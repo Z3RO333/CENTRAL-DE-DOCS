@@ -245,7 +245,7 @@ async function executarBuscarDocumentosConteudo(
   );
 
   // Enrich with metadata (titulo, abrirArquivoPath)
-  let metadataMap = new Map<string, { titulo: string; abrirArquivoPath: string | null }>();
+  const metadataMap = new Map<string, { titulo: string; abrirArquivoPath: string | null }>();
   if (resultado.documentos.length > 0) {
     const ids = resultado.documentos.map((d) => d.documentoId);
     const { data: forms } = await ctx.supabaseAdmin

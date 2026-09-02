@@ -61,10 +61,9 @@ async function construirAllowlist(
     filterLojas,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   // The Supabase query builder's chained methods lose their precise return types
-  // when conditionally applied (e.g. .or(), .filter(), .eq() all return different
-  // generic instantiations), forcing `any` here so the chain remains composable.
+  // when conditionally applied; `any` keeps the chain composable.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query: any = supabaseAdmin
     .from("formularios")
     .select("id")
