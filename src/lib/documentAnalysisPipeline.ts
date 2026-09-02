@@ -5,6 +5,7 @@ import {
 } from "@/lib/openAiDocumentAnalysis";
 import { safeParseDados } from "@/lib/documentosApiUtils";
 import { indexarConteudoDocumento } from "@/lib/documentoIndexacao";
+import { classificarDocumento } from "@/lib/taxonomiaIndexacao";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 
@@ -510,6 +511,18 @@ export async function processarDocumentoComIa(
     } catch (err) {
       // Best-effort: indexacao e aditiva e nao pode derrubar a analise.
       console.error("[processarDocumentoComIa] Falha ao indexar conteudo:", err);
+    }
+
+    try {
+      await classificarDocumento(supabaseAdmin, {
+        documentoId: row.id,
+        texto: analise.textoExtraido,
+        equipamentoTipo: resultado.equipamento_tipo,
+        equipamentoIdentificacao: resultado.equipamento_identificacao,
+      });
+    } catch (err) {
+      // Best-effort: classificacao de taxonomia e aditiva e nao pode derrubar a analise.
+      console.error("[processarDocumentoComIa] Falha ao classificar taxonomia:", err);
     }
 
     return { status: statusFinal };

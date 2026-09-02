@@ -14,6 +14,10 @@ vi.mock("@/lib/documentoIndexacao", () => ({
   indexarConteudoDocumento: vi.fn(async () => ({ status: "indexado", chunks: 3 })),
 }));
 
+vi.mock("@/lib/taxonomiaIndexacao", () => ({
+  classificarDocumento: vi.fn(async () => ({ status: "classificado", termos: ["gerador"] })),
+}));
+
 import {
   deveAnalisarAutomaticamente,
   determinarStatusFinal,
@@ -32,6 +36,7 @@ import {
 } from "@/lib/documentAnalysisPipeline";
 import { analisarDocumentoComOpenAi } from "@/lib/openAiDocumentAnalysis";
 import { indexarConteudoDocumento } from "@/lib/documentoIndexacao";
+import { classificarDocumento } from "@/lib/taxonomiaIndexacao";
 import type { DocumentoAnaliseIa, RecomendacaoCritica } from "@/lib/openAiDocumentAnalysis";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -881,6 +886,65 @@ describe("processarDocumentoComIa", () => {
     });
 
     const resultado = await processarDocumentoComIa(supabase, "doc-idx-erro");
+
+    expect(resultado.status).toBe("concluida");
+    expect(updates.map((u) => u.payload.status_analise_ia)).toEqual([
+      "em_analise",
+      "concluida",
+    ]);
+  });
+
+  it("classifica o conteudo contra a taxonomia ao final do processamento bem-sucedido", async () => {
+    vi.mocked(classificarDocumento).mockClear();
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce(
+      analiseBase({
+        textoExtraido: "laudo do grupo gerador da matriz",
+        resultado: resultadoBase({ equipamento_tipo: "Gerador", equipamento_identificacao: "Gerador 01" }),
+      }),
+    );
+
+    const { supabase } = criarSupabaseFake({
+      registro: {
+        id: "doc-tax",
+        tipo: "registro_laudos",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/laudo.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: null,
+        created_at: "2026-07-10T00:00:00.000Z",
+      },
+    });
+
+    await processarDocumentoComIa(supabase, "doc-tax");
+
+    expect(classificarDocumento).toHaveBeenCalledTimes(1);
+    const [, params] = vi.mocked(classificarDocumento).mock.calls[0];
+    expect(params).toMatchObject({
+      documentoId: "doc-tax",
+      texto: "laudo do grupo gerador da matriz",
+      equipamentoTipo: "Gerador",
+      equipamentoIdentificacao: "Gerador 01",
+    });
+  });
+
+  it("falha na classificacao de taxonomia nao altera o status final da analise", async () => {
+    vi.mocked(classificarDocumento).mockClear();
+    vi.mocked(classificarDocumento).mockRejectedValueOnce(new Error("taxonomia indisponivel"));
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce(analiseBase());
+
+    const { supabase, updates } = criarSupabaseFake({
+      registro: {
+        id: "doc-tax-erro",
+        tipo: "notas_fiscais",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/nota.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: null,
+        created_at: "2026-07-10T00:00:00.000Z",
+      },
+    });
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-tax-erro");
 
     expect(resultado.status).toBe("concluida");
     expect(updates.map((u) => u.payload.status_analise_ia)).toEqual([
