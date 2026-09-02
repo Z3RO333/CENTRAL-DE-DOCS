@@ -28,6 +28,7 @@ import {
   X,
   Wrench,
   ClipboardCheck,
+  Tags,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabaseClient";
@@ -212,6 +213,13 @@ export default function AppShell({
           label: "Equipamentos",
           icon: Wrench,
           isActive: pathname?.startsWith("/equipamentos"),
+          isVisible: isAdmin,
+        },
+        {
+          href: "/taxonomia",
+          label: "Taxonomia",
+          icon: Tags,
+          isActive: pathname?.startsWith("/taxonomia"),
           isVisible: isAdmin,
         },
       ],
