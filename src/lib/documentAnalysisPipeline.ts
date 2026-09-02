@@ -4,6 +4,7 @@ import {
   type RecomendacaoCritica,
 } from "@/lib/openAiDocumentAnalysis";
 import { safeParseDados } from "@/lib/documentosApiUtils";
+import { indexarConteudoDocumento } from "@/lib/documentoIndexacao";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 
@@ -301,6 +302,7 @@ type FormularioRow = {
   arquivo_assinado_path: string | null;
   prestador_id: string | null;
   equipamento_id: string | null;
+  created_at?: string | null;
 };
 
 export type EquipamentoAtivo = {
@@ -370,7 +372,7 @@ export async function processarDocumentoComIa(
   try {
     const { data: registro, error: registroError } = await supabaseAdmin
       .from("formularios")
-      .select("id,tipo,dados,arquivo_path,arquivo_assinado_path,prestador_id,equipamento_id")
+      .select("id,tipo,dados,arquivo_path,arquivo_assinado_path,prestador_id,equipamento_id,created_at")
       .eq("id", documentoId)
       .maybeSingle();
 
@@ -420,11 +422,12 @@ export async function processarDocumentoComIa(
       return { status: "erro", motivo: "Documento sem arquivo." };
     }
 
-    const { provider, model, resultado } = await baixarEAnalisarArquivo(supabaseAdmin, {
+    const analise = await baixarEAnalisarArquivo(supabaseAdmin, {
       path,
       tipoDocumento: row.tipo,
       dadosAtuais: dados,
     });
+    const { provider, model, resultado } = analise;
 
     await registrarAnaliseIa(supabaseAdmin, {
       documentoId: row.id,
@@ -487,6 +490,27 @@ export async function processarDocumentoComIa(
       .from("formularios")
       .update(updatePayload)
       .eq("id", row.id);
+
+    try {
+      await indexarConteudoDocumento(supabaseAdmin, {
+        documentoId: row.id,
+        texto: analise.textoExtraido,
+        origem: analise.textoExtraido ? "ocr" : "nao_aplicavel",
+        paginas: analise.paginas,
+        arquivoHash: analise.arquivoHash,
+        metadados: {
+          lojaId,
+          tipo: row.tipo,
+          competencia,
+          equipamentoId,
+          prestadorId: row.prestador_id ?? null,
+          documentoCreatedAt: row.created_at ?? null,
+        },
+      });
+    } catch (err) {
+      // Best-effort: indexacao e aditiva e nao pode derrubar a analise.
+      console.error("[processarDocumentoComIa] Falha ao indexar conteudo:", err);
+    }
 
     return { status: statusFinal };
   } catch (err) {

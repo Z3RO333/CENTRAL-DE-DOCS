@@ -10,6 +10,10 @@ vi.mock("@/lib/openAiDocumentAnalysis", async () => {
   };
 });
 
+vi.mock("@/lib/documentoIndexacao", () => ({
+  indexarConteudoDocumento: vi.fn(async () => ({ status: "indexado", chunks: 3 })),
+}));
+
 import {
   deveAnalisarAutomaticamente,
   determinarStatusFinal,
@@ -27,6 +31,7 @@ import {
   type EquipamentoAtivo,
 } from "@/lib/documentAnalysisPipeline";
 import { analisarDocumentoComOpenAi } from "@/lib/openAiDocumentAnalysis";
+import { indexarConteudoDocumento } from "@/lib/documentoIndexacao";
 import type { DocumentoAnaliseIa, RecomendacaoCritica } from "@/lib/openAiDocumentAnalysis";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -817,6 +822,71 @@ describe("processarDocumentoComIa", () => {
     expect(resultado.status).toBe("concluida");
     const statusGravados = updates.map((u) => u.payload.status_analise_ia);
     expect(statusGravados).toEqual(["em_analise", "concluida"]);
+  });
+
+  it("indexa o conteudo ao final do processamento bem-sucedido", async () => {
+    vi.mocked(indexarConteudoDocumento).mockClear();
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce(
+      analiseBase({ textoExtraido: "laudo do grupo gerador da matriz", paginas: 2 }),
+    );
+
+    const { supabase } = criarSupabaseFake({
+      registro: {
+        id: "doc-idx",
+        tipo: "notas_fiscais",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/nota.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: "prest-1",
+        created_at: "2026-07-10T00:00:00.000Z",
+      },
+    });
+
+    await processarDocumentoComIa(supabase, "doc-idx");
+
+    expect(indexarConteudoDocumento).toHaveBeenCalledTimes(1);
+    const [, params] = vi.mocked(indexarConteudoDocumento).mock.calls[0];
+    expect(params).toMatchObject({
+      documentoId: "doc-idx",
+      texto: "laudo do grupo gerador da matriz",
+      origem: "ocr",
+      paginas: 2,
+      metadados: expect.objectContaining({
+        lojaId: "loja-1",
+        tipo: "notas_fiscais",
+        competencia: "07/2026",
+        prestadorId: "prest-1",
+      }),
+    });
+    expect(typeof params.arquivoHash).toBe("string");
+  });
+
+  it("falha na indexacao nao altera o status final da analise", async () => {
+    vi.mocked(indexarConteudoDocumento).mockClear();
+    vi.mocked(indexarConteudoDocumento).mockRejectedValueOnce(
+      new Error("pgvector fora do ar"),
+    );
+    vi.mocked(analisarDocumentoComOpenAi).mockResolvedValueOnce(analiseBase());
+
+    const { supabase, updates } = criarSupabaseFake({
+      registro: {
+        id: "doc-idx-erro",
+        tipo: "notas_fiscais",
+        dados: { loja_id: "loja-1", competencia: "07/2026" },
+        arquivo_path: "pasta/nota.pdf",
+        arquivo_assinado_path: null,
+        prestador_id: null,
+        created_at: "2026-07-10T00:00:00.000Z",
+      },
+    });
+
+    const resultado = await processarDocumentoComIa(supabase, "doc-idx-erro");
+
+    expect(resultado.status).toBe("concluida");
+    expect(updates.map((u) => u.payload.status_analise_ia)).toEqual([
+      "em_analise",
+      "concluida",
+    ]);
   });
 
   it("marca erro quando a analise por IA falha (ex.: OCR fora do ar)", async () => {
