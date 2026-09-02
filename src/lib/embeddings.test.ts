@@ -33,7 +33,7 @@ describe("gerarEmbeddings", () => {
   });
 
   it("monta a URL de embeddings a partir do endpoint base", async () => {
-    const fetchMock = vi.fn(async () => respostaOk(1));
+    const fetchMock = vi.fn(async (_url: string) => respostaOk(1));
     vi.stubGlobal("fetch", fetchMock);
 
     await gerarEmbeddings(["laudo do gerador"]);
@@ -48,7 +48,7 @@ describe("gerarEmbeddings", () => {
   it("deriva a base quando o endpoint ja aponta para chat/completions", async () => {
     process.env.AZURE_OPENAI_ENDPOINT =
       "https://exemplo.openai.azure.com/openai/deployments/gpt-5-chat/chat/completions?api-version=2025-01-01-preview";
-    const fetchMock = vi.fn(async () => respostaOk(1));
+    const fetchMock = vi.fn(async (_url: string) => respostaOk(1));
     vi.stubGlobal("fetch", fetchMock);
 
     await gerarEmbeddings(["laudo"]);
