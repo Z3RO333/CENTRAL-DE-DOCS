@@ -53,7 +53,7 @@ const TOOLS: AzureOpenAiTool[] = [
     },
   },
   {
-    type: "function" as const,
+    type: "function",
     function: {
       name: "buscar_documentos_conteudo",
       description:
@@ -206,10 +206,11 @@ async function executarBuscarDocumentosConteudo(
   }
 
   // Load taxonomy terms
-  const { data: termosData } = await ctx.supabaseAdmin
+  const { data: termosData, error: termosError } = await ctx.supabaseAdmin
     .from("taxonomia_termos")
     .select("termo")
     .eq("ativo", true);
+  if (termosError) throw termosError;
   const termosDisponiveis = (termosData ?? []).map((t: { termo: string }) => t.termo);
 
   // Interpret the question
@@ -327,7 +328,7 @@ export const dominioDocumentos: AssistenteDominio = {
     }
     partes.push(
       "Use buscar_documentos_conteudo para perguntas sobre o CONTEÚDO dos documentos: assuntos técnicos, equipamentos, laudos, problemas. Use buscar_documentos para LISTAR ou FILTRAR por metadados.",
-      "Exemplos: 'laudo do gerador da Matriz' → buscar_documentos_conteudo. 'notas fiscais de março' → buscar_documentos.",
+      "Exemplos: 'laudo do gerador da Matriz' → buscar_documentos_conteudo. 'notas fiscais de março' → buscar_documentos. 'tem recomendação de troca de peças do elevador?' → buscar_documentos_conteudo.",
     );
     return partes.join(" ");
   },
