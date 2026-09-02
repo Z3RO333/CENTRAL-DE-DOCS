@@ -44,3 +44,4 @@ next-env.d.ts
 # playwright mcp (snapshots, screenshots, logs temporários)
 .playwright-mcp/
 .superpowers/
+.worktrees/
