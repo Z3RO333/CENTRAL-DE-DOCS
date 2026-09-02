@@ -184,7 +184,12 @@ describe("indexarConteudoDocumento", () => {
     expect(resultado).toEqual({ status: "pulado", chunks: 0, detalhe: "sem_texto" });
     expect(mockedEmbeddings).not.toHaveBeenCalled();
     const upsert = chamadas.find((c) => c.metodo === "upsert");
-    expect(upsert?.payload).toMatchObject({ origem: "nao_aplicavel" });
+    // indexado_em deve ser um timestamp (nao null): documento sem texto e conclusivo,
+    // nao pendente — null o manteria no conjunto de reprocessamento indefinidamente.
+    expect(upsert?.payload).toMatchObject({
+      origem: "nao_aplicavel",
+      indexado_em: expect.any(String),
+    });
   });
 
   it("nao lanca quando o embedding falha: registra o erro e devolve status erro", async () => {

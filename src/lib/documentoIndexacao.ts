@@ -59,17 +59,23 @@ export async function indexarConteudoDocumento(
 
   try {
     if (!texto) {
-      await supabaseAdmin.from("documento_conteudo").upsert({
-        documento_id: params.documentoId,
-        texto: "",
-        origem: "nao_aplicavel",
-        paginas: params.paginas,
-        arquivo_hash: params.arquivoHash,
-        caracteres: 0,
-        indexado_em: null,
-        erro: "Sem texto extraido para indexar.",
-        updated_at: agora,
-      });
+      // indexado_em recebe timestamp (nao null): documentos sem texto sao conclusivos,
+      // nao pendentes. null significaria "ainda por fazer" e o backfill os retomaria
+      // indefinidamente. Falhas genuinas (Finding 1) ficam com indexado_em null.
+      const { error: erroUpsertNaoAplicavel } = await supabaseAdmin
+        .from("documento_conteudo")
+        .upsert({
+          documento_id: params.documentoId,
+          texto: "",
+          origem: "nao_aplicavel",
+          paginas: params.paginas,
+          arquivo_hash: params.arquivoHash,
+          caracteres: 0,
+          indexado_em: agora,
+          erro: "Sem texto extraido para indexar.",
+          updated_at: agora,
+        });
+      if (erroUpsertNaoAplicavel) throw erroUpsertNaoAplicavel;
       return { status: "pulado", chunks: 0, detalhe: "sem_texto" };
     }
 
@@ -88,17 +94,20 @@ export async function indexarConteudoDocumento(
       return { status: "pulado", chunks: 0, detalhe: "hash_igual" };
     }
 
-    await supabaseAdmin.from("documento_conteudo").upsert({
-      documento_id: params.documentoId,
-      texto,
-      origem: params.origem,
-      paginas: params.paginas,
-      arquivo_hash: params.arquivoHash,
-      caracteres: texto.length,
-      indexado_em: null,
-      erro: null,
-      updated_at: agora,
-    });
+    const { error: erroUpsertConteudo } = await supabaseAdmin
+      .from("documento_conteudo")
+      .upsert({
+        documento_id: params.documentoId,
+        texto,
+        origem: params.origem,
+        paginas: params.paginas,
+        arquivo_hash: params.arquivoHash,
+        caracteres: texto.length,
+        indexado_em: null,
+        erro: null,
+        updated_at: agora,
+      });
+    if (erroUpsertConteudo) throw erroUpsertConteudo;
 
     const chunks = dividirEmChunks(texto);
     if (chunks.length === 0) {
@@ -112,31 +121,36 @@ export async function indexarConteudoDocumento(
 
     const embeddings = await gerarEmbeddings(chunks.map((chunk) => chunk.texto));
 
-    await supabaseAdmin
+    const { error: erroDelete } = await supabaseAdmin
       .from("documento_chunks")
       .delete()
       .eq("documento_id", params.documentoId);
+    if (erroDelete) throw erroDelete;
 
-    await supabaseAdmin.from("documento_chunks").insert(
-      chunks.map((chunk, indice) => ({
-        documento_id: params.documentoId,
-        ordem: chunk.ordem,
-        pagina: chunk.pagina,
-        texto: chunk.texto,
-        embedding: paraVetorPg(embeddings[indice] ?? []),
-        loja_id: params.metadados.lojaId,
-        tipo: params.metadados.tipo,
-        competencia: params.metadados.competencia,
-        equipamento_id: params.metadados.equipamentoId,
-        prestador_id: params.metadados.prestadorId,
-        documento_created_at: params.metadados.documentoCreatedAt,
-      })),
-    );
+    const { error: erroInsert } = await supabaseAdmin
+      .from("documento_chunks")
+      .insert(
+        chunks.map((chunk, indice) => ({
+          documento_id: params.documentoId,
+          ordem: chunk.ordem,
+          pagina: chunk.pagina,
+          texto: chunk.texto,
+          embedding: paraVetorPg(embeddings[indice] ?? []),
+          loja_id: params.metadados.lojaId,
+          tipo: params.metadados.tipo,
+          competencia: params.metadados.competencia,
+          equipamento_id: params.metadados.equipamentoId,
+          prestador_id: params.metadados.prestadorId,
+          documento_created_at: params.metadados.documentoCreatedAt,
+        })),
+      );
+    if (erroInsert) throw erroInsert;
 
-    await supabaseAdmin
+    const { error: erroUpdate } = await supabaseAdmin
       .from("documento_conteudo")
       .update({ indexado_em: new Date().toISOString(), erro: null })
       .eq("documento_id", params.documentoId);
+    if (erroUpdate) throw erroUpdate;
 
     return { status: "indexado", chunks: chunks.length };
   } catch (err) {

@@ -41,24 +41,35 @@ export async function POST(request: Request) {
       : LIMITE_PADRAO;
 
     // Teto diario protege o custo de OCR (cobrado por pagina).
-    const limiteDiario = Number(process.env.INDEXACAO_LIMITE_DIARIO ?? "");
-    if (Number.isFinite(limiteDiario) && limiteDiario > 0) {
-      const inicioDoDia = new Date();
-      inicioDoDia.setUTCHours(0, 0, 0, 0);
-      const { count } = await supabaseAdmin
-        .from("documento_conteudo")
-        .select("documento_id", { count: "exact", head: true })
-        .gte("indexado_em", inicioDoDia.toISOString());
-      if ((count ?? 0) >= limiteDiario) {
-        return NextResponse.json({
-          processados: 0,
-          indexados: 0,
-          pulados: 0,
-          erros: 0,
-          limiteDiarioAtingido: true,
-          proximoAntesDe: body.antesDe ?? null,
-        });
-      }
+    // Padrao de 500 quando a variavel de ambiente esta ausente ou invalida
+    // (INDEXACAO_LIMITE_DIARIO vazio resulta em Number("") = 0, que falharia
+    // o teste > 0 e desativaria o teto — perigoso). Defina a variavel para
+    // aumentar ou reduzir o limite.
+    const limiteDiarioEnv = Number(process.env.INDEXACAO_LIMITE_DIARIO ?? "");
+    const limiteDiario =
+      Number.isFinite(limiteDiarioEnv) && limiteDiarioEnv > 0
+        ? limiteDiarioEnv
+        : 500;
+
+    const inicioDoDia = new Date();
+    inicioDoDia.setUTCHours(0, 0, 0, 0);
+    // Conta documentos com indexado_em preenchido hoje como proxy de tentativas
+    // bem-sucedidas; tentativas malsucedidas sao acumuladas pelo contador
+    // in-loop abaixo para que o teto se aplique mesmo quando tudo falha.
+    const { count: contagemDia } = await supabaseAdmin
+      .from("documento_conteudo")
+      .select("documento_id", { count: "exact", head: true })
+      .gte("indexado_em", inicioDoDia.toISOString());
+    const contagemHoje = contagemDia ?? 0;
+    if (contagemHoje >= limiteDiario) {
+      return NextResponse.json({
+        processados: 0,
+        indexados: 0,
+        pulados: 0,
+        erros: 0,
+        limiteDiarioAtingido: true,
+        proximoAntesDe: body.antesDe ?? null,
+      });
     }
 
     // A janela busca mais candidatos que o lote (limite) porque parte deles
@@ -118,10 +129,22 @@ export async function POST(request: Request) {
     let indexados = 0;
     let pulados = 0;
     let erros = 0;
+    // tentativas conta documentos efetivamente processados nesta requisicao.
+    // Somado a contagemHoje, determina quando o teto diario e atingido — mesmo
+    // que todas as tentativas falhem e nao gravem indexado_em no banco.
+    let tentativas = 0;
+    let limiteDiarioAtingido = false;
 
     // Sequencial de proposito: OCR e lento e cobrado por pagina; paralelizar
     // aqui multiplicaria custo e risco de throttling no Azure.
     for (const row of pendentes) {
+      // 3(c): verificar teto a cada iteracao para parar o lote no meio quando necessario.
+      if (contagemHoje + tentativas >= limiteDiario) {
+        limiteDiarioAtingido = true;
+        break;
+      }
+      tentativas += 1;
+
       const path = row.arquivo_assinado_path ?? row.arquivo_path;
       const dados = safeParseDados(row.dados);
       const metadados = {
@@ -144,6 +167,25 @@ export async function POST(request: Request) {
           metadados,
         });
 
+        if (resultado.status === "indexado") indexados += 1;
+        else if (resultado.status === "pulado") pulados += 1;
+        else erros += 1;
+        continue;
+      }
+
+      // 2(a): imagens e outros formatos nao-PDF nao possuem texto indexavel
+      // nesta fase. Registra como nao_aplicavel sem baixar nem analisar o arquivo,
+      // evitando chamadas ao modelo de visao (caras e desnecessarias).
+      const extensao = path.split(".").pop()?.toLowerCase() ?? "";
+      if (extensao !== "pdf") {
+        const resultado = await indexarConteudoDocumento(supabaseAdmin, {
+          documentoId: row.id,
+          texto: null,
+          origem: "nao_aplicavel",
+          paginas: null,
+          arquivoHash: null,
+          metadados,
+        });
         if (resultado.status === "indexado") indexados += 1;
         else if (resultado.status === "pulado") pulados += 1;
         else erros += 1;
@@ -177,20 +219,29 @@ export async function POST(request: Request) {
 
     // A janela vem ordenada por created_at desc, entao qualquer pendente nao
     // processado nesta chamada e sempre mais antigo que o ultimo pendente
-    // processado. Se o lote foi truncado pelo limite, retomar do ultimo
-    // pendente processado evita pular os que sobraram na janela. So quando a
-    // janela inteira coube no lote (sem truncamento) e que podemos avancar o
-    // cursor ate o fim da janela (ultimo candidato), pulando os ja indexados.
-    const proximoAntesDe = truncado
-      ? (pendentes[pendentes.length - 1]?.created_at ?? candidatos[candidatos.length - 1].created_at)
+    // processado. Se o lote foi truncado pelo limite ou interrompido pelo teto
+    // diario antes de esgotar os pendentes, retomar do ultimo pendente
+    // processado evita pular os que sobraram na janela. So quando a janela
+    // inteira coube no lote (sem truncamento nem interrupcao) e que podemos
+    // avancar o cursor ate o fim da janela (ultimo candidato), pulando os ja
+    // indexados.
+    const processadosSlice = pendentes.slice(0, tentativas);
+    const truncadoPorLimite = pendentesTotais.length > pendentes.length;
+    const truncadoPorCap = limiteDiarioAtingido && tentativas < pendentes.length;
+    const truncadoFinal = truncadoPorLimite || truncadoPorCap;
+
+    const ultimoProcessado = processadosSlice[processadosSlice.length - 1];
+    const proximoAntesDe = truncadoFinal
+      ? (ultimoProcessado?.created_at ?? candidatos[candidatos.length - 1].created_at)
       : candidatos[candidatos.length - 1].created_at;
 
     return NextResponse.json({
-      processados: pendentes.length,
+      processados: tentativas,
       indexados,
       pulados,
       erros,
       concluido: false,
+      ...(limiteDiarioAtingido && { limiteDiarioAtingido: true }),
       proximoAntesDe,
     });
   } catch (err) {
