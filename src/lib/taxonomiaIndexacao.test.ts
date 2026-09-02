@@ -91,6 +91,8 @@ describe("classificarDocumento", () => {
     });
     expect(resultado).toEqual({ status: "pulado", termos: [], detalhe: "sem_texto" });
     expect(chamadas.some((c) => c.tabela === "taxonomia_sugestoes")).toBe(false);
+    const update = chamadas.find((c) => c.tabela === "documento_conteudo" && c.metodo === "update");
+    expect(update?.payload).toMatchObject({ termos: [], termos_classificado_em: expect.any(String) });
   });
 
   it("classifica o texto e grava termos + termos_classificado_em", async () => {

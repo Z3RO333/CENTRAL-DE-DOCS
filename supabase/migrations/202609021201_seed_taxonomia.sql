@@ -149,7 +149,6 @@ from (values
   ('pintura', 'reparo'),
   ('pintura', 'retoque'),
   ('pintura', 'repintura'),
-  ('portas automaticas', 'sensor de presenca'),
   ('portas automaticas', 'catraca'),
   ('portas automaticas', 'roleta'),
   ('portas automaticas', 'portao automatico'),

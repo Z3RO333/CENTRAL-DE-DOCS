@@ -108,6 +108,17 @@ export async function classificarDocumento(
 ): Promise<ResultadoClassificacao> {
   const texto = params.texto?.trim() ?? "";
   if (!texto) {
+    // Best-effort: advance the cursor so this document is not retried on every reclassification pass.
+    const { error: errMarca } = await supabaseAdmin
+      .from("documento_conteudo")
+      .update({
+        termos: [],
+        termos_classificado_em: new Date().toISOString(),
+      })
+      .eq("documento_id", params.documentoId);
+    if (errMarca) {
+      console.error("[classificarDocumento] Falha ao marcar sem_texto:", errMarca);
+    }
     return { status: "pulado", termos: [], detalhe: "sem_texto" };
   }
 
