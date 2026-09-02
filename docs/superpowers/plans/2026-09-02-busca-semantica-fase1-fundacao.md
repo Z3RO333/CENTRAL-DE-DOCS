@@ -204,7 +204,9 @@ describe("dividirEmChunks", () => {
   });
 
   it("descarta fragmento abaixo do minimo util quando ha trecho util", () => {
-    const grande = paragrafo(55);
+    // 58 + 2 (separador) + 2 ("ok") = 62 > alvo 60, entao "ok" vira um bloco
+    // separado em vez de ser empacotado junto — e ai cai abaixo do minimo util.
+    const grande = paragrafo(58);
     const chunks = dividirEmChunks(`${grande}\n\nok`, {
       alvo: 60,
       sobreposicao: 0,
@@ -287,7 +289,10 @@ const explodirBloco = (bloco: string, alvo: number): string[] => {
 
 /** Cauda do texto anterior, cortada no inicio de palavra para nao comecar picotado. */
 const caudaEmLimiteDePalavra = (texto: string, tamanho: number) => {
-  if (tamanho <= 0 || texto.length <= tamanho) {
+  if (tamanho <= 0) {
+    return "";
+  }
+  if (texto.length <= tamanho) {
     return texto;
   }
   const cauda = texto.slice(-tamanho);
@@ -391,6 +396,8 @@ beforeEach(() => {
   process.env.AZURE_OPENAI_API_KEY = "chave";
   process.env.AZURE_OPENAI_ENDPOINT = "https://exemplo.openai.azure.com";
   process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT = "text-embedding-3-small";
+  // Limpa a versao de API para o teste de URL nao depender do .env de quem roda.
+  delete process.env.AZURE_OPENAI_EMBEDDING_API_VERSION;
   vi.restoreAllMocks();
 });
 
