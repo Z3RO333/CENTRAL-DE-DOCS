@@ -5,15 +5,22 @@ const TENTATIVAS_MAX = 3;
 const API_VERSION_PADRAO = "2024-02-01";
 
 function getConfig() {
-  const apiKey = process.env.AZURE_OPENAI_API_KEY?.trim();
-  const endpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim();
+  // O recurso de embeddings pode ser diferente do recurso de chat (endpoint e
+  // chave proprios) — cai para as variaveis do chat quando as dedicadas nao
+  // estao definidas, para permitir compartilhar um unico recurso se preferido.
+  const apiKey =
+    process.env.AZURE_OPENAI_EMBEDDING_API_KEY?.trim() ||
+    process.env.AZURE_OPENAI_API_KEY?.trim();
+  const endpoint =
+    process.env.AZURE_OPENAI_EMBEDDING_ENDPOINT?.trim() ||
+    process.env.AZURE_OPENAI_ENDPOINT?.trim();
   const deployment = process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT?.trim();
   const apiVersion =
     process.env.AZURE_OPENAI_EMBEDDING_API_VERSION?.trim() || API_VERSION_PADRAO;
 
   if (!apiKey || !endpoint || !deployment) {
     throw new Error(
-      "Configure AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT e AZURE_OPENAI_EMBEDDING_DEPLOYMENT no .env.",
+      "Configure AZURE_OPENAI_EMBEDDING_API_KEY (ou AZURE_OPENAI_API_KEY), AZURE_OPENAI_EMBEDDING_ENDPOINT (ou AZURE_OPENAI_ENDPOINT) e AZURE_OPENAI_EMBEDDING_DEPLOYMENT no .env.",
     );
   }
 
