@@ -61,6 +61,9 @@ export async function POST(request: Request) {
       }
     }
 
+    // A janela busca mais candidatos que o lote (limite) porque parte deles
+    // pode ja estar indexada; isso mantem o lote cheio sem exigir varias
+    // idas ao banco so para descartar documentos ja processados.
     let query = supabaseAdmin
       .from("formularios")
       .select(
@@ -108,9 +111,9 @@ export async function POST(request: Request) {
       ),
     );
 
-    const pendentes = candidatos
-      .filter((row) => !indexadosSet.has(row.id))
-      .slice(0, limite);
+    const pendentesTotais = candidatos.filter((row) => !indexadosSet.has(row.id));
+    const pendentes = pendentesTotais.slice(0, limite);
+    const truncado = pendentesTotais.length > pendentes.length;
 
     let indexados = 0;
     let pulados = 0;
@@ -132,7 +135,7 @@ export async function POST(request: Request) {
       };
 
       if (!path) {
-        await indexarConteudoDocumento(supabaseAdmin, {
+        const resultado = await indexarConteudoDocumento(supabaseAdmin, {
           documentoId: row.id,
           texto: null,
           origem: "nao_aplicavel",
@@ -140,7 +143,10 @@ export async function POST(request: Request) {
           arquivoHash: null,
           metadados,
         });
-        pulados += 1;
+
+        if (resultado.status === "indexado") indexados += 1;
+        else if (resultado.status === "pulado") pulados += 1;
+        else erros += 1;
         continue;
       }
 
@@ -169,8 +175,15 @@ export async function POST(request: Request) {
       }
     }
 
-    const proximoAntesDe =
-      candidatos.length > 0 ? candidatos[candidatos.length - 1].created_at : null;
+    // A janela vem ordenada por created_at desc, entao qualquer pendente nao
+    // processado nesta chamada e sempre mais antigo que o ultimo pendente
+    // processado. Se o lote foi truncado pelo limite, retomar do ultimo
+    // pendente processado evita pular os que sobraram na janela. So quando a
+    // janela inteira coube no lote (sem truncamento) e que podemos avancar o
+    // cursor ate o fim da janela (ultimo candidato), pulando os ja indexados.
+    const proximoAntesDe = truncado
+      ? (pendentes[pendentes.length - 1]?.created_at ?? candidatos[candidatos.length - 1].created_at)
+      : candidatos[candidatos.length - 1].created_at;
 
     return NextResponse.json({
       processados: pendentes.length,
