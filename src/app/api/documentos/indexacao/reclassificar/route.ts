@@ -42,24 +42,31 @@ export async function POST(request: Request) {
 
     const pendentes = (data as DocumentoConteudoRow[] | null) ?? [];
 
+    let processados = 0;
     let classificados = 0;
     let pulados = 0;
     let erros = 0;
 
     for (const row of pendentes) {
-      const resultado = await classificarDocumento(supabaseAdmin, {
-        documentoId: row.documento_id,
-        texto: row.texto,
-        equipamentoTipo: null,
-        equipamentoIdentificacao: null,
-      });
-      if (resultado.status === "classificado") classificados += 1;
-      else if (resultado.status === "pulado") pulados += 1;
-      else erros += 1;
+      try {
+        const resultado = await classificarDocumento(supabaseAdmin, {
+          documentoId: row.documento_id,
+          texto: row.texto,
+          equipamentoTipo: null,
+          equipamentoIdentificacao: null,
+        });
+        if (resultado.status === "classificado") classificados += 1;
+        else if (resultado.status === "pulado") pulados += 1;
+        else erros += 1;
+      } catch (docErr) {
+        console.error(`Erro ao classificar documento ${row.documento_id}:`, docErr);
+        erros += 1;
+      }
+      processados += 1;
     }
 
     return NextResponse.json({
-      processados: pendentes.length,
+      processados,
       classificados,
       pulados,
       erros,

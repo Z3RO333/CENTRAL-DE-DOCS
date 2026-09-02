@@ -112,6 +112,48 @@ describe("POST /api/documentos/indexacao/reclassificar", () => {
     );
   });
 
+  it("continua o lote quando classificarDocumento rejeita em um documento", async () => {
+    mockedActor.mockResolvedValueOnce({
+      userId: "admin-1",
+      email: "admin@empresa.com",
+      isAdmin: true,
+      realUserId: "admin-1",
+      realEmail: "admin@empresa.com",
+      realIsAdmin: true,
+      isSimulating: false,
+    });
+    mockedCreateSupabase.mockReturnValueOnce(
+      makeSupabaseComPendentes([
+        { documento_id: "doc-1", texto: "laudo do gerador" },
+        { documento_id: "doc-2", texto: "nota fiscal" },
+        { documento_id: "doc-3", texto: "contrato de manutencao" },
+      ]) as never,
+    );
+    mockedClassificar
+      .mockResolvedValueOnce({ status: "classificado", termos: ["gerador"] })
+      .mockRejectedValueOnce(new Error("falha inesperada"))
+      .mockResolvedValueOnce({ status: "classificado", termos: ["contrato"] });
+
+    const response = await POST(makeRequest());
+    const payload = (await response.json()) as {
+      processados: number;
+      classificados: number;
+      pulados: number;
+      erros: number;
+      concluido: boolean;
+    };
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({
+      processados: 3,
+      classificados: 2,
+      pulados: 0,
+      erros: 1,
+      concluido: false,
+    });
+    expect(mockedClassificar).toHaveBeenCalledTimes(3);
+  });
+
   it("reporta concluido quando nao ha mais pendentes", async () => {
     mockedActor.mockResolvedValueOnce({
       userId: "admin-1",
