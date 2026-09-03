@@ -65,6 +65,10 @@ const TOOLS: AzureOpenAiTool[] = [
             type: "string",
             description: "A pergunta em linguagem natural sobre o conteúdo dos documentos",
           },
+          lojaId: {
+            type: "string",
+            description: "ID exato da loja, obtido via buscar_lojas. Obrigatório quando o usuário mencionar uma loja específica.",
+          },
         },
         required: ["pergunta"],
       },
@@ -204,6 +208,7 @@ async function executarBuscarDocumentosConteudo(
   if (!pergunta.trim()) {
     return { content: JSON.stringify({ erro: "Informe uma pergunta para buscar pelo conteúdo." }) };
   }
+  const lojaIdArg = typeof args.lojaId === "string" && args.lojaId.trim() ? args.lojaId.trim() : undefined;
 
   // Load taxonomy terms
   const { data: termosData, error: termosError } = await ctx.supabaseAdmin
@@ -216,15 +221,31 @@ async function executarBuscarDocumentosConteudo(
   // Interpret the question
   const consulta = await interpretarConsulta(pergunta, termosDisponiveis);
 
-  // Resolve lojaTermo → lojaId (best-effort)
-  let lojaId: string | undefined;
-  if (consulta.lojaTermo) {
+  // Resolve lojaTermo → lojaId (lojaIdArg tem precedência se o modelo já resolveu via buscar_lojas)
+  let lojaId: string | undefined = lojaIdArg;
+  if (!lojaId && consulta.lojaTermo) {
     const { data: lojas } = await ctx.supabaseAdmin
       .from("lojas")
-      .select("id")
+      .select("id, nome")
       .ilike("nome", `%${consulta.lojaTermo}%`)
-      .limit(1);
-    lojaId = (lojas as Array<{ id: string }> | null)?.[0]?.id;
+      .limit(5);
+    const matches = lojas as Array<{ id: string; nome: string }> | null;
+    if (!matches || matches.length === 0) {
+      return {
+        content: JSON.stringify({
+          erro: `Não encontrei nenhuma loja com o nome "${consulta.lojaTermo}". Chame buscar_lojas com esse termo para encontrar o ID correto e depois repita a busca informando o lojaId.`,
+        }),
+      };
+    }
+    if (matches.length === 1) {
+      lojaId = matches[0].id;
+    } else {
+      return {
+        content: JSON.stringify({
+          erro: `Encontrei ${matches.length} lojas com "${consulta.lojaTermo}": ${matches.map((l) => l.nome).join(", ")}. Chame buscar_lojas para identificar a loja exata e depois repita a busca com o lojaId correto.`,
+        }),
+      };
+    }
   }
 
   const { allowedPrestadores, gerenteEntries, canAccess } = await getDocumentosAccessInfo(ctx);
@@ -328,7 +349,8 @@ export const dominioDocumentos: AssistenteDominio = {
     }
     partes.push(
       "Use buscar_documentos_conteudo para perguntas sobre o CONTEÚDO dos documentos: assuntos técnicos, equipamentos, laudos, problemas. Use buscar_documentos para LISTAR ou FILTRAR por metadados.",
-      "Exemplos: 'laudo do gerador da Matriz' → buscar_documentos_conteudo. 'notas fiscais de março' → buscar_documentos. 'tem recomendação de troca de peças do elevador?' → buscar_documentos_conteudo.",
+      "IMPORTANTE: se o usuário mencionar uma loja junto com uma pergunta de conteúdo (ex.: 'laudo do gerador da Avenida'), chame buscar_lojas PRIMEIRO para resolver o ID da loja — nunca chame buscar_documentos_conteudo sem ter resolvido o lojaId quando uma loja for mencionada.",
+      "Exemplos: 'laudo do gerador da Matriz' → buscar_lojas('Matriz') → buscar_documentos_conteudo. 'notas fiscais de março' → buscar_documentos. 'tem recomendação de troca de peças do elevador?' → buscar_documentos_conteudo (sem loja específica).",
     );
     return partes.join(" ");
   },
