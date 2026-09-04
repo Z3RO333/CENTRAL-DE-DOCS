@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
@@ -199,6 +199,7 @@ export default function OrcamentosInternosPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const deepLinkHandledRef = useRef(false);
 
   const canAccess = modules.documentos;
 
@@ -379,6 +380,29 @@ export default function OrcamentosInternosPage() {
       setDetailLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (
+      deepLinkHandledRef.current ||
+      !user ||
+      accessLoading ||
+      aprovadorLoading
+    ) {
+      return;
+    }
+
+    deepLinkHandledRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tab") === "aprovacao" && isGestor) {
+      setTab("aprovacao");
+    }
+
+    const orcamentoId = params.get("orcamento")?.trim();
+    if (orcamentoId && isGestor) {
+      setDetailId(orcamentoId);
+      void loadDetail(orcamentoId);
+    }
+  }, [accessLoading, aprovadorLoading, isGestor, loadDetail, user]);
 
   const openDetail = (id: string) => {
     setDetailId(id);

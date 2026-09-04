@@ -29,6 +29,7 @@ import {
 } from "@/lib/orcamentosInternos";
 import { type DocumentoAuditEvent } from "@/lib/documentosAudit";
 import { gerarPdfAssinado, resolveAssinadoPorNome } from "@/lib/orcamentoAssinatura";
+import { enviarEmailOrcamentoParaAprovacao } from "@/lib/orcamentoNotificationService";
 
 export const runtime = "nodejs";
 
@@ -602,6 +603,17 @@ export async function PATCH(
           data_validade: updates.data_validade,
         },
       });
+      const notification = await enviarEmailOrcamentoParaAprovacao({
+        id,
+        destinatarios: aprovadores,
+        solicitanteEmail: current.solicitante_email,
+        prestadorNome,
+        lojaNome,
+        numeroOrcamento: updates.numero_orcamento,
+        descricao: updates.descricao,
+        valorTotal: updates.valor_total,
+        reenviado: action === "reenviar",
+      });
       await logOrcamentoEvent({
         supabaseAdmin,
         documentoId: id,
@@ -613,7 +625,11 @@ export async function PATCH(
         actorEmail: actor.realEmail,
         from,
         to: nextStatus,
-        metadata: { notification: "aprovadores" },
+        metadata: {
+          notification: "email_aprovadores",
+          notification_status: notification.status,
+          notification_recipients: notification.recipientCount,
+        },
       });
       return NextResponse.json({ orcamento: mapOrcamento(data as OrcamentoInternoRow) });
     }

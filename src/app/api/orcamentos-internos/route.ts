@@ -21,6 +21,9 @@ import {
   type OrcamentoInternoInput,
   type OrcamentoInternoRow,
 } from "@/lib/orcamentosInternos";
+import { enviarEmailOrcamentoParaAprovacao } from "@/lib/orcamentoNotificationService";
+
+export const runtime = "nodejs";
 
 const PAGE_SIZE = 50;
 
@@ -328,6 +331,38 @@ export async function POST(request: Request) {
       }
     }
 
+    let notification: Awaited<
+      ReturnType<typeof enviarEmailOrcamentoParaAprovacao>
+    > | null = null;
+    if (submit) {
+      try {
+        const aprovadores = await getAprovadorEmails(supabaseAdmin);
+        notification = await enviarEmailOrcamentoParaAprovacao({
+          id,
+          destinatarios: aprovadores,
+          solicitanteEmail,
+          prestadorNome,
+          lojaNome,
+          numeroOrcamento: normalizeText(body.numeroOrcamento),
+          descricao: normalizeText(body.descricao),
+          valorTotal: parseValorTotal(body.valorTotal),
+        });
+      } catch (notificationError) {
+        console.error(
+          "Falha ao preparar aviso de orçamento aos aprovadores:",
+          notificationError,
+        );
+        notification = {
+          status: "failed",
+          recipientCount: 0,
+          reason:
+            notificationError instanceof Error
+              ? notificationError.message
+              : "Falha ao consultar os aprovadores",
+        };
+      }
+    }
+
     await logOrcamentoEvent({
       supabaseAdmin,
       documentoId: id,
@@ -336,7 +371,13 @@ export async function POST(request: Request) {
       actorEmail: actor.realEmail,
       to: status,
       metadata: {
-        notification: submit ? "aprovadores" : null,
+        notification: submit ? "email_aprovadores" : null,
+        ...(notification
+          ? {
+              notification_status: notification.status,
+              notification_recipients: notification.recipientCount,
+            }
+          : {}),
       },
     });
 
@@ -349,7 +390,11 @@ export async function POST(request: Request) {
         actorEmail: actor.realEmail,
         from: "rascunho",
         to: status,
-        metadata: { notification: "aprovadores" },
+        metadata: {
+          notification: "email_aprovadores",
+          notification_status: notification?.status ?? "skipped",
+          notification_recipients: notification?.recipientCount ?? 0,
+        },
       });
     }
 
