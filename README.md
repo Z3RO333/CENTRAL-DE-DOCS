@@ -59,6 +59,22 @@ supabase         # migrations e políticas de segurança
 
 ## Execução local
 
+### Avisos de novas notas fiscais
+
+Cada nova nota fiscal enviada gera um aviso para `ordensmanutencao@bemol.com.br`,
+usando o mesmo SendGrid dos avisos de orçamento (`SENDGRID_API_KEY`, `FROM_EMAIL`
+e `NEXT_PUBLIC_SITE_URL` para o link de consulta).
+As notas comuns usam o webhook de INSERT já existente em `/api/documentos/ia/processar`
+(`DOCUMENTOS_IA_WEBHOOK_SECRET` e o segredo correspondente no Vault do Supabase).
+O aviso é enviado antes da análise por IA. As notas de conservação são notificadas
+após o cadastro na API própria. Edições e a importação de notas antigas para conservação
+não disparam avisos. O resultado é registrado em `documentos_auditoria`, no evento
+`nota_fiscal_notificacao`; envios já registrados com sucesso não são repetidos.
+Falhas de envio são registradas sem interromper o cadastro ou a análise; não há
+retentativa automática de e-mail.
+
+### Desenvolvimento
+
 ```bash
 npm ci
 npm run dev

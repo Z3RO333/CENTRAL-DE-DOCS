@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdminClient";
+import { notificarNovaNotaFiscal } from "@/lib/notaFiscalNotification";
 import {
   processarDocumentoComIa,
   verificarSegredoWebhook,
@@ -42,6 +43,10 @@ export async function POST(request: Request) {
     }
 
     const supabaseAdmin = createSupabaseAdminClient();
+    // Avisar no recebimento, mesmo se a análise por IA falhar ou estiver desativada.
+    if (payload?.type === "INSERT" && payload.table === "formularios") {
+      await notificarNovaNotaFiscal(supabaseAdmin, documentoId);
+    }
     const resultado = await processarDocumentoComIa(supabaseAdmin, documentoId);
 
     return NextResponse.json({ ok: true, resultado });

@@ -13,6 +13,7 @@ import {
 } from "@/lib/orcamentosInternos";
 import { parseCompetencia } from "@/lib/competencia";
 import { syncNotasFiscaisConservacaoFromGenericos } from "@/lib/notasFiscaisConservacaoSync";
+import { notificarNovaNotaFiscal } from "@/lib/notaFiscalNotification";
 
 export type NotaFiscalConservacaoRow = {
   id: string;
@@ -303,6 +304,8 @@ export async function POST(request: Request) {
     if (!nota) {
       throw new Error("Falha ao criar a nota fiscal.");
     }
+
+    await notificarNovaNotaFiscal(supabaseAdmin, id);
 
     await logDocumentoAuditEvent({
       supabaseAdmin,
