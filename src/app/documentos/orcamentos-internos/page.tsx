@@ -1301,22 +1301,45 @@ export default function OrcamentosInternosPage() {
                         <TriangleAlert className="h-4 w-4" />
                         Solicitar ajuste
                       </button>
-                      <button
-                        type="button"
-                        disabled={Boolean(actionLoading) || !justificativa.trim()}
-                        onClick={() =>
-                          void patchAction(
-                            selectedDetail.id,
-                            { action: "rejeitar", justificativa },
-                            "Orçamento rejeitado.",
-                          )
-                        }
-                        className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 font-semibold text-red-700 disabled:opacity-60"
-                      >
-                        <XCircle className="h-4 w-4" />
-                        Rejeitar
-                      </button>
                     </>
+                  ) : null}
+                  {(detail?.canDecide &&
+                    ["aguardando_aprovacao", "em_analise_gestor", "reenviado"].includes(
+                      selectedDetail.status,
+                    )) ||
+                  isAdmin ? (
+                    <button
+                      type="button"
+                      disabled={
+                        Boolean(actionLoading) ||
+                        (Boolean(
+                          detail?.canDecide &&
+                            ["aguardando_aprovacao", "em_analise_gestor", "reenviado"].includes(
+                              selectedDetail.status,
+                            ),
+                        ) &&
+                          !justificativa.trim())
+                      }
+                      onClick={() => {
+                        const podeRejeitar =
+                          detail?.canDecide &&
+                          ["aguardando_aprovacao", "em_analise_gestor", "reenviado"].includes(
+                            selectedDetail.status,
+                          );
+                        void patchAction(
+                          selectedDetail.id,
+                          {
+                            action: podeRejeitar ? "rejeitar" : "cancelar",
+                            justificativa,
+                          },
+                          podeRejeitar ? "Orçamento rejeitado." : "Orçamento cancelado.",
+                        );
+                      }}
+                      className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-semibold text-white disabled:opacity-60"
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Não Autorizado
+                    </button>
                   ) : null}
                   {selectedDetail.status === "ajuste_solicitado" &&
                   selectedDetail.solicitante_id === user.id ? (
@@ -1353,23 +1376,6 @@ export default function OrcamentosInternosPage() {
                         Reenviar ajuste
                       </button>
                     </div>
-                  ) : null}
-                  {isAdmin ? (
-                    <button
-                      type="button"
-                      disabled={Boolean(actionLoading)}
-                      onClick={() =>
-                        void patchAction(
-                          selectedDetail.id,
-                          { action: "cancelar", justificativa },
-                          "Orçamento cancelado.",
-                        )
-                      }
-                      className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 font-semibold text-slate-700 disabled:opacity-60"
-                    >
-                      <XCircle className="h-4 w-4" />
-                      Cancelar
-                    </button>
                   ) : null}
                   <button
                     type="button"
