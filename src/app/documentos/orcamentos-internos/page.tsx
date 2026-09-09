@@ -8,6 +8,9 @@ import {
   Eye,
   ExternalLink,
   FilePlus2,
+  FileText,
+  Plus,
+  X,
   History,
   LoaderCircle,
   RefreshCw,
@@ -28,6 +31,12 @@ import {
 import { uploadDocumentFile } from "@/lib/documentUpload";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
+import { OrcamentoModal } from "./_components/OrcamentoModal";
+import {
+  EMPTY_FILTERS,
+  OrcamentoFiltersModal,
+  type OrcamentoFilters,
+} from "./_components/OrcamentoFiltersModal";
 import { OrcamentoIntakeForm } from "./_components/OrcamentoIntakeForm";
 import type {
   ColaboradorOption,
@@ -76,21 +85,6 @@ type PreviewDocument = {
 };
 
 const STORAGE_BUCKET = "formularios";
-
-const STATUS_GROUPS: Array<{ label: string; statuses: OrcamentoInternoStatus[] }> = [
-  {
-    label: "Precisam de ação",
-    statuses: ["rascunho", "ajuste_solicitado", "reenviado"],
-  },
-  {
-    label: "Em andamento",
-    statuses: ["aguardando_aprovacao", "em_analise_gestor"],
-  },
-  {
-    label: "Encerrados",
-    statuses: ["aprovado_assinado", "rejeitado", "cancelado"],
-  },
-];
 
 function formatDateTime(value: string | null) {
   if (!value) return "--";
@@ -187,11 +181,10 @@ export default function OrcamentosInternosPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [justificativa, setJustificativa] = useState("");
-  const [statusFilter, setStatusFilter] = useState("todos");
-  const [gestorFilter, setGestorFilter] = useState("todos");
-  const [colaboradorFilter, setColaboradorFilter] = useState("todos");
-  const [dataInicio, setDataInicio] = useState("");
-  const [dataFim, setDataFim] = useState("");
+  const [filters, setFilters] = useState<OrcamentoFilters>(EMPTY_FILTERS);
+  const { statusFilter, gestorFilter, colaboradorFilter, dataInicio, dataFim } = filters;
+  const [intakeOpen, setIntakeOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [numeroPedido, setNumeroPedido] = useState("");
   const [replacementFile, setReplacementFile] = useState<File | null>(null);
   const [replacementValor, setReplacementValor] = useState("");
@@ -202,6 +195,10 @@ export default function OrcamentosInternosPage() {
   const deepLinkHandledRef = useRef(false);
 
   const canAccess = modules.documentos;
+  const visibleTabs = [
+    ["meus", "Meus orçamentos"],
+    ...(isGestor ? [["aprovacao", "Aguardando minha aprovação"], ["todos", "Todos os orçamentos"]] : []),
+  ];
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -334,14 +331,32 @@ export default function OrcamentosInternosPage() {
 
   const colaboradorOptions = useMemo(() => {
     const map = new Map<string, string>();
+    colaboradores.forEach((colaborador) => {
+      map.set(colaborador.id, colaborador.name ?? colaborador.email);
+    });
     orcamentos.forEach((orcamento) => {
+      if (map.has(orcamento.solicitante_id)) return;
       map.set(
         orcamento.solicitante_id,
         orcamento.solicitante_email ?? orcamento.solicitante_id,
       );
     });
     return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
-  }, [orcamentos]);
+  }, [colaboradores, orcamentos]);
+
+  const activeFilters = (Object.keys(filters) as Array<keyof OrcamentoFilters>)
+    .filter((key) => filters[key] !== EMPTY_FILTERS[key])
+    .map((key) => {
+      const value = filters[key];
+      const labels: Record<keyof OrcamentoFilters, string> = {
+        statusFilter: STATUS_LABEL[statusFilter as OrcamentoInternoStatus] ?? statusFilter,
+        gestorFilter: `Decidido por: ${gestores.find((gestor) => gestor.email === gestorFilter)?.name ?? gestorFilter}`,
+        colaboradorFilter: `Colaborador: ${colaboradorOptions.find((option) => option.id === colaboradorFilter)?.label ?? colaboradorFilter}`,
+        dataInicio: `De ${value.split("-").reverse().join("/")}`,
+        dataFim: `Até ${value.split("-").reverse().join("/")}`,
+      };
+      return { key, label: labels[key] };
+    });
 
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true);
@@ -566,7 +581,7 @@ export default function OrcamentosInternosPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 py-4">
+    <div className="flex min-w-0 flex-1 flex-col gap-6 py-4">
       {confirmationDialog}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -587,9 +602,19 @@ export default function OrcamentosInternosPage() {
             Envio, análise, assinatura e consulta centralizada de orçamentos internos.
           </p>
         </div>
-        <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <p className="font-semibold">{aguardandoCount} aguardando aprovação</p>
-          <p className="text-xs">Fila atual conforme os filtros aplicados.</p>
+        <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:self-end">
+          <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800" title="Orçamentos aguardando aprovação entre os registros carregados.">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            {aguardandoCount} aguardando aprovação
+          </span>
+          <button
+            type="button"
+            onClick={() => setIntakeOpen(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-500"
+          >
+            <Plus className="h-4 w-4" />
+            Novo orçamento
+          </button>
         </div>
       </header>
 
@@ -603,7 +628,13 @@ export default function OrcamentosInternosPage() {
         </div>
       )}
 
-      <section className="grid gap-5 2xl:grid-cols-[minmax(320px,380px)_minmax(0,1fr)] 2xl:items-start">
+      <OrcamentoModal
+        open={intakeOpen}
+        onClose={() => setIntakeOpen(false)}
+        title="Novo orçamento"
+        description="Envie seus PDFs, confira os dados e encaminhe para aprovação."
+        wide
+      >
         <OrcamentoIntakeForm
           colaboradores={colaboradores}
           draftToResume={draftToResume}
@@ -622,134 +653,150 @@ export default function OrcamentosInternosPage() {
           }}
         />
 
-        <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-100">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-2">
-              {[
-                ["meus", "Meus orçamentos"],
-                ...(isGestor ? [["aprovacao", "Aguardando minha aprovação"]] : []),
-                ...(isGestor ? [["todos", "Todos os orçamentos"]] : []),
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setTab(value as "meus" | "aprovacao" | "todos")}
-                  className={`rounded-full px-4 py-2 text-xs font-semibold ${
-                    tab === value
-                      ? "bg-slate-900 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+          <p className="max-w-md text-xs leading-relaxed text-slate-500">Ao fechar, seu preenchimento fica preservado enquanto você estiver nesta página.</p>
+          <button type="button" onClick={() => setIntakeOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Voltar à lista</button>
+        </div>
+      </OrcamentoModal>
+
+      {filtersOpen && (
+        <OrcamentoFiltersModal
+          filters={filters}
+          gestores={gestores}
+          colaboradores={colaboradorOptions}
+          isAdmin={isAdmin}
+          onClose={() => setFiltersOpen(false)}
+          onApply={(next) => {
+            setFilters(next);
+            setFiltersOpen(false);
+          }}
+        />
+      )}
+
+      <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm shadow-slate-100 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <select
+            aria-label="Visualização dos orçamentos"
+            value={tab}
+            onChange={(event) => setTab(event.target.value as "meus" | "aprovacao" | "todos")}
+            className="w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-800 sm:hidden"
+          >
+            {visibleTabs.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <div className="hidden flex-wrap gap-2 sm:flex">
+            {visibleTabs.map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setTab(value as "meus" | "aprovacao" | "todos")}
+                aria-pressed={tab === value}
+                className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold ${
+                  tab === value
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(true)}
+              className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${activeFilters.length > 0 ? "border-sky-200 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filtros
+              {activeFilters.length > 0 && <span className="rounded-md bg-sky-600 px-1.5 py-0.5 text-[10px] text-white">{activeFilters.length}</span>}
+            </button>
             <button
               type="button"
               onClick={() => void loadOrcamentos()}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Atualizar
             </button>
           </div>
+        </div>
 
-          <div className="mt-4 grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-4">
-            <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Status
-              <select
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs normal-case tracking-normal text-slate-800"
+        {activeFilters.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+            <span className="mr-1 text-xs text-slate-500">Filtros ativos</span>
+            {activeFilters.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setFilters((current) => ({ ...current, [key]: EMPTY_FILTERS[key] }))}
+                aria-label={`Remover filtro: ${label}`}
+                className="inline-flex max-w-full items-center gap-2 rounded-lg bg-sky-50 px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-100"
               >
-                <option value="todos">Todos os status</option>
-                {STATUS_GROUPS.map((group) => (
-                  <optgroup key={group.label} label={group.label}>
-                    {group.statuses.map((status) => (
-                      <option key={status} value={status}>
-                        {STATUS_LABEL[status]}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
-            <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Decidido por
-              <select
-                value={gestorFilter}
-                onChange={(event) => setGestorFilter(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs normal-case tracking-normal text-slate-800"
-              >
-                <option value="todos">Todos</option>
-                {gestores.map((gestor) => (
-                  <option key={gestor.email} value={gestor.email}>
-                    {gestor.name ?? gestor.email}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {isAdmin ? (
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Colaborador
-                <select
-                  value={colaboradorFilter}
-                  onChange={(event) => setColaboradorFilter(event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs normal-case tracking-normal text-slate-800"
-                >
-                  <option value="todos">Todos</option>
-                  {colaboradorOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            <input
-              value={dataInicio}
-              onChange={(event) => setDataInicio(event.target.value)}
-              type="date"
-              className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs"
-              aria-label="Data inicial"
-            />
-            <input
-              value={dataFim}
-              onChange={(event) => setDataFim(event.target.value)}
-              type="date"
-              className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs"
-              aria-label="Data final"
-            />
+                <span className="truncate">{label}</span>
+                <X className="h-3.5 w-3.5 shrink-0" />
+              </button>
+            ))}
+            <button type="button" onClick={() => setFilters(EMPTY_FILTERS)} className="px-2 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900">Limpar todos</button>
           </div>
+        )}
 
-          <div className="mt-4 overflow-hidden rounded-xl border border-slate-100">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-              <span className="inline-flex items-center gap-2 font-semibold">
-                <SlidersHorizontal className="h-4 w-4" />
-                {total} registro(s)
+        <div className="mt-4 overflow-hidden rounded-xl border border-slate-100">
+          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+            <span className="inline-flex items-center gap-2 font-semibold">
+              <FileText className="h-4 w-4" />
+              {total} {total === 1 ? "orçamento" : "orçamentos"}
+            </span>
+            {loading ? (
+              <span className="inline-flex items-center gap-1">
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                Carregando
               </span>
-              {loading ? (
-                <span className="inline-flex items-center gap-1">
-                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                  Carregando
-                </span>
-              ) : null}
-            </div>
-            {orcamentos.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-slate-500">
-                Nenhum orçamento encontrado.
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] table-fixed text-left text-sm">
+            ) : null}
+          </div>
+          {orcamentos.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-slate-500">
+              Nenhum orçamento encontrado.
+            </p>
+          ) : (
+            <>
+              <div className="divide-y divide-slate-100 lg:hidden">
+                {orcamentos.map((orcamento) => (
+                  <article key={orcamento.id} className="space-y-3 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <StatusBadge status={orcamento.status} />
+                      <span className="text-sm font-semibold tabular-nums text-slate-900">{formatCurrency(orcamento.valor_total)}</span>
+                    </div>
+                    <div>
+                      <button type="button" onClick={() => openDetail(orcamento.id)} className="break-words text-left text-sm font-semibold text-slate-900 hover:text-sky-600">
+                        {orcamento.numero_orcamento || orcamento.arquivo_original_nome || orcamento.id.slice(0, 8)}
+                      </button>
+                      <p className="mt-1 text-xs leading-relaxed text-slate-600">{orcamento.prestador_nome || "Fornecedor não identificado"}</p>
+                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">{orcamento.descricao}</p>
+                    </div>
+                    {orcamento.numero_pedido && <p className="text-xs text-slate-500">Pedido: {orcamento.numero_pedido}</p>}
+                    <div className="flex items-center justify-between gap-2">
+                      <button type="button" onClick={() => openDetail(orcamento.id)} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                        <Eye className="h-4 w-4" />
+                        Ver detalhes
+                      </button>
+                      <button type="button" onClick={() => void baixarArquivo(orcamento, Boolean(orcamento.arquivo_assinado_path), orcamento.arquivo_original_nome)} aria-label={orcamento.arquivo_assinado_path ? "Baixar assinado" : "Baixar original"} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50">
+                        <Download className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto lg:block">
+                <table className="w-full min-w-[1000px] table-fixed text-left text-sm">
                   <caption className="sr-only">Orçamentos internos e status de aprovação</caption>
                   <colgroup>
-                    <col className="w-[28%]" />
-                    <col className="w-[19%]" />
-                    <col className="w-[11%]" />
-                    <col className="w-[19%]" />
+                    <col className="w-[26%]" />
+                    <col className="w-[20%]" />
                     <col className="w-[13%]" />
-                    <col className="w-[10%]" />
+                    <col className="w-[18%]" />
+                    <col className="w-[11%]" />
+                    <col className="w-[12%]" />
                   </colgroup>
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
@@ -757,7 +804,7 @@ export default function OrcamentosInternosPage() {
                       <th className="px-5 py-3.5">Fornecedor</th>
                       <th className="px-5 py-3.5 text-right">Valor</th>
                       <th className="px-5 py-3.5">Status</th>
-                      <th className="px-5 py-3.5">Número do pedido</th>
+                      <th className="px-5 py-3.5">Pedido</th>
                       <th className="px-5 py-3.5 text-right">Ações</th>
                     </tr>
                   </thead>
@@ -769,12 +816,12 @@ export default function OrcamentosInternosPage() {
                           className="align-top transition-colors hover:bg-slate-50/70"
                         >
                           <td className="px-5 py-4">
-                            <p className="font-semibold text-slate-900">
+                            <button type="button" onClick={() => openDetail(orcamento.id)} className="max-w-full truncate text-left font-semibold text-slate-900 hover:text-sky-600 hover:underline">
                               {orcamento.numero_orcamento ||
                                 orcamento.arquivo_original_nome ||
                                 orcamento.id.slice(0, 8)}
-                            </p>
-                            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">
+                            </button>
+                            <p className="mt-1 line-clamp-1 text-xs leading-relaxed text-slate-500">
                               {orcamento.descricao}
                             </p>
                           </td>
@@ -788,7 +835,7 @@ export default function OrcamentosInternosPage() {
                               </p>
                             ) : null}
                           </td>
-                          <td className="px-5 py-4 text-right text-xs font-semibold text-slate-700">
+                          <td className="whitespace-nowrap px-5 py-4 text-right text-sm font-semibold tabular-nums text-slate-700">
                             {formatCurrency(orcamento.valor_total)}
                           </td>
                           <td className="px-5 py-4">
@@ -833,9 +880,9 @@ export default function OrcamentosInternosPage() {
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
-        </section>
+            </>
+          )}
+        </div>
       </section>
 
       {detailId ? (
@@ -1210,7 +1257,7 @@ export default function OrcamentosInternosPage() {
                         setDraftToResume(selectedDetail);
                         setDetailId(null);
                         setDetail(null);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
+                        setIntakeOpen(true);
                       }}
                       className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 font-semibold text-white disabled:opacity-60"
                     >

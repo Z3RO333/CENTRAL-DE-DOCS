@@ -501,12 +501,9 @@ export function OrcamentoIntakeForm({
   const busy = working !== null || bulkCreating;
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-100">
+    <section>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Novo orçamento
-          </p>
           <p className="mt-1 text-sm font-semibold text-slate-900">
             Envie o PDF e confira a leitura automática
           </p>
@@ -577,7 +574,7 @@ export function OrcamentoIntakeForm({
       ) : null}
 
       {idle ? (
-        <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+        <div className="mt-5 rounded-2xl border border-dashed border-sky-200 bg-sky-50/40 p-5 sm:p-8">
           <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
             PDF do orçamento (pode selecionar vários)
             <input
