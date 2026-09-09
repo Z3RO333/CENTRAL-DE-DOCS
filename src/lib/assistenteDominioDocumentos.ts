@@ -17,6 +17,7 @@ import {
   hasDocumentosAccess,
   type GerenteAccessRow,
 } from "@/lib/apiAuth";
+import { resolverLojaId } from "@/lib/documentosCopilotEntitySearch";
 import {
   createEmptyAssistenteInsights,
   type AssistenteContext,
@@ -161,6 +162,18 @@ async function executarBuscarDocumentos(
     };
   }
 
+  if (filters.lojaId) {
+    const lojaId = await resolverLojaId(filters.lojaId, ctx.supabaseAdmin);
+    if (!lojaId) {
+      return {
+        content: JSON.stringify({
+          erro: `lojaId "${filters.lojaId}" não corresponde a nenhuma loja. Chame buscar_lojas novamente para obter o ID correto.`,
+        }),
+      };
+    }
+    filters.lojaId = lojaId;
+  }
+
   const { allowedPrestadores, gerenteEntries, canAccess } = await getDocumentosAccessInfo(ctx);
   const { matches, total, insights } = await queryDocumentoCandidates({
     filters,
@@ -208,7 +221,19 @@ async function executarBuscarDocumentosConteudo(
   if (!pergunta.trim()) {
     return { content: JSON.stringify({ erro: "Informe uma pergunta para buscar pelo conteúdo." }) };
   }
-  const lojaIdArg = typeof args.lojaId === "string" && args.lojaId.trim() ? args.lojaId.trim() : undefined;
+  const lojaIdArgBruto =
+    typeof args.lojaId === "string" && args.lojaId.trim() ? args.lojaId.trim() : undefined;
+  let lojaIdArg: string | undefined;
+  if (lojaIdArgBruto) {
+    lojaIdArg = (await resolverLojaId(lojaIdArgBruto, ctx.supabaseAdmin)) ?? undefined;
+    if (!lojaIdArg) {
+      return {
+        content: JSON.stringify({
+          erro: `lojaId "${lojaIdArgBruto}" não corresponde a nenhuma loja. Chame buscar_lojas novamente para obter o ID correto.`,
+        }),
+      };
+    }
+  }
 
   // Load taxonomy terms
   const { data: termosData, error: termosError } = await ctx.supabaseAdmin
