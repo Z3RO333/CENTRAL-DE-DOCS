@@ -89,8 +89,7 @@ async function construirAllowlist(
     );
   }
 
-  // Ruling 2: when ordering by most recent, apply in Stage 1 so IDs arrive in
-  // creation order and the RPC preserves that intent.
+  // Keep creation order for restoring recency after relevance ranking.
   if (consulta.ordenar === "mais_recente") {
     query = query.order("created_at", { ascending: false });
   }
@@ -263,15 +262,26 @@ export async function buscarDocumentosConteudo(
   }));
 
   // Reranking (best-effort — failure does not cancel the search)
-  const documentos = await rerankear(semJustificativa, perguntaOriginal);
-
+  let documentos = await rerankear(semJustificativa, perguntaOriginal);
   const filtroNaoResolvido =
     (!!consulta.lojaTermo && !params.lojaId) ||
     (!!consulta.equipamentoTermo && !params.equipamentoId);
+  // Evaluate confidence before limiting: one displayed item is not evidence
+  // that the search itself had a single unambiguous match.
+  const confianca = calcularConfianca(documentos, filtroNaoResolvido);
+  if (consulta.ordenar === "mais_recente") {
+    const posicoes = new Map(documentoIds.map((id, index) => [id, index]));
+    documentos.sort((a, b) =>
+      (posicoes.get(a.documentoId) ?? Infinity) - (posicoes.get(b.documentoId) ?? Infinity),
+    );
+    filtrosAplicados.ordenar = "mais_recente";
+  }
+  if (consulta.limite) documentos = documentos.slice(0, consulta.limite);
+
 
   return {
     documentos,
-    confianca: calcularConfianca(documentos, filtroNaoResolvido),
+    confianca,
     recorteExcedido: false,
     sugestaoRefinamento: filtroNaoResolvido
       ? `Não consegui identificar "${consulta.lojaTermo ?? consulta.equipamentoTermo}" com segurança — verifique o nome e tente novamente.`

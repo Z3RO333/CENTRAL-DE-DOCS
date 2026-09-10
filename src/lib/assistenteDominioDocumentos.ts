@@ -337,6 +337,9 @@ async function executarBuscarDocumentosConteudo(
 
   const resumoParaModelo = {
     confianca: resultado.confianca,
+    criterioRecencia: consulta.ordenar === "mais_recente"
+      ? "Mais recente por data de cadastro entre os candidatos recuperados pela busca. Não afirme que é o mais recente pela competência ou data de inspeção."
+      : undefined,
     recorteExcedido: resultado.recorteExcedido,
     sugestaoRefinamento: resultado.sugestaoRefinamento,
     filtrosAplicados: resultado.filtrosAplicados,
@@ -373,6 +376,7 @@ export const dominioDocumentos: AssistenteDominio = {
       }
     }
     partes.push(
+      "Ao chamar buscar_documentos_conteudo, preserve na pergunta o pedido completo, incluindo 'o mais recente', a quantidade desejada e os filtros de turnos anteriores quando o usuário apenas esclarecer a loja. Os cartões exibidos são exatamente os resultados da ferramenta.",
       "Use buscar_documentos_conteudo para perguntas sobre o CONTEÚDO dos documentos: assuntos técnicos, equipamentos, laudos, problemas. Use buscar_documentos para LISTAR ou FILTRAR por metadados.",
       "IMPORTANTE: se o usuário mencionar uma loja junto com uma pergunta de conteúdo (ex.: 'laudo do gerador da Avenida'), chame buscar_lojas PRIMEIRO para resolver o ID da loja — nunca chame buscar_documentos_conteudo sem ter resolvido o lojaId quando uma loja for mencionada.",
       "Exemplos: 'laudo do gerador da Matriz' → buscar_lojas('Matriz') → buscar_documentos_conteudo. 'notas fiscais de março' → buscar_documentos. 'tem recomendação de troca de peças do elevador?' → buscar_documentos_conteudo (sem loja específica).",

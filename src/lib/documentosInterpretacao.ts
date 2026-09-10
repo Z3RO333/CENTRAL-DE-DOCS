@@ -9,6 +9,7 @@ export type ConsultaInterpretada = {
   ano?: string;
   mes?: string;
   ordenar: "relevancia" | "mais_recente";
+  limite?: number;
 };
 
 function promptSistema(termosDisponiveis: string[]): string {
@@ -23,12 +24,13 @@ Analise a pergunta e extraia em JSON (sem markdown):
   "equipamentoTermo": "<identificacao do equipamento se mencionado — omitir se incerto>",
   "ano": "<4 digitos — omitir se nao explicitado>",
   "mes": "<2 digitos 01-12 — omitir se nao explicitado>",
-  "ordenar": "relevancia" | "mais_recente"
+  "ordenar": "relevancia" | "mais_recente",
+  "limite": "<numero de documentos solicitado; 1 para o mais recente ou o último; omitir sem quantidade>"
 }
 
 Regra critica: nao invente filtros. Um filtro errado zera os resultados.
 Se nao tiver certeza, omita o campo e inclua o conceito em consultaSemantica.
-Use "mais_recente" apenas para perguntas de listagem ("liste os últimos", "mostre todos de março").
+Use "mais_recente" quando houver pedido explícito de recência, inclusive no singular ("qual o documento mais recente sobre gerador?"). Nesse caso singular, use limite 1. Não deduza recência apenas de um filtro de mês.
 Responda SOMENTE o JSON.`;
 }
 
@@ -36,6 +38,14 @@ export async function interpretarConsulta(
   pergunta: string,
   termosDisponiveis: string[],
 ): Promise<ConsultaInterpretada> {
+  const singularRecente = /\bmais recente\b(?!s)|\bultim[oa]\b/.test(
+    pergunta.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(),
+  );
+  const fallback: ConsultaInterpretada = {
+    consultaSemantica: pergunta,
+    ordenar: singularRecente ? "mais_recente" : "relevancia",
+    ...(singularRecente ? { limite: 1 } : {}),
+  };
   let resposta = "";
   try {
     const result = await callAzureOpenAiChat({
@@ -47,7 +57,7 @@ export async function interpretarConsulta(
     });
     resposta = result.content ?? "";
   } catch {
-    return { consultaSemantica: pergunta, ordenar: "relevancia" };
+    return fallback;
   }
 
   let parsed: Partial<ConsultaInterpretada> = {};
@@ -65,6 +75,9 @@ export async function interpretarConsulta(
     equipamentoTermo: parsed.equipamentoTermo,
     ano: parsed.ano,
     mes: parsed.mes,
-    ordenar: parsed.ordenar === "mais_recente" ? "mais_recente" : "relevancia",
+    ordenar: singularRecente || parsed.ordenar === "mais_recente" ? "mais_recente" : "relevancia",
+    limite: typeof parsed.limite === "number" && Number.isInteger(parsed.limite) && parsed.limite > 0
+      ? Math.min(parsed.limite, 20)
+      : fallback.limite,
   };
 }

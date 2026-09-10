@@ -65,6 +65,19 @@ function makeSupabase(docIds: string[], rpcRows: Record<string, unknown>[]) {
 describe("buscarDocumentosConteudo", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("retorna apenas o candidato mais recente mesmo após ranking por relevância", async () => {
+    const supabase = makeSupabase(["doc-2", "doc-1"], [
+      { documento_id: "doc-1", rrf_score: 0.05, melhor_trecho: "gerador antigo", pagina: 1, n_trechos_relevantes: 1 },
+      { documento_id: "doc-2", rrf_score: 0.04, melhor_trecho: "gerador recente", pagina: 1, n_trechos_relevantes: 1 },
+    ]);
+    const resultado = await buscarDocumentosConteudo({
+      ...paramsBase, consulta: { ...consultaBase, ordenar: "mais_recente", limite: 1 },
+    }, supabase as never, "o documento mais recente sobre gerador");
+    expect(resultado.documentos.map((d) => d.documentoId)).toEqual(["doc-2"]);
+    expect(resultado.confianca).toBe("media");
+    expect(resultado.filtrosAplicados.ordenar).toBe("mais_recente");
+  });
+
   it("chama rpc com p_documento_ids correto e retorna documentos ranqueados", async () => {
     const supabase = makeSupabase(
       ["doc-1", "doc-2"],

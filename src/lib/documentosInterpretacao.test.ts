@@ -11,6 +11,31 @@ const TERMOS = ["gerador", "ar condicionado", "elevador", "extintor", "subestaca
 describe("interpretarConsulta", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it.each(["qual o mais recente sobre gerador?", "quero o último laudo"])(
+    "preserva pedido singular mesmo quando o modelo omite quantidade: %s", async (pergunta) => {
+      vi.mocked(callAzureOpenAiChat).mockResolvedValueOnce({
+        content: JSON.stringify({ ordenar: "relevancia" }), toolCalls: [],
+      });
+      expect(await interpretarConsulta(pergunta, TERMOS)).toMatchObject({
+        ordenar: "mais_recente", limite: 1,
+      });
+    },
+  );
+
+  it("não limita pedidos no plural a um documento", async () => {
+    vi.mocked(callAzureOpenAiChat).mockResolvedValueOnce({
+      content: JSON.stringify({ ordenar: "mais_recente" }), toolCalls: [],
+    });
+    expect((await interpretarConsulta("liste os mais recentes", TERMOS)).limite).toBeUndefined();
+  });
+
+  it("preserva recência singular quando a interpretação falha", async () => {
+    vi.mocked(callAzureOpenAiChat).mockRejectedValueOnce(new Error("offline"));
+    expect(await interpretarConsulta("o laudo mais recente", TERMOS)).toMatchObject({
+      ordenar: "mais_recente", limite: 1,
+    });
+  });
+
   it("extrai tipo e assunto de uma pergunta objetiva", async () => {
     vi.mocked(callAzureOpenAiChat).mockResolvedValueOnce({
       content: JSON.stringify({
