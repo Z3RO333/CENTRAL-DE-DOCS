@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { X } from "lucide-react";
 import { STATUS_LABEL, type OrcamentoInternoStatus } from "@/lib/orcamentosInternosShared";
 import type { GestorOption } from "../_lib/orcamentosTypes";
-import { OrcamentoModal } from "./OrcamentoModal";
 
 export const EMPTY_FILTERS = {
   statusFilter: "todos",
@@ -23,7 +23,7 @@ const STATUS_GROUPS: Array<{ label: string; statuses: OrcamentoInternoStatus[] }
 
 const fieldClassName = "mt-2 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100";
 
-export function OrcamentoFiltersModal({
+export function OrcamentoFiltersPanel({
   filters,
   gestores,
   colaboradores,
@@ -43,11 +43,28 @@ export function OrcamentoFiltersModal({
   const update = (key: keyof OrcamentoFilters, value: string) => setDraft((current) => ({ ...current, [key]: value }));
 
   return (
-    <OrcamentoModal open onClose={onClose} title="Filtrar orçamentos" description="Escolha os critérios para encontrar os orçamentos que precisa.">
-      <form onSubmit={(event) => {
-        event.preventDefault();
-        if (!invalidDates) onApply(draft);
-      }}>
+    <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100 sm:p-5">
+      <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Filtrar orçamentos</h2>
+          <p className="mt-1 text-sm leading-relaxed text-slate-500">Escolha os critérios para encontrar os orçamentos que precisa.</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar filtros"
+          className="shrink-0 rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-sky-600"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+      <form
+        className="pt-5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!invalidDates) onApply(draft);
+        }}
+      >
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="text-sm font-medium text-slate-700">
             Status
@@ -97,6 +114,6 @@ export function OrcamentoFiltersModal({
           </div>
         </div>
       </form>
-    </OrcamentoModal>
+    </div>
   );
 }

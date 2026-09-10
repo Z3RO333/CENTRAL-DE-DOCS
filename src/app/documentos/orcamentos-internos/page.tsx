@@ -34,7 +34,7 @@ import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { OrcamentoModal } from "./_components/OrcamentoModal";
 import {
   EMPTY_FILTERS,
-  OrcamentoFiltersModal,
+  OrcamentoFiltersPanel,
   type OrcamentoFilters,
 } from "./_components/OrcamentoFiltersModal";
 import { OrcamentoIntakeForm } from "./_components/OrcamentoIntakeForm";
@@ -660,7 +660,7 @@ export default function OrcamentosInternosPage() {
       </OrcamentoModal>
 
       {filtersOpen && (
-        <OrcamentoFiltersModal
+        <OrcamentoFiltersPanel
           filters={filters}
           gestores={gestores}
           colaboradores={colaboradorOptions}
@@ -1303,38 +1303,20 @@ export default function OrcamentosInternosPage() {
                       </button>
                     </>
                   ) : null}
-                  {(detail?.canDecide &&
-                    ["aguardando_aprovacao", "em_analise_gestor", "reenviado"].includes(
-                      selectedDetail.status,
-                    )) ||
-                  isAdmin ? (
+                  {detail?.canDecide &&
+                  ["aguardando_aprovacao", "em_analise_gestor", "reenviado"].includes(
+                    selectedDetail.status,
+                  ) ? (
                     <button
                       type="button"
-                      disabled={
-                        Boolean(actionLoading) ||
-                        (Boolean(
-                          detail?.canDecide &&
-                            ["aguardando_aprovacao", "em_analise_gestor", "reenviado"].includes(
-                              selectedDetail.status,
-                            ),
-                        ) &&
-                          !justificativa.trim())
-                      }
-                      onClick={() => {
-                        const podeRejeitar =
-                          detail?.canDecide &&
-                          ["aguardando_aprovacao", "em_analise_gestor", "reenviado"].includes(
-                            selectedDetail.status,
-                          );
+                      disabled={Boolean(actionLoading) || !justificativa.trim()}
+                      onClick={() =>
                         void patchAction(
                           selectedDetail.id,
-                          {
-                            action: podeRejeitar ? "rejeitar" : "cancelar",
-                            justificativa,
-                          },
-                          podeRejeitar ? "Orçamento rejeitado." : "Orçamento cancelado.",
-                        );
-                      }}
+                          { action: "rejeitar", justificativa },
+                          "Orçamento rejeitado.",
+                        )
+                      }
                       className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-semibold text-white disabled:opacity-60"
                     >
                       <XCircle className="h-4 w-4" />
