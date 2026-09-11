@@ -26,15 +26,11 @@ const fieldClassName = "mt-2 w-full min-w-0 rounded-xl border border-slate-200 b
 export function OrcamentoFiltersPanel({
   filters,
   gestores,
-  colaboradores,
-  isAdmin,
   onApply,
   onClose,
 }: {
   filters: OrcamentoFilters;
   gestores: GestorOption[];
-  colaboradores: Array<{ id: string; label: string }>;
-  isAdmin: boolean;
   onApply: (filters: OrcamentoFilters) => void;
   onClose: () => void;
 }) {
@@ -84,15 +80,6 @@ export function OrcamentoFiltersPanel({
               {gestores.map((gestor) => <option key={gestor.email} value={gestor.email}>{gestor.name ?? gestor.email}</option>)}
             </select>
           </label>
-          {isAdmin && (
-            <label className="text-sm font-medium text-slate-700 sm:col-span-2">
-              Colaborador
-              <select value={draft.colaboradorFilter} onChange={(event) => update("colaboradorFilter", event.target.value)} className={fieldClassName}>
-                <option value="todos">Todos</option>
-                {colaboradores.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-              </select>
-            </label>
-          )}
           <fieldset className="grid min-w-0 gap-4 sm:col-span-2 sm:grid-cols-2">
             <legend className="mb-3 text-sm font-semibold text-slate-900">Período</legend>
             <label className="min-w-0 text-sm font-medium text-slate-700">

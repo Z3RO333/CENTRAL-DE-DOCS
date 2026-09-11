@@ -672,8 +672,6 @@ export default function OrcamentosInternosPage() {
         <OrcamentoFiltersPanel
           filters={filters}
           gestores={gestores}
-          colaboradores={colaboradorOptions}
-          isAdmin={isAdmin}
           onClose={() => setFiltersOpen(false)}
           onApply={(next) => {
             setFilters(next);
@@ -710,6 +708,23 @@ export default function OrcamentosInternosPage() {
             ))}
           </div>
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <select
+                aria-label="Filtrar por colaborador"
+                value={filters.colaboradorFilter}
+                onChange={(event) =>
+                  setFilters((current) => ({ ...current, colaboradorFilter: event.target.value }))
+                }
+                className="w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 sm:w-auto"
+              >
+                <option value="todos">Colaborador: todos</option>
+                {colaboradorOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               type="button"
               onClick={() => setFiltersOpen(true)}
