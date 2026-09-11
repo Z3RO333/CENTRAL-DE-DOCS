@@ -27,22 +27,42 @@ export async function GET(request: Request) {
       );
     }
 
-    const { data: acessos, error: acessosError } = await supabaseAdmin
-      .from("documentos_acesso")
-      .select("user_id,email")
-      .eq("scope", "admin");
-    if (acessosError) {
-      throw acessosError;
-    }
-
+    const escopo = new URL(request.url).searchParams.get("escopo");
     const porUserId = new Map<string, string>();
-    for (const row of acessos ?? []) {
-      const userId = row.user_id as string | null;
-      const email = normalizeEmail(row.email as string | null);
-      if (!userId || !email) {
-        continue;
+
+    if (escopo === "enviaram") {
+      // Filtro "Colaborador": só quem já enviou pelo menos um orçamento —
+      // não a lista completa de administradores.
+      const { data: envios, error: enviosError } = await supabaseAdmin
+        .from("orcamentos_internos")
+        .select("solicitante_id,solicitante_email");
+      if (enviosError) {
+        throw enviosError;
       }
-      porUserId.set(userId, email);
+      for (const row of envios ?? []) {
+        const userId = row.solicitante_id as string | null;
+        if (!userId) {
+          continue;
+        }
+        porUserId.set(userId, normalizeEmail(row.solicitante_email as string | null) ?? "");
+      }
+    } else {
+      const { data: acessos, error: acessosError } = await supabaseAdmin
+        .from("documentos_acesso")
+        .select("user_id,email")
+        .eq("scope", "admin");
+      if (acessosError) {
+        throw acessosError;
+      }
+
+      for (const row of acessos ?? []) {
+        const userId = row.user_id as string | null;
+        const email = normalizeEmail(row.email as string | null);
+        if (!userId || !email) {
+          continue;
+        }
+        porUserId.set(userId, email);
+      }
     }
 
     const nomesPorUserId = new Map<string, string | null>();

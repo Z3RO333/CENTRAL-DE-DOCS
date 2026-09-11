@@ -175,6 +175,7 @@ export default function OrcamentosInternosPage() {
   const [principalIndex, setPrincipalIndex] = useState(0);
   const [gestores, setGestores] = useState<GestorOption[]>([]);
   const [colaboradores, setColaboradores] = useState<ColaboradorOption[]>([]);
+  const [colaboradoresEnviaram, setColaboradoresEnviaram] = useState<ColaboradorOption[]>([]);
   const [draftToResume, setDraftToResume] = useState<OrcamentoInterno | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailPayload | null>(null);
@@ -225,17 +226,25 @@ export default function OrcamentosInternosPage() {
         setGestores(payload.gestores ?? []);
       }
       if (isAprovadorInterno) {
-        const colaboradoresRes = await fetch("/api/orcamentos-internos/colaboradores", {
-          headers,
-        });
+        const [colaboradoresRes, enviaramRes] = await Promise.all([
+          fetch("/api/orcamentos-internos/colaboradores", { headers }),
+          fetch("/api/orcamentos-internos/colaboradores?escopo=enviaram", { headers }),
+        ]);
         if (colaboradoresRes.ok) {
           const payload = (await colaboradoresRes.json()) as {
             colaboradores?: ColaboradorOption[];
           };
           setColaboradores(payload.colaboradores ?? []);
         }
+        if (enviaramRes.ok) {
+          const payload = (await enviaramRes.json()) as {
+            colaboradores?: ColaboradorOption[];
+          };
+          setColaboradoresEnviaram(payload.colaboradores ?? []);
+        }
       } else {
         setColaboradores([]);
+        setColaboradoresEnviaram([]);
       }
     } catch (err) {
       console.error("Erro ao carregar opções de orçamento:", err);
@@ -331,7 +340,7 @@ export default function OrcamentosInternosPage() {
 
   const colaboradorOptions = useMemo(() => {
     const map = new Map<string, string>();
-    colaboradores.forEach((colaborador) => {
+    colaboradoresEnviaram.forEach((colaborador) => {
       map.set(colaborador.id, colaborador.name ?? colaborador.email);
     });
     orcamentos.forEach((orcamento) => {
@@ -342,7 +351,7 @@ export default function OrcamentosInternosPage() {
       );
     });
     return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
-  }, [colaboradores, orcamentos]);
+  }, [colaboradoresEnviaram, orcamentos]);
 
   const activeFilters = (Object.keys(filters) as Array<keyof OrcamentoFilters>)
     .filter((key) => filters[key] !== EMPTY_FILTERS[key])
