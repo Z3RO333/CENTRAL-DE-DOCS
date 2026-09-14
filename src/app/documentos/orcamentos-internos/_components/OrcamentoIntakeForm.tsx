@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { LoaderCircle, Sparkles, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/components/AuthProvider";
-import type { ColaboradorOption, OrcamentoInterno } from "../_lib/orcamentosTypes";
+import type {
+  ColaboradorOption,
+  GestorOption,
+  OrcamentoInterno,
+} from "../_lib/orcamentosTypes";
 import { uploadDocumentFile } from "@/lib/documentUpload";
 import {
   EMPTY_REVIEW_VALUES,
@@ -40,6 +44,7 @@ type BulkDraft = {
 
 type Props = {
   colaboradores: ColaboradorOption[];
+  gestores: GestorOption[];
   draftToResume: OrcamentoInterno | null;
   onUpsert: (orcamento: OrcamentoInterno) => void;
   onSubmitted: (orcamento: OrcamentoInterno) => void;
@@ -73,6 +78,7 @@ function sugestaoToValues(
 
 export function OrcamentoIntakeForm({
   colaboradores,
+  gestores,
   draftToResume,
   onUpsert,
   onSubmitted,
@@ -82,6 +88,8 @@ export function OrcamentoIntakeForm({
   const [files, setFiles] = useState<File[]>([]);
   const [fileInputKey, setFileInputKey] = useState(0);
   const [solicitanteId, setSolicitanteId] = useState("");
+  const [approvalMode, setApprovalMode] = useState<"all" | "specific">("all");
+  const [selectedApproverEmails, setSelectedApproverEmails] = useState<string[]>([]);
 
   const [draftId, setDraftId] = useState<string | null>(null);
   const [attachedFileName, setAttachedFileName] = useState("");
@@ -120,6 +128,10 @@ export function OrcamentoIntakeForm({
       observacoes: draftToResume.observacoes ?? "",
     });
     setSolicitanteId("");
+    setApprovalMode(
+      draftToResume.aprovadores_emails == null ? "all" : "specific",
+    );
+    setSelectedApproverEmails(draftToResume.aprovadores_emails ?? []);
     setFiles([]);
     setBulkDrafts([]);
     setConfidence(null);
@@ -133,6 +145,8 @@ export function OrcamentoIntakeForm({
     setFiles([]);
     setFileInputKey((current) => current + 1);
     setSolicitanteId("");
+    setApprovalMode("all");
+    setSelectedApproverEmails([]);
     setDraftId(null);
     setAttachedFileName("");
     setValues(EMPTY_REVIEW_VALUES);
@@ -245,6 +259,10 @@ export function OrcamentoIntakeForm({
       setError("Confirme o nome do fornecedor.");
       return;
     }
+    if (approvalMode === "specific" && selectedApproverEmails.length === 0) {
+      setError("Selecione ao menos um gestor ou marque Todos os gestores.");
+      return;
+    }
     setWorking(submit ? "submitting" : "saving");
     setError(null);
     setSuccess(null);
@@ -266,6 +284,8 @@ export function OrcamentoIntakeForm({
           dataValidade: values.dataValidade || null,
           descricao: values.descricao.trim(),
           observacoes: values.observacoes.trim() || null,
+          aprovadoresEmails:
+            approvalMode === "all" ? null : selectedApproverEmails,
         }),
       });
       const payload = (await response.json()) as {
@@ -423,6 +443,20 @@ export function OrcamentoIntakeForm({
       );
       return;
     }
+    if (approvalMode === "specific" && selectedApproverEmails.length === 0) {
+      setBulkDrafts((current) =>
+        current.map((item) =>
+          item.orcamentoId === orcamentoId
+            ? {
+                ...item,
+                error: "Selecione ao menos um gestor ou marque Todos os gestores.",
+                success: null,
+              }
+            : item,
+        ),
+      );
+      return;
+    }
     setBulkDrafts((current) =>
       current.map((item) =>
         item.orcamentoId === orcamentoId
@@ -448,6 +482,8 @@ export function OrcamentoIntakeForm({
           dataValidade: entry.values.dataValidade || null,
           descricao: entry.values.descricao.trim(),
           observacoes: entry.values.observacoes.trim() || null,
+          aprovadoresEmails:
+            approvalMode === "all" ? null : selectedApproverEmails,
         }),
       });
       const payload = (await response.json()) as {
@@ -553,6 +589,79 @@ export function OrcamentoIntakeForm({
         <div className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
           Alguns arquivos não puderam ser enviados: {bulkFailed.join(", ")}
         </div>
+      ) : null}
+
+      {gestores.length > 0 ? (
+        <fieldset className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Enviar para aprovação de
+          </legend>
+          <div className="mt-1 flex flex-wrap gap-4 text-sm text-slate-700">
+            <label className="inline-flex cursor-pointer items-center gap-2 font-medium">
+              <input
+                type="radio"
+                name="approval-mode"
+                checked={approvalMode === "all"}
+                onChange={() => setApprovalMode("all")}
+                disabled={busy}
+                className="accent-sky-600"
+              />
+              Todos os gestores
+            </label>
+            <label className="inline-flex cursor-pointer items-center gap-2 font-medium">
+              <input
+                type="radio"
+                name="approval-mode"
+                checked={approvalMode === "specific"}
+                onChange={() => setApprovalMode("specific")}
+                disabled={busy}
+                className="accent-sky-600"
+              />
+              Gestores específicos
+            </label>
+          </div>
+          {approvalMode === "specific" ? (
+            <div className="mt-3 grid gap-2 border-t border-slate-200 pt-3 sm:grid-cols-2">
+              {gestores.map((gestor) => {
+                const checked = selectedApproverEmails.includes(gestor.email);
+                return (
+                  <label
+                    key={gestor.email}
+                    className="flex cursor-pointer items-start gap-2 rounded-lg bg-white px-3 py-2 text-xs text-slate-700 ring-1 ring-slate-200"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={busy}
+                      onChange={() =>
+                        setSelectedApproverEmails((current) =>
+                          checked
+                            ? current.filter((email) => email !== gestor.email)
+                            : [...current, gestor.email],
+                        )
+                      }
+                      className="mt-0.5 accent-sky-600"
+                    />
+                    <span>
+                      <span className="block font-semibold">
+                        {gestor.name ?? gestor.email}
+                      </span>
+                      {gestor.name ? (
+                        <span className="block text-[11px] text-slate-500">
+                          {gestor.email}
+                        </span>
+                      ) : null}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-2 text-[11px] text-slate-500">
+              Padrão: todos os gestores cadastrados recebem e podem aprovar.
+            </p>
+          )}
+        </fieldset>
       ) : null}
 
       {idle && colaboradores.length > 0 ? (

@@ -646,6 +646,7 @@ export default function OrcamentosInternosPage() {
       >
         <OrcamentoIntakeForm
           colaboradores={colaboradores}
+          gestores={gestores}
           draftToResume={draftToResume}
           onResumeHandled={() => setDraftToResume(null)}
           onUpsert={(orcamento) => {
@@ -963,6 +964,18 @@ export default function OrcamentosInternosPage() {
                       ["Valor", formatCurrency(selectedDetail.valor_total)],
                       ["Validade", selectedDetail.data_validade || "--"],
                       ["Solicitante", selectedDetail.solicitante_email ?? selectedDetail.solicitante_id],
+                      [
+                        "Aprovação de",
+                        selectedDetail.aprovadores_emails == null
+                          ? "Todos os gestores"
+                          : selectedDetail.aprovadores_emails
+                              .map(
+                                (email) =>
+                                  gestores.find((gestor) => gestor.email === email)?.name ??
+                                  email,
+                              )
+                              .join(", "),
+                      ],
                       ["Decidido por", selectedDetail.gestor_nome || selectedDetail.gestor_email || "--"],
                       ["Número do pedido", selectedDetail.numero_pedido || "--"],
                       ["Enviado em", formatDateTime(selectedDetail.enviado_em)],

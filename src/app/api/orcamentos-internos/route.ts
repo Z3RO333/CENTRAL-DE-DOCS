@@ -13,6 +13,7 @@ import {
   normalizeEmail,
   normalizeText,
   parseValorTotal,
+  resolveAprovadoresSelecionados,
   resolveLojaNome,
   resolvePrestadorNome,
   validateOrcamentoInput,
@@ -102,6 +103,12 @@ export async function GET(request: Request) {
         "em_analise_gestor",
         "reenviado",
       ]);
+      const actorEmail = normalizeEmail(actor.email);
+      if (!actor.isAdmin && actorEmail && isAprovador) {
+        query = query.or(
+          `aprovadores_emails.is.null,aprovadores_emails.cs.{${actorEmail}}`,
+        );
+      }
     } else if (tab === "todos" && !actor.isAdmin && !isAprovador) {
       throw new HttpError(403, "A visão geral é restrita a administradores e aprovadores.");
     }
@@ -225,6 +232,15 @@ export async function POST(request: Request) {
       solicitanteEmail = normalizeEmail(acessoAlvo.email as string | null);
     }
 
+    const aprovadores = submit ? await getAprovadorEmails(supabaseAdmin) : null;
+    const aprovadoresSelecionados = submit
+      ? resolveAprovadoresSelecionados(
+          body.aprovadoresEmails,
+          aprovadores!,
+          solicitanteEmail,
+        )
+      : null;
+
     const principal = getArquivoPrincipal(body.arquivos ?? []);
     if (!principal?.path) {
       throw new HttpError(400, "Arquivo principal não informado.");
@@ -296,6 +312,7 @@ export async function POST(request: Request) {
         gestor_id: null,
         gestor_email: "",
         gestor_nome: null,
+        aprovadores_emails: aprovadoresSelecionados,
         observacoes: normalizeText(body.observacoes) || null,
         arquivo_original_path: principal.path.trim(),
         status,
@@ -336,10 +353,9 @@ export async function POST(request: Request) {
     > | null = null;
     if (submit) {
       try {
-        const aprovadores = await getAprovadorEmails(supabaseAdmin);
         notification = await enviarEmailOrcamentoParaAprovacao({
           id,
-          destinatarios: aprovadores,
+          destinatarios: aprovadoresSelecionados ?? aprovadores!,
           solicitanteEmail,
           prestadorNome,
           lojaNome,
@@ -376,6 +392,7 @@ export async function POST(request: Request) {
           ? {
               notification_status: notification.status,
               notification_recipients: notification.recipientCount,
+              notification_target: aprovadoresSelecionados ?? "todos",
             }
           : {}),
       },
@@ -394,6 +411,7 @@ export async function POST(request: Request) {
           notification: "email_aprovadores",
           notification_status: notification?.status ?? "skipped",
           notification_recipients: notification?.recipientCount ?? 0,
+          notification_target: aprovadoresSelecionados ?? "todos",
         },
       });
     }

@@ -54,6 +54,7 @@ export type OrcamentoInternoInput = {
   gestorId?: string | null;
   gestorEmail?: string | null;
   gestorNome?: string | null;
+  aprovadoresEmails?: string[] | null;
   observacoes?: string | null;
   arquivos?: OrcamentoInternoArquivoInput[];
 };
@@ -77,6 +78,7 @@ export type OrcamentoInternoRow = {
   gestor_id: string | null;
   gestor_email: string;
   gestor_nome: string | null;
+  aprovadores_emails: string[] | null;
   observacoes: string | null;
   arquivo_original_path: string;
   arquivo_assinado_path: string | null;
@@ -302,6 +304,16 @@ export function assertCanDecide(
       "Somente um aprovador ou administrador pode decidir este orçamento.",
     );
   }
+  if (
+    row.aprovadores_emails !== null &&
+    (actorEmail === null ||
+      !row.aprovadores_emails.map(normalizeEmail).includes(actorEmail))
+  ) {
+    throw new HttpError(
+      403,
+      "Este orçamento foi direcionado a outro gestor.",
+    );
+  }
   if (row.solicitante_id === actor.realUserId) {
     throw new HttpError(
       403,
@@ -311,6 +323,55 @@ export function assertCanDecide(
   if (!DECISAO_STATUS.has(row.status)) {
     throw new HttpError(400, "Este orçamento não está aguardando decisão.");
   }
+}
+
+export function canDecideOrcamento(
+  row: OrcamentoInternoRow,
+  actor: Actor,
+  aprovadores: Set<string>,
+) {
+  try {
+    assertCanDecide(row, actor, aprovadores);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function resolveAprovadoresSelecionados(
+  value: unknown,
+  aprovadores: Set<string>,
+  solicitanteEmail?: string | null,
+): string[] | null {
+  if (value === null || value === undefined) return null;
+  if (!Array.isArray(value)) {
+    throw new HttpError(400, "Seleção de gestores inválida.");
+  }
+
+  const selecionados = [
+    ...new Set(
+      value
+        .map((email) =>
+          typeof email === "string" ? normalizeEmail(email) : null,
+        )
+        .filter((email): email is string => Boolean(email)),
+    ),
+  ];
+  if (selecionados.length === 0) {
+    throw new HttpError(400, "Selecione ao menos um gestor ou envie para todos.");
+  }
+  if (selecionados.some((email) => !aprovadores.has(email))) {
+    throw new HttpError(
+      400,
+      "Um dos gestores selecionados não é um aprovador válido.",
+    );
+  }
+
+  const solicitante = normalizeEmail(solicitanteEmail);
+  if (solicitante && selecionados.every((email) => email === solicitante)) {
+    throw new HttpError(400, "Selecione um gestor diferente do solicitante.");
+  }
+  return selecionados;
 }
 
 export function assertCanManageSignedOrcamento(

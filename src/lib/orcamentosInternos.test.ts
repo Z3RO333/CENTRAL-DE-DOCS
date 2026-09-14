@@ -33,6 +33,7 @@ const baseRow: OrcamentoInternoRow = {
   gestor_id: null,
   gestor_email: "",
   gestor_nome: null,
+  aprovadores_emails: null,
   observacoes: null,
   arquivo_original_path: arquivo.path,
   arquivo_assinado_path: null,
@@ -151,5 +152,32 @@ describe("fluxo de orçamentos internos", () => {
         actor(),
       ),
     ).toThrow("Somente administradores");
+  });
+
+  it("restringe a decisao aos gestores escolhidos", () => {
+    const direcionado = {
+      ...baseRow,
+      aprovadores_emails: ["aprovador2@bemol.com.br"],
+    };
+    const aprovadores = new Set([
+      "aprovador1@bemol.com.br",
+      "aprovador2@bemol.com.br",
+    ]);
+
+    expect(() => assertCanDecide(direcionado, actor(), aprovadores)).toThrow(
+      "direcionado a outro gestor",
+    );
+    expect(() =>
+      assertCanDecide(
+        direcionado,
+        actor({
+          userId: "aprovador-2",
+          email: "aprovador2@bemol.com.br",
+          realUserId: "aprovador-2",
+          realEmail: "aprovador2@bemol.com.br",
+        }),
+        aprovadores,
+      ),
+    ).not.toThrow();
   });
 });

@@ -10,6 +10,7 @@ import {
   assertCanEditAsSolicitante,
   assertCanManageSignedOrcamento,
   assertCanViewOrcamento,
+  canDecideOrcamento,
   assertInternalActor,
   getArquivoPrincipal,
   getAprovadorEmails,
@@ -17,6 +18,7 @@ import {
   normalizeEmail,
   normalizeText,
   parseValorTotal,
+  resolveAprovadoresSelecionados,
   resolveLojaNome,
   resolvePrestadorNome,
   validateOrcamentoInput,
@@ -169,12 +171,7 @@ export async function GET(
           }),
         ),
       isAdmin: actor.isAdmin,
-      canDecide:
-        ["aguardando_aprovacao", "em_analise_gestor", "reenviado"].includes(
-          orcamento.status,
-        ) &&
-        (actor.realIsAdmin || actorIsAprovador) &&
-        orcamento.solicitante_id !== actor.realUserId,
+      canDecide: canDecideOrcamento(orcamento, actor, aprovadores),
     });
   } catch (err) {
     console.error("Erro ao carregar orçamento interno:", err);
@@ -427,6 +424,16 @@ export async function PATCH(
         numero_referencia:
           normalizeText(body.numeroReferencia) || current.numero_referencia,
         observacoes: normalizeText(body.observacoes) || current.observacoes,
+        aprovadores_emails: Object.prototype.hasOwnProperty.call(
+          body,
+          "aprovadoresEmails",
+        )
+          ? resolveAprovadoresSelecionados(
+              body.aprovadoresEmails,
+              aprovadores,
+              current.solicitante_email,
+            )
+          : current.aprovadores_emails,
       };
       const { data, error } = await supabaseAdmin
         .from("orcamentos_internos")
@@ -520,6 +527,16 @@ export async function PATCH(
 
       const nextStatus: OrcamentoInternoStatus =
         action === "reenviar" ? "reenviado" : "aguardando_aprovacao";
+      const aprovadoresSelecionados = Object.prototype.hasOwnProperty.call(
+        body,
+        "aprovadoresEmails",
+      )
+        ? resolveAprovadoresSelecionados(
+            body.aprovadoresEmails,
+            aprovadores,
+            current.solicitante_email,
+          )
+        : current.aprovadores_emails;
       const nextVersion =
         body.arquivos && body.arquivos.length > 0
           ? current.versao_atual + 1
@@ -557,6 +574,7 @@ export async function PATCH(
         gestor_id: null,
         gestor_email: "",
         gestor_nome: null,
+        aprovadores_emails: aprovadoresSelecionados,
       };
       const { data, error } = await supabaseAdmin
         .from("orcamentos_internos")
@@ -605,7 +623,7 @@ export async function PATCH(
       });
       const notification = await enviarEmailOrcamentoParaAprovacao({
         id,
-        destinatarios: aprovadores,
+        destinatarios: aprovadoresSelecionados ?? aprovadores,
         solicitanteEmail: current.solicitante_email,
         prestadorNome,
         lojaNome,
@@ -629,6 +647,7 @@ export async function PATCH(
           notification: "email_aprovadores",
           notification_status: notification.status,
           notification_recipients: notification.recipientCount,
+          notification_target: aprovadoresSelecionados ?? "todos",
         },
       });
       return NextResponse.json({ orcamento: mapOrcamento(data as OrcamentoInternoRow) });

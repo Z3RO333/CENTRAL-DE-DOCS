@@ -32,6 +32,7 @@ export type OrcamentoInterno = {
   gestor_id: string | null;
   gestor_email: string;
   gestor_nome: string | null;
+  aprovadores_emails: string[] | null;
   observacoes: string | null;
   arquivo_original_path: string;
   arquivo_original_nome?: string | null;
