@@ -12,16 +12,18 @@ import {
   assertCanViewOrcamento,
   canDecideOrcamento,
   assertInternalActor,
+  elegiveisParaDecidir,
   emailsDoGrupo,
+  finalizaAoAprovar,
   getArquivoPrincipal,
   getAprovadorEmails,
   getAprovadoresPorGrupo,
+  grupoDoAprovador,
   logOrcamentoEvent,
   normalizeEmail,
   normalizeText,
   parseValorTotal,
   resolveAprovadoresSelecionados,
-  resolverEtapaAprovacao,
   resolveLojaNome,
   resolvePrestadorNome,
   validateOrcamentoInput,
@@ -131,9 +133,9 @@ export async function GET(
 
     const orcamento = await getOrcamentoOrThrow(id, supabaseAdmin);
     assertCanViewOrcamento(orcamento, actor, aprovadores);
-    const etapa = resolverEtapaAprovacao(orcamento);
     const aprovadoresPorGrupo = await getAprovadoresPorGrupo(supabaseAdmin);
-    const aprovadoresEtapa = emailsDoGrupo(aprovadoresPorGrupo, etapa.grupo);
+    const aprovadoresEtapa = elegiveisParaDecidir(orcamento, aprovadoresPorGrupo);
+    const atorGrupo = grupoDoAprovador(actor.realEmail, aprovadoresPorGrupo);
 
     const [versoesResult, timelineResult] = await Promise.all([
       supabaseAdmin
@@ -178,8 +180,8 @@ export async function GET(
         ),
       isAdmin: actor.isAdmin,
       canDecide: canDecideOrcamento(orcamento, actor, aprovadoresEtapa),
-      grupoEtapa: etapa.grupo,
-      finalizaAprovacao: etapa.finalizaAprovacao,
+      grupoEtapa: atorGrupo,
+      finalizaAprovacao: atorGrupo ? finalizaAoAprovar(orcamento, atorGrupo) : null,
     });
   } catch (err) {
     console.error("Erro ao carregar orçamento interno:", err);
@@ -630,11 +632,13 @@ export async function PATCH(
           data_validade: updates.data_validade,
         },
       });
-      const etapaEnvio = resolverEtapaAprovacao({
-        valor_total: updates.valor_total,
-        pre_aprovado_por: current.pre_aprovado_por,
-      });
-      const grupoEnvioEmails = emailsDoGrupo(aprovadoresPorGrupo, etapaEnvio.grupo);
+      // Notificacao de envio/reenvio sempre mira quem tem a bola agora: o
+      // grupo "alta" se ja foi pre-aprovado, senao o grupo "padrao" (etapa
+      // inicial de qualquer orcamento, mesmo em faixa alta).
+      const grupoEnvioEmails = emailsDoGrupo(
+        aprovadoresPorGrupo,
+        current.pre_aprovado_por ? "alta" : "padrao",
+      );
       const selecionadosNoGrupo = aprovadoresSelecionados?.filter((email) =>
         grupoEnvioEmails.has(email),
       );
@@ -675,7 +679,7 @@ export async function PATCH(
     }
 
     if (action === "solicitar_ajuste") {
-      assertCanDecide(current, actor, emailsDoGrupo(aprovadoresPorGrupo, resolverEtapaAprovacao(current).grupo));
+      assertCanDecide(current, actor, elegiveisParaDecidir(current, aprovadoresPorGrupo));
       const justificativa = normalizeText(body.justificativa);
       if (!justificativa) {
         throw new HttpError(400, "Informe a justificativa do ajuste.");
@@ -714,7 +718,7 @@ export async function PATCH(
     }
 
     if (action === "rejeitar") {
-      assertCanDecide(current, actor, emailsDoGrupo(aprovadoresPorGrupo, resolverEtapaAprovacao(current).grupo));
+      assertCanDecide(current, actor, elegiveisParaDecidir(current, aprovadoresPorGrupo));
       const justificativa = normalizeText(body.justificativa);
       if (!justificativa) {
         throw new HttpError(400, "Informe a justificativa da rejeição.");
@@ -754,7 +758,7 @@ export async function PATCH(
     }
 
     if (action === "devolver_sem_decisao") {
-      assertCanDecide(current, actor, emailsDoGrupo(aprovadoresPorGrupo, resolverEtapaAprovacao(current).grupo));
+      assertCanDecide(current, actor, elegiveisParaDecidir(current, aprovadoresPorGrupo));
       const nextStatus: OrcamentoInternoStatus = "aguardando_aprovacao";
       const { data, error } = await supabaseAdmin
         .from("orcamentos_internos")
@@ -778,10 +782,13 @@ export async function PATCH(
     }
 
     if (action === "aprovar_assinar") {
-      const etapa = resolverEtapaAprovacao(current);
-      assertCanDecide(current, actor, emailsDoGrupo(aprovadoresPorGrupo, etapa.grupo));
+      assertCanDecide(current, actor, elegiveisParaDecidir(current, aprovadoresPorGrupo));
+      const atorGrupo = grupoDoAprovador(actor.realEmail, aprovadoresPorGrupo);
+      if (!atorGrupo) {
+        throw new HttpError(403, "Você não está cadastrado como aprovador.");
+      }
 
-      if (!etapa.finalizaAprovacao) {
+      if (!finalizaAoAprovar(current, atorGrupo)) {
         const nextStatus: OrcamentoInternoStatus = "em_analise_gestor";
         const now = new Date().toISOString();
         const { data, error } = await supabaseAdmin

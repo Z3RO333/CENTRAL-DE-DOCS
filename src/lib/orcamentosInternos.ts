@@ -146,35 +146,60 @@ export type AprovadorConfig = {
   grupo: GrupoAprovador;
 };
 
-export type EtapaAprovacaoOrcamento = {
-  grupo: GrupoAprovador;
-  /** false = decisao de "aprovar" aqui e uma pre-aprovacao, nao finaliza. */
-  finalizaAprovacao: boolean;
-};
+function valorNumerico(valorTotal: OrcamentoInternoRow["valor_total"]): number | null {
+  const valor =
+    typeof valorTotal === "number" ? valorTotal : valorTotal !== null ? Number(valorTotal) : null;
+  return valor !== null && Number.isFinite(valor) ? valor : null;
+}
+
+function isFaixaAlta(valorTotal: OrcamentoInternoRow["valor_total"]): boolean {
+  const valor = valorNumerico(valorTotal);
+  return valor === null || valor >= FAIXA_ALTA_MINIMO;
+}
 
 /**
- * Resolve quem deve decidir um orcamento agora e se a decisao de aprovar
- * finaliza (assina) ou e apenas uma pre-aprovacao que cai para o proximo
- * grupo.
+ * Quem pode agir (aprovar/rejeitar/pedir ajuste) neste orçamento agora.
+ * Daniel/Flávio (grupo "alta") podem decidir qualquer valor a qualquer
+ * momento. Walter/Luciana (grupo "padrao") só decidem antes de uma
+ * pré-aprovação já ter acontecido — depois que pré-aprovam uma faixa alta,
+ * a etapa passa a ser exclusiva do grupo "alta".
  */
-export function resolverEtapaAprovacao(
+export function elegiveisParaDecidir(
   row: Pick<OrcamentoInternoRow, "valor_total" | "pre_aprovado_por">,
-): EtapaAprovacaoOrcamento {
-  const valor =
-    typeof row.valor_total === "number"
-      ? row.valor_total
-      : row.valor_total !== null
-        ? Number(row.valor_total)
-        : null;
-  const isFaixaAlta = valor === null || !Number.isFinite(valor) || valor >= FAIXA_ALTA_MINIMO;
+  aprovadoresPorGrupo: Record<GrupoAprovador, AprovadorConfig[]>,
+): Set<string> {
+  if (isFaixaAlta(row.valor_total) && row.pre_aprovado_por) {
+    return emailsDoGrupo(aprovadoresPorGrupo, "alta");
+  }
+  return new Set([
+    ...emailsDoGrupo(aprovadoresPorGrupo, "padrao"),
+    ...emailsDoGrupo(aprovadoresPorGrupo, "alta"),
+  ]);
+}
 
-  if (!isFaixaAlta) {
-    return { grupo: "padrao", finalizaAprovacao: true };
-  }
-  if (!row.pre_aprovado_por) {
-    return { grupo: "padrao", finalizaAprovacao: false };
-  }
-  return { grupo: "alta", finalizaAprovacao: true };
+/**
+ * Resolve se uma decisão de "aprovar" do `atorGrupo` finaliza (assina) o
+ * orçamento ou é apenas uma pré-aprovação que cai para o grupo "alta".
+ * Faixa baixa finaliza sempre; faixa alta só finaliza quando quem decide é
+ * do grupo "alta" (Daniel/Flávio podem aprovar qualquer valor direto).
+ */
+export function finalizaAoAprovar(
+  row: Pick<OrcamentoInternoRow, "valor_total">,
+  atorGrupo: GrupoAprovador,
+): boolean {
+  if (!isFaixaAlta(row.valor_total)) return true;
+  return atorGrupo === "alta";
+}
+
+export function grupoDoAprovador(
+  email: string | null,
+  aprovadoresPorGrupo: Record<GrupoAprovador, AprovadorConfig[]>,
+): GrupoAprovador | null {
+  const normalizado = normalizeEmail(email);
+  if (!normalizado) return null;
+  if (emailsDoGrupo(aprovadoresPorGrupo, "alta").has(normalizado)) return "alta";
+  if (emailsDoGrupo(aprovadoresPorGrupo, "padrao").has(normalizado)) return "padrao";
+  return null;
 }
 
 export function normalizeEmail(value: string | null | undefined) {
@@ -370,7 +395,7 @@ export function assertCanEditAsSolicitante(
 
 /**
  * `aprovadores` deve ser o conjunto de e-mails elegiveis para a etapa atual
- * do orcamento (ver `resolverEtapaAprovacao`) — não a lista completa de
+ * do orcamento (ver `elegiveisParaDecidir`) — não a lista completa de
  * aprovadores cadastrados. `aprovadores_emails` do registro não restringe
  * mais quem pode decidir (a faixa de valor já define isso); ele só narra
  * quem o solicitante prefere notificar.

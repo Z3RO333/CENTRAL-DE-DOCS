@@ -75,8 +75,8 @@ type DetailPayload = {
   versoes: Versao[];
   timeline: TimelineEvent[];
   canDecide: boolean;
-  grupoEtapa?: "padrao" | "alta";
-  finalizaAprovacao?: boolean;
+  grupoEtapa?: "padrao" | "alta" | null;
+  finalizaAprovacao?: boolean | null;
   error?: string;
 };
 

@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   assertCanDecide,
   assertCanManageSignedOrcamento,
-  resolverEtapaAprovacao,
+  elegiveisParaDecidir,
+  finalizaAoAprovar,
   validateOrcamentoInput,
   type OrcamentoInternoRow,
 } from "@/lib/orcamentosInternos";
@@ -187,28 +188,62 @@ describe("fluxo de orçamentos internos", () => {
   });
 });
 
-describe("resolverEtapaAprovacao (faixa de valor)", () => {
-  it("valor até 15.000 vai direto pro grupo padrão e finaliza", () => {
-    expect(
-      resolverEtapaAprovacao({ valor_total: 15000, pre_aprovado_por: null }),
-    ).toEqual({ grupo: "padrao", finalizaAprovacao: true });
+const grupos = {
+  padrao: [
+    { email: "walterrodrigues@bemol.com.br", nome: "Walter", grupo: "padrao" as const },
+    { email: "lucianaoliveira@bemol.com.br", nome: "Luciana", grupo: "padrao" as const },
+  ],
+  alta: [
+    { email: "danieldamasceno@bemol.com.br", nome: "Daniel", grupo: "alta" as const },
+    { email: "flavioqueiroz@bemol.com.br", nome: "Flávio", grupo: "alta" as const },
+  ],
+};
+
+describe("finalizaAoAprovar (faixa de valor)", () => {
+  it("faixa baixa finaliza para qualquer grupo", () => {
+    expect(finalizaAoAprovar({ valor_total: 15000 }, "padrao")).toBe(true);
+    expect(finalizaAoAprovar({ valor_total: 15000 }, "alta")).toBe(true);
   });
 
-  it("valor a partir de 15.000,01 exige pré-aprovação do grupo padrão primeiro", () => {
-    expect(
-      resolverEtapaAprovacao({ valor_total: 15000.01, pre_aprovado_por: null }),
-    ).toEqual({ grupo: "padrao", finalizaAprovacao: false });
+  it("faixa alta só finaliza quando quem decide é do grupo alta", () => {
+    expect(finalizaAoAprovar({ valor_total: 15000.01 }, "padrao")).toBe(false);
+    expect(finalizaAoAprovar({ valor_total: 15000.01 }, "alta")).toBe(true);
   });
 
-  it("depois de pré-aprovado, cai pro grupo alta finalizar", () => {
-    expect(
-      resolverEtapaAprovacao({ valor_total: 20000, pre_aprovado_por: "gestor-1" }),
-    ).toEqual({ grupo: "alta", finalizaAprovacao: true });
+  it("Daniel/Flávio aprovam qualquer valor direto, mesmo faixa alta", () => {
+    expect(finalizaAoAprovar({ valor_total: 999999 }, "alta")).toBe(true);
   });
 
   it("valor não informado é tratado como faixa alta por segurança", () => {
-    expect(
-      resolverEtapaAprovacao({ valor_total: null, pre_aprovado_por: null }),
-    ).toEqual({ grupo: "padrao", finalizaAprovacao: false });
+    expect(finalizaAoAprovar({ valor_total: null }, "padrao")).toBe(false);
+    expect(finalizaAoAprovar({ valor_total: null }, "alta")).toBe(true);
+  });
+});
+
+describe("elegiveisParaDecidir", () => {
+  it("antes de pré-aprovar, qualquer aprovador (padrão ou alta) pode agir", () => {
+    const elegiveis = elegiveisParaDecidir(
+      { valor_total: 30000, pre_aprovado_por: null },
+      grupos,
+    );
+    expect(elegiveis.has("walterrodrigues@bemol.com.br")).toBe(true);
+    expect(elegiveis.has("danieldamasceno@bemol.com.br")).toBe(true);
+  });
+
+  it("depois de pré-aprovado em faixa alta, só o grupo alta decide", () => {
+    const elegiveis = elegiveisParaDecidir(
+      { valor_total: 30000, pre_aprovado_por: "gestor-1" },
+      grupos,
+    );
+    expect(elegiveis.has("walterrodrigues@bemol.com.br")).toBe(false);
+    expect(elegiveis.has("danieldamasceno@bemol.com.br")).toBe(true);
+  });
+
+  it("faixa baixa é sempre de todo mundo, mesmo com pre_aprovado_por preenchido", () => {
+    const elegiveis = elegiveisParaDecidir(
+      { valor_total: 10000, pre_aprovado_por: "gestor-1" },
+      grupos,
+    );
+    expect(elegiveis.has("walterrodrigues@bemol.com.br")).toBe(true);
   });
 });
