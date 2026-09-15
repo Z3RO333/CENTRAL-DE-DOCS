@@ -17,7 +17,7 @@ export type OrcamentoInternoStatus =
 export const STATUS_LABEL: Record<OrcamentoInternoStatus, string> = {
   rascunho: "Rascunho",
   aguardando_aprovacao: "Aguardando aprovação",
-  em_analise_gestor: "Em análise pelo gestor",
+  em_analise_gestor: "Aguardando aprovação final",
   ajuste_solicitado: "Ajuste solicitado",
   reenviado: "Reenviado",
   aprovado_assinado: "Aprovado e assinado",

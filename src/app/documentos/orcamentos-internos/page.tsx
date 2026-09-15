@@ -75,6 +75,8 @@ type DetailPayload = {
   versoes: Versao[];
   timeline: TimelineEvent[];
   canDecide: boolean;
+  grupoEtapa?: "padrao" | "alta";
+  finalizaAprovacao?: boolean;
   error?: string;
 };
 
@@ -107,6 +109,7 @@ function humanizeEvent(value: string) {
     orcamento_visualizado_gestor: "Visualizado pelo gestor",
     ajuste_solicitado: "Ajuste solicitado",
     orcamento_reenviado: "Orçamento reenviado",
+    orcamento_pre_aprovado: "Pré-aprovado, aguardando aprovação final",
     orcamento_aprovado: "Orçamento aprovado",
     orcamento_assinado: "Orçamento assinado",
     orcamento_rejeitado: "Orçamento rejeitado",
@@ -533,7 +536,9 @@ export default function OrcamentosInternosPage() {
     await patchAction(
       orcamento.id,
       { action: "aprovar_assinar" },
-      "Orçamento aprovado e assinado.",
+      detail?.finalizaAprovacao === false
+        ? "Orçamento pré-aprovado. Segue para aprovação final."
+        : "Orçamento aprovado e assinado.",
     );
   };
 
@@ -976,6 +981,14 @@ export default function OrcamentosInternosPage() {
                               )
                               .join(", "),
                       ],
+                      ...(selectedDetail.pre_aprovado_email
+                        ? [
+                            [
+                              "Pré-aprovado por",
+                              `${selectedDetail.pre_aprovado_nome || selectedDetail.pre_aprovado_email} em ${formatDateTime(selectedDetail.pre_aprovado_em)}`,
+                            ],
+                          ]
+                        : []),
                       ["Decidido por", selectedDetail.gestor_nome || selectedDetail.gestor_email || "--"],
                       ["Número do pedido", selectedDetail.numero_pedido || "--"],
                       ["Enviado em", formatDateTime(selectedDetail.enviado_em)],
@@ -1311,17 +1324,24 @@ export default function OrcamentosInternosPage() {
                         type="button"
                         disabled={Boolean(actionLoading)}
                         onClick={async () => {
+                          const isPreAprovacao = detail?.finalizaAprovacao === false;
                           const confirmed = await confirm({
-                            title: "Aprovar e assinar orçamento",
-                            description: `Confirma a aprovação e assinatura do orçamento de ${selectedDetail.prestador_nome}?`,
-                            confirmLabel: "Aprovar e assinar",
+                            title: isPreAprovacao ? "Pré-aprovar orçamento" : "Aprovar e assinar orçamento",
+                            description: isPreAprovacao
+                              ? `Confirma a pré-aprovação do orçamento de ${selectedDetail.prestador_nome}? Ele seguirá para a aprovação final de Daniel ou Flávio.`
+                              : `Confirma a aprovação e assinatura do orçamento de ${selectedDetail.prestador_nome}?`,
+                            confirmLabel: isPreAprovacao ? "Pré-aprovar" : "Aprovar e assinar",
                           });
                           if (confirmed) void signAndApprove(selectedDetail);
                         }}
                         className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white disabled:opacity-60"
                       >
                         <Signature className="h-4 w-4" />
-                        {actionLoading === "aprovar_assinar" ? "Assinando..." : "Aprovar e assinar"}
+                        {actionLoading === "aprovar_assinar"
+                          ? "Enviando..."
+                          : detail?.finalizaAprovacao === false
+                            ? "Pré-aprovar"
+                            : "Aprovar e assinar"}
                       </button>
                       <button
                         type="button"

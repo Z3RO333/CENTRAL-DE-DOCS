@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertCanDecide,
   assertCanManageSignedOrcamento,
+  resolverEtapaAprovacao,
   validateOrcamentoInput,
   type OrcamentoInternoRow,
 } from "@/lib/orcamentosInternos";
@@ -34,6 +35,10 @@ const baseRow: OrcamentoInternoRow = {
   gestor_email: "",
   gestor_nome: null,
   aprovadores_emails: null,
+  pre_aprovado_por: null,
+  pre_aprovado_email: null,
+  pre_aprovado_nome: null,
+  pre_aprovado_em: null,
   observacoes: null,
   arquivo_original_path: arquivo.path,
   arquivo_assinado_path: null,
@@ -154,30 +159,56 @@ describe("fluxo de orçamentos internos", () => {
     ).toThrow("Somente administradores");
   });
 
-  it("restringe a decisao aos gestores escolhidos", () => {
+  it("aprovadores_emails do registro não restringe mais quem decide (só a faixa de valor decide)", () => {
     const direcionado = {
       ...baseRow,
       aprovadores_emails: ["aprovador2@bemol.com.br"],
     };
-    const aprovadores = new Set([
-      "aprovador1@bemol.com.br",
-      "aprovador2@bemol.com.br",
-    ]);
+    expect(() =>
+      assertCanDecide(direcionado, actor(), new Set(["aprovador1@bemol.com.br"])),
+    ).not.toThrow();
+  });
 
-    expect(() => assertCanDecide(direcionado, actor(), aprovadores)).toThrow(
-      "direcionado a outro gestor",
-    );
+  it("administrador sem estar na lista de aprovadores não pode decidir", () => {
     expect(() =>
       assertCanDecide(
-        direcionado,
+        baseRow,
         actor({
-          userId: "aprovador-2",
-          email: "aprovador2@bemol.com.br",
-          realUserId: "aprovador-2",
-          realEmail: "aprovador2@bemol.com.br",
+          userId: "admin-1",
+          email: "admin@bemol.com.br",
+          realUserId: "admin-1",
+          realEmail: "admin@bemol.com.br",
+          realIsAdmin: true,
+          isAdmin: true,
         }),
-        aprovadores,
+        new Set(["aprovador1@bemol.com.br"]),
       ),
-    ).not.toThrow();
+    ).toThrow("Somente um aprovador");
+  });
+});
+
+describe("resolverEtapaAprovacao (faixa de valor)", () => {
+  it("valor até 15.000 vai direto pro grupo padrão e finaliza", () => {
+    expect(
+      resolverEtapaAprovacao({ valor_total: 15000, pre_aprovado_por: null }),
+    ).toEqual({ grupo: "padrao", finalizaAprovacao: true });
+  });
+
+  it("valor a partir de 15.000,01 exige pré-aprovação do grupo padrão primeiro", () => {
+    expect(
+      resolverEtapaAprovacao({ valor_total: 15000.01, pre_aprovado_por: null }),
+    ).toEqual({ grupo: "padrao", finalizaAprovacao: false });
+  });
+
+  it("depois de pré-aprovado, cai pro grupo alta finalizar", () => {
+    expect(
+      resolverEtapaAprovacao({ valor_total: 20000, pre_aprovado_por: "gestor-1" }),
+    ).toEqual({ grupo: "alta", finalizaAprovacao: true });
+  });
+
+  it("valor não informado é tratado como faixa alta por segurança", () => {
+    expect(
+      resolverEtapaAprovacao({ valor_total: null, pre_aprovado_por: null }),
+    ).toEqual({ grupo: "padrao", finalizaAprovacao: false });
   });
 });

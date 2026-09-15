@@ -79,6 +79,10 @@ export type OrcamentoInternoRow = {
   gestor_email: string;
   gestor_nome: string | null;
   aprovadores_emails: string[] | null;
+  pre_aprovado_por: string | null;
+  pre_aprovado_email: string | null;
+  pre_aprovado_nome: string | null;
+  pre_aprovado_em: string | null;
   observacoes: string | null;
   arquivo_original_path: string;
   arquivo_assinado_path: string | null;
@@ -111,7 +115,7 @@ export type OrcamentoInternoVersaoRow = {
 export const STATUS_LABEL: Record<OrcamentoInternoStatus, string> = {
   rascunho: "Rascunho",
   aguardando_aprovacao: "Aguardando aprovação",
-  em_analise_gestor: "Em análise pelo gestor",
+  em_analise_gestor: "Aguardando aprovação final",
   ajuste_solicitado: "Ajuste solicitado",
   reenviado: "Reenviado",
   aprovado_assinado: "Aprovado e assinado",
@@ -124,6 +128,54 @@ export const DECISAO_STATUS = new Set<OrcamentoInternoStatus>([
   "em_analise_gestor",
   "reenviado",
 ]);
+
+/**
+ * Estrategia de liberacao por faixa de valor: ate este limite, o grupo
+ * "padrao" (Walter/Luciana) aprova diretamente. A partir daqui, o grupo
+ * "padrao" so pre-aprova e a decisao final fica com o grupo "alta"
+ * (Daniel/Flavio). Valor nao informado e tratado como faixa alta (mais
+ * criteriosa) por seguranca.
+ */
+export const FAIXA_ALTA_MINIMO = 15000.01;
+
+export type GrupoAprovador = "padrao" | "alta";
+
+export type AprovadorConfig = {
+  email: string;
+  nome: string | null;
+  grupo: GrupoAprovador;
+};
+
+export type EtapaAprovacaoOrcamento = {
+  grupo: GrupoAprovador;
+  /** false = decisao de "aprovar" aqui e uma pre-aprovacao, nao finaliza. */
+  finalizaAprovacao: boolean;
+};
+
+/**
+ * Resolve quem deve decidir um orcamento agora e se a decisao de aprovar
+ * finaliza (assina) ou e apenas uma pre-aprovacao que cai para o proximo
+ * grupo.
+ */
+export function resolverEtapaAprovacao(
+  row: Pick<OrcamentoInternoRow, "valor_total" | "pre_aprovado_por">,
+): EtapaAprovacaoOrcamento {
+  const valor =
+    typeof row.valor_total === "number"
+      ? row.valor_total
+      : row.valor_total !== null
+        ? Number(row.valor_total)
+        : null;
+  const isFaixaAlta = valor === null || !Number.isFinite(valor) || valor >= FAIXA_ALTA_MINIMO;
+
+  if (!isFaixaAlta) {
+    return { grupo: "padrao", finalizaAprovacao: true };
+  }
+  if (!row.pre_aprovado_por) {
+    return { grupo: "padrao", finalizaAprovacao: false };
+  }
+  return { grupo: "alta", finalizaAprovacao: true };
+}
 
 export function normalizeEmail(value: string | null | undefined) {
   return value?.toLowerCase().trim() || null;
@@ -238,6 +290,31 @@ export async function getAprovadorEmails(
   return new Set(emails);
 }
 
+export async function getAprovadoresPorGrupo(
+  supabaseAdmin: ReturnType<typeof createSupabaseAdminClient>,
+): Promise<Record<GrupoAprovador, AprovadorConfig[]>> {
+  const { data, error } = await supabaseAdmin
+    .from("orcamentos_internos_aprovadores")
+    .select("email,nome,grupo");
+  if (error) throw error;
+
+  const result: Record<GrupoAprovador, AprovadorConfig[]> = { padrao: [], alta: [] };
+  for (const row of data ?? []) {
+    const email = normalizeEmail(row.email as string | null);
+    if (!email) continue;
+    const grupo: GrupoAprovador = row.grupo === "alta" ? "alta" : "padrao";
+    result[grupo].push({ email, nome: (row.nome as string | null) ?? null, grupo });
+  }
+  return result;
+}
+
+export function emailsDoGrupo(
+  aprovadoresPorGrupo: Record<GrupoAprovador, AprovadorConfig[]>,
+  grupo: GrupoAprovador,
+): Set<string> {
+  return new Set(aprovadoresPorGrupo[grupo].map((a) => a.email));
+}
+
 export async function isAprovadorInterno(
   email: string | null,
   supabaseAdmin: ReturnType<typeof createSupabaseAdminClient>,
@@ -291,6 +368,13 @@ export function assertCanEditAsSolicitante(
   }
 }
 
+/**
+ * `aprovadores` deve ser o conjunto de e-mails elegiveis para a etapa atual
+ * do orcamento (ver `resolverEtapaAprovacao`) — não a lista completa de
+ * aprovadores cadastrados. `aprovadores_emails` do registro não restringe
+ * mais quem pode decidir (a faixa de valor já define isso); ele só narra
+ * quem o solicitante prefere notificar.
+ */
 export function assertCanDecide(
   row: OrcamentoInternoRow,
   actor: Actor,
@@ -298,20 +382,10 @@ export function assertCanDecide(
 ) {
   const actorEmail = normalizeEmail(actor.realEmail);
   const isAprovador = actorEmail !== null && aprovadores.has(actorEmail);
-  if (!actor.realIsAdmin && !isAprovador) {
+  if (!isAprovador) {
     throw new HttpError(
       403,
-      "Somente um aprovador ou administrador pode decidir este orçamento.",
-    );
-  }
-  if (
-    row.aprovadores_emails !== null &&
-    (actorEmail === null ||
-      !row.aprovadores_emails.map(normalizeEmail).includes(actorEmail))
-  ) {
-    throw new HttpError(
-      403,
-      "Este orçamento foi direcionado a outro gestor.",
+      "Somente um aprovador do grupo responsável por esta etapa pode decidir este orçamento.",
     );
   }
   if (row.solicitante_id === actor.realUserId) {

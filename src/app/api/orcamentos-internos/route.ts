@@ -7,8 +7,10 @@ import {
 import {
   TIPO_ORCAMENTO_INTERNO,
   assertInternalActor,
+  emailsDoGrupo,
   getArquivoPrincipal,
   getAprovadorEmails,
+  getAprovadoresPorGrupo,
   logOrcamentoEvent,
   normalizeEmail,
   normalizeText,
@@ -103,12 +105,6 @@ export async function GET(request: Request) {
         "em_analise_gestor",
         "reenviado",
       ]);
-      const actorEmail = normalizeEmail(actor.email);
-      if (!actor.isAdmin && actorEmail && isAprovador) {
-        query = query.or(
-          `aprovadores_emails.is.null,aprovadores_emails.cs.{${actorEmail}}`,
-        );
-      }
     } else if (tab === "todos" && !actor.isAdmin && !isAprovador) {
       throw new HttpError(403, "A visão geral é restrita a administradores e aprovadores.");
     }
@@ -240,6 +236,21 @@ export async function POST(request: Request) {
           solicitanteEmail,
         )
       : null;
+    // Todo orçamento novo começa na etapa "padrao" (Walter/Luciana), mesmo
+    // em faixa alta — a etapa "alta" só existe depois da pré-aprovação.
+    const aprovadoresPorGrupo = submit ? await getAprovadoresPorGrupo(supabaseAdmin) : null;
+    const grupoInicialEmails = aprovadoresPorGrupo
+      ? emailsDoGrupo(aprovadoresPorGrupo, "padrao")
+      : null;
+    const selecionadosNoGrupoInicial = aprovadoresSelecionados?.filter((email) =>
+      grupoInicialEmails?.has(email),
+    );
+    const destinatariosEnvio =
+      selecionadosNoGrupoInicial && selecionadosNoGrupoInicial.length > 0
+        ? selecionadosNoGrupoInicial
+        : grupoInicialEmails
+          ? Array.from(grupoInicialEmails)
+          : [];
 
     const principal = getArquivoPrincipal(body.arquivos ?? []);
     if (!principal?.path) {
@@ -355,7 +366,7 @@ export async function POST(request: Request) {
       try {
         notification = await enviarEmailOrcamentoParaAprovacao({
           id,
-          destinatarios: aprovadoresSelecionados ?? aprovadores!,
+          destinatarios: destinatariosEnvio,
           solicitanteEmail,
           prestadorNome,
           lojaNome,

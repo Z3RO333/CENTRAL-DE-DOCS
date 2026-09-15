@@ -24,7 +24,7 @@ const STATUS: Record<string, { label: string; tone: StatusTone }> = {
   rejeitada: { label: "Rejeitada", tone: "danger" },
   rascunho: { label: "Rascunho", tone: "neutral" },
   aguardando_aprovacao: { label: "Aguardando aprovação", tone: "warning" },
-  em_analise_gestor: { label: "Em análise do gestor", tone: "info" },
+  em_analise_gestor: { label: "Aguardando aprovação final", tone: "info" },
   reenviado: { label: "Reenviado", tone: "info" },
   ajuste_solicitado: { label: "Ajuste solicitado", tone: "warning" },
   aprovado_assinado: { label: "Aprovado e assinado", tone: "success" },

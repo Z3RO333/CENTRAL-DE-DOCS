@@ -33,6 +33,10 @@ export type OrcamentoInterno = {
   gestor_email: string;
   gestor_nome: string | null;
   aprovadores_emails: string[] | null;
+  pre_aprovado_por: string | null;
+  pre_aprovado_email: string | null;
+  pre_aprovado_nome: string | null;
+  pre_aprovado_em: string | null;
   observacoes: string | null;
   arquivo_original_path: string;
   arquivo_original_nome?: string | null;

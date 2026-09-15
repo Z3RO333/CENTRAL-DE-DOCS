@@ -12,13 +12,16 @@ import {
   assertCanViewOrcamento,
   canDecideOrcamento,
   assertInternalActor,
+  emailsDoGrupo,
   getArquivoPrincipal,
   getAprovadorEmails,
+  getAprovadoresPorGrupo,
   logOrcamentoEvent,
   normalizeEmail,
   normalizeText,
   parseValorTotal,
   resolveAprovadoresSelecionados,
+  resolverEtapaAprovacao,
   resolveLojaNome,
   resolvePrestadorNome,
   validateOrcamentoInput,
@@ -128,6 +131,9 @@ export async function GET(
 
     const orcamento = await getOrcamentoOrThrow(id, supabaseAdmin);
     assertCanViewOrcamento(orcamento, actor, aprovadores);
+    const etapa = resolverEtapaAprovacao(orcamento);
+    const aprovadoresPorGrupo = await getAprovadoresPorGrupo(supabaseAdmin);
+    const aprovadoresEtapa = emailsDoGrupo(aprovadoresPorGrupo, etapa.grupo);
 
     const [versoesResult, timelineResult] = await Promise.all([
       supabaseAdmin
@@ -171,7 +177,9 @@ export async function GET(
           }),
         ),
       isAdmin: actor.isAdmin,
-      canDecide: canDecideOrcamento(orcamento, actor, aprovadores),
+      canDecide: canDecideOrcamento(orcamento, actor, aprovadoresEtapa),
+      grupoEtapa: etapa.grupo,
+      finalizaAprovacao: etapa.finalizaAprovacao,
     });
   } catch (err) {
     console.error("Erro ao carregar orçamento interno:", err);
@@ -196,6 +204,7 @@ export async function PATCH(
     const actor = await getActorFromRequest(request, supabaseAdmin);
     await assertInternalActor({ actor, supabaseAdmin });
     const aprovadores = await getAprovadorEmails(supabaseAdmin);
+    const aprovadoresPorGrupo = await getAprovadoresPorGrupo(supabaseAdmin);
 
     const body = (await request.json()) as OrcamentoInternoInput & {
       action?: OrcamentoInternoAction;
@@ -621,9 +630,21 @@ export async function PATCH(
           data_validade: updates.data_validade,
         },
       });
+      const etapaEnvio = resolverEtapaAprovacao({
+        valor_total: updates.valor_total,
+        pre_aprovado_por: current.pre_aprovado_por,
+      });
+      const grupoEnvioEmails = emailsDoGrupo(aprovadoresPorGrupo, etapaEnvio.grupo);
+      const selecionadosNoGrupo = aprovadoresSelecionados?.filter((email) =>
+        grupoEnvioEmails.has(email),
+      );
+      const destinatariosEnvio =
+        selecionadosNoGrupo && selecionadosNoGrupo.length > 0
+          ? selecionadosNoGrupo
+          : Array.from(grupoEnvioEmails);
       const notification = await enviarEmailOrcamentoParaAprovacao({
         id,
-        destinatarios: aprovadoresSelecionados ?? aprovadores,
+        destinatarios: destinatariosEnvio,
         solicitanteEmail: current.solicitante_email,
         prestadorNome,
         lojaNome,
@@ -654,7 +675,7 @@ export async function PATCH(
     }
 
     if (action === "solicitar_ajuste") {
-      assertCanDecide(current, actor, aprovadores);
+      assertCanDecide(current, actor, emailsDoGrupo(aprovadoresPorGrupo, resolverEtapaAprovacao(current).grupo));
       const justificativa = normalizeText(body.justificativa);
       if (!justificativa) {
         throw new HttpError(400, "Informe a justificativa do ajuste.");
@@ -693,7 +714,7 @@ export async function PATCH(
     }
 
     if (action === "rejeitar") {
-      assertCanDecide(current, actor, aprovadores);
+      assertCanDecide(current, actor, emailsDoGrupo(aprovadoresPorGrupo, resolverEtapaAprovacao(current).grupo));
       const justificativa = normalizeText(body.justificativa);
       if (!justificativa) {
         throw new HttpError(400, "Informe a justificativa da rejeição.");
@@ -733,7 +754,7 @@ export async function PATCH(
     }
 
     if (action === "devolver_sem_decisao") {
-      assertCanDecide(current, actor, aprovadores);
+      assertCanDecide(current, actor, emailsDoGrupo(aprovadoresPorGrupo, resolverEtapaAprovacao(current).grupo));
       const nextStatus: OrcamentoInternoStatus = "aguardando_aprovacao";
       const { data, error } = await supabaseAdmin
         .from("orcamentos_internos")
@@ -757,7 +778,63 @@ export async function PATCH(
     }
 
     if (action === "aprovar_assinar") {
-      assertCanDecide(current, actor, aprovadores);
+      const etapa = resolverEtapaAprovacao(current);
+      assertCanDecide(current, actor, emailsDoGrupo(aprovadoresPorGrupo, etapa.grupo));
+
+      if (!etapa.finalizaAprovacao) {
+        const nextStatus: OrcamentoInternoStatus = "em_analise_gestor";
+        const now = new Date().toISOString();
+        const { data, error } = await supabaseAdmin
+          .from("orcamentos_internos")
+          .update({
+            status: nextStatus,
+            pre_aprovado_por: actor.realUserId,
+            pre_aprovado_email: actor.realEmail ?? "",
+            pre_aprovado_nome: null,
+            pre_aprovado_em: now,
+            gestor_id: actor.realUserId,
+            gestor_email: actor.realEmail ?? "",
+            gestor_nome: null,
+          })
+          .eq("id", id)
+          .eq("status", from)
+          .select("*")
+          .maybeSingle();
+        if (error) throw error;
+        if (!data) {
+          throw new HttpError(409, "Este orçamento já foi decidido por outro gestor.");
+        }
+        await updateFormularioStatus({ supabaseAdmin, id, status: nextStatus });
+
+        const destinatariosFinal = aprovadoresPorGrupo.alta.map((a) => a.email);
+        const notification = await enviarEmailOrcamentoParaAprovacao({
+          id,
+          destinatarios: destinatariosFinal,
+          solicitanteEmail: current.solicitante_email,
+          prestadorNome: current.prestador_nome,
+          lojaNome: current.loja_nome,
+          numeroOrcamento: current.numero_orcamento,
+          descricao: current.descricao,
+          valorTotal: current.valor_total,
+        });
+        await logOrcamentoEvent({
+          supabaseAdmin,
+          documentoId: id,
+          eventType: "orcamento_pre_aprovado",
+          actorId: actor.realUserId,
+          actorEmail: actor.realEmail,
+          from,
+          to: nextStatus,
+          metadata: {
+            notification: "email_aprovadores_final",
+            notification_status: notification.status,
+            notification_recipients: notification.recipientCount,
+          },
+        });
+        return NextResponse.json({
+          orcamento: mapOrcamento(data as OrcamentoInternoRow),
+        });
+      }
 
       const assinadoPorNome = await resolveAssinadoPorNome(supabaseAdmin, {
         userId: actor.realUserId,
