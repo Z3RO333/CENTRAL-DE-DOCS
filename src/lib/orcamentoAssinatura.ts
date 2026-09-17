@@ -41,15 +41,32 @@ export async function resolveAssinadoPorNome(
   }
 }
 
+/** Altura ocupada por cada carimbo (logo + 3 linhas), usada para empilhar
+ * sem sobrepor quando o PDF já tem um carimbo anterior (ex.: pré-aprovação
+ * seguida de aprovação final). */
+const STAMP_HEIGHT = 42;
+
 export async function gerarPdfAssinado(input: {
   supabaseAdmin: ReturnType<typeof createSupabaseAdminClient>;
   orcamentoId: string;
   arquivoOriginalPath: string;
   assinadoPorNome: string;
   assinadoPorUserId: string;
+  /** Texto acima do nome. Default: "Assinado de forma digital por". */
+  rotulo?: string;
+  /** Posição do carimbo na pilha (0 = mais embaixo). Use 1+ quando o PDF
+   * de origem já contém um carimbo anterior, para não sobrepor. */
+  carimboIndex?: number;
 }) {
-  const { supabaseAdmin, orcamentoId, arquivoOriginalPath, assinadoPorNome, assinadoPorUserId } =
-    input;
+  const {
+    supabaseAdmin,
+    orcamentoId,
+    arquivoOriginalPath,
+    assinadoPorNome,
+    assinadoPorUserId,
+    rotulo = "Assinado de forma digital por",
+    carimboIndex = 0,
+  } = input;
 
   const { data: originalBlob, error: downloadError } = await supabaseAdmin.storage
     .from(STORAGE_BUCKET)
@@ -72,7 +89,7 @@ export async function gerarPdfAssinado(input: {
 
   const dadosLabel = formatDadosLabel(new Date());
 
-  const stampBaseY = 54;
+  const stampBaseY = 54 + carimboIndex * STAMP_HEIGHT;
   const logoX = 48;
   page.drawImage(logoImage, {
     x: logoX,
@@ -82,7 +99,7 @@ export async function gerarPdfAssinado(input: {
   });
 
   const stampX = logoX + logoWidth + 12;
-  page.drawText("Assinado de forma digital por", {
+  page.drawText(rotulo, {
     x: stampX,
     y: stampBaseY + 24,
     size: 8,

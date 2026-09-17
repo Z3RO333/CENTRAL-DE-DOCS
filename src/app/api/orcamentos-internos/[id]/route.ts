@@ -792,6 +792,20 @@ export async function PATCH(
       }
 
       if (!finalizaAoAprovar(current, atorGrupo)) {
+        const preAprovadoPorNome = await resolveAssinadoPorNome(supabaseAdmin, {
+          userId: actor.realUserId,
+          email: actor.realEmail,
+        });
+        const preAprovadoArquivoPath = await gerarPdfAssinado({
+          supabaseAdmin,
+          orcamentoId: id,
+          arquivoOriginalPath: current.arquivo_original_path,
+          assinadoPorNome: preAprovadoPorNome,
+          assinadoPorUserId: actor.realUserId,
+          rotulo: "Pré-aprovado de forma digital por",
+          carimboIndex: 0,
+        });
+
         const nextStatus: OrcamentoInternoStatus = "em_analise_gestor";
         const now = new Date().toISOString();
         const { data, error } = await supabaseAdmin
@@ -800,8 +814,9 @@ export async function PATCH(
             status: nextStatus,
             pre_aprovado_por: actor.realUserId,
             pre_aprovado_email: actor.realEmail ?? "",
-            pre_aprovado_nome: null,
+            pre_aprovado_nome: preAprovadoPorNome,
             pre_aprovado_em: now,
+            pre_aprovado_arquivo_path: preAprovadoArquivoPath,
             gestor_id: actor.realUserId,
             gestor_email: actor.realEmail ?? "",
             gestor_nome: null,
@@ -810,8 +825,12 @@ export async function PATCH(
           .eq("status", from)
           .select("*")
           .maybeSingle();
-        if (error) throw error;
+        if (error) {
+          await supabaseAdmin.storage.from("formularios").remove([preAprovadoArquivoPath]);
+          throw error;
+        }
         if (!data) {
+          await supabaseAdmin.storage.from("formularios").remove([preAprovadoArquivoPath]);
           throw new HttpError(409, "Este orçamento já foi decidido por outro gestor.");
         }
         await updateFormularioStatus({ supabaseAdmin, id, status: nextStatus });
@@ -850,12 +869,16 @@ export async function PATCH(
         userId: actor.realUserId,
         email: actor.realEmail,
       });
+      // Se houve pré-aprovação, carimba em cima do PDF que já tem o
+      // carimbo de pré-aprovação (índice 1), pra ficarem os dois visíveis
+      // e empilhados sem se sobrepor.
       const signedPath = await gerarPdfAssinado({
         supabaseAdmin,
         orcamentoId: id,
-        arquivoOriginalPath: current.arquivo_original_path,
+        arquivoOriginalPath: current.pre_aprovado_arquivo_path ?? current.arquivo_original_path,
         assinadoPorNome,
         assinadoPorUserId: actor.realUserId,
+        carimboIndex: current.pre_aprovado_arquivo_path ? 1 : 0,
       });
 
       const nextStatus: OrcamentoInternoStatus = "aprovado_assinado";

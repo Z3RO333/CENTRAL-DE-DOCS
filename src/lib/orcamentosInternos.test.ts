@@ -40,6 +40,7 @@ const baseRow: OrcamentoInternoRow = {
   pre_aprovado_email: null,
   pre_aprovado_nome: null,
   pre_aprovado_em: null,
+  pre_aprovado_arquivo_path: null,
   observacoes: null,
   arquivo_original_path: arquivo.path,
   arquivo_assinado_path: null,

@@ -83,6 +83,7 @@ export type OrcamentoInternoRow = {
   pre_aprovado_email: string | null;
   pre_aprovado_nome: string | null;
   pre_aprovado_em: string | null;
+  pre_aprovado_arquivo_path: string | null;
   observacoes: string | null;
   arquivo_original_path: string;
   arquivo_assinado_path: string | null;
