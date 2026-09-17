@@ -36,7 +36,10 @@ import {
 } from "@/lib/orcamentosInternos";
 import { type DocumentoAuditEvent } from "@/lib/documentosAudit";
 import { gerarPdfAssinado, resolveAssinadoPorNome } from "@/lib/orcamentoAssinatura";
-import { enviarEmailOrcamentoParaAprovacao } from "@/lib/orcamentoNotificationService";
+import {
+  enviarEmailOrcamentoAprovado,
+  enviarEmailOrcamentoParaAprovacao,
+} from "@/lib/orcamentoNotificationService";
 
 export const runtime = "nodejs";
 
@@ -894,6 +897,17 @@ export async function PATCH(
         .eq("versao", current.versao_atual)
         .eq("principal", true);
       if (versaoAssinadaError) throw versaoAssinadaError;
+      const notificationSolicitante = await enviarEmailOrcamentoAprovado({
+        id,
+        solicitanteEmail: current.solicitante_email,
+        prestadorNome: current.prestador_nome,
+        lojaNome: current.loja_nome,
+        numeroOrcamento: current.numero_orcamento,
+        descricao: current.descricao,
+        valorTotal: current.valor_total,
+        aprovadoPorNome: assinadoPorNome,
+        aprovadoPorEmail: actor.realEmail,
+      });
       await logOrcamentoEvent({
         supabaseAdmin,
         documentoId: id,
@@ -902,7 +916,12 @@ export async function PATCH(
         actorEmail: actor.realEmail,
         from,
         to: nextStatus,
-        metadata: { approved_at: now, notification: "solicitante" },
+        metadata: {
+          approved_at: now,
+          notification: "solicitante",
+          notification_status: notificationSolicitante.status,
+          notification_recipients: notificationSolicitante.recipientCount,
+        },
       });
       await logOrcamentoEvent({
         supabaseAdmin,
