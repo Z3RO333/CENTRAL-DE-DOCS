@@ -7,6 +7,7 @@ import {
 import {
   TIPO_ORCAMENTO_INTERNO,
   assertCanDecide,
+  assertCanDeleteOrcamento,
   assertCanEditAsSolicitante,
   assertCanManageSignedOrcamento,
   assertCanViewOrcamento,
@@ -997,6 +998,67 @@ export async function PATCH(
       err instanceof Error
         ? err.message
         : "Não foi possível atualizar o orçamento interno.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await context.params;
+    const supabaseAdmin = createSupabaseAdminClient();
+    const actor = await getActorFromRequest(request, supabaseAdmin);
+    await assertInternalActor({ actor, supabaseAdmin });
+    const aprovadores = await getAprovadorEmails(supabaseAdmin);
+    const current = await getOrcamentoOrThrow(id, supabaseAdmin);
+    assertCanViewOrcamento(current, actor, aprovadores);
+    assertCanDeleteOrcamento(current, actor, aprovadores);
+
+    const { data: versoes } = await supabaseAdmin
+      .from("orcamentos_internos_versoes")
+      .select("arquivo_path, arquivo_assinado_path")
+      .eq("orcamento_id", id);
+
+    const arquivoPaths = new Set<string>();
+    [
+      current.arquivo_original_path,
+      current.arquivo_assinado_path,
+      current.pre_aprovado_arquivo_path,
+    ].forEach((path) => {
+      if (path) arquivoPaths.add(path);
+    });
+    ((versoes ?? []) as Array<{ arquivo_path: string | null; arquivo_assinado_path: string | null }>).forEach(
+      (versao) => {
+        if (versao.arquivo_path) arquivoPaths.add(versao.arquivo_path);
+        if (versao.arquivo_assinado_path) arquivoPaths.add(versao.arquivo_assinado_path);
+      },
+    );
+
+    // formularios é o dono do registro: excluí-lo em cascata remove
+    // orcamentos_internos, orcamentos_internos_versoes e documentos_auditoria.
+    const { error } = await supabaseAdmin
+      .from("formularios")
+      .delete()
+      .eq("id", id)
+      .eq("tipo", TIPO_ORCAMENTO_INTERNO);
+    if (error) throw error;
+
+    if (arquivoPaths.size > 0) {
+      await supabaseAdmin.storage.from("formularios").remove(Array.from(arquivoPaths));
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Erro ao excluir orçamento interno:", err);
+    if (err instanceof HttpError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Não foi possível excluir o orçamento interno.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

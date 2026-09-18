@@ -474,6 +474,35 @@ export function resolveAprovadoresSelecionados(
   return selecionados;
 }
 
+/**
+ * Exclusão (hard delete) serve para limpar envios duplicados. Quem enviou
+ * pode excluir o próprio orçamento, e qualquer aprovador cadastrado também
+ * pode excluir (mesmo sem ser da etapa/faixa atual). Uma vez aprovado e
+ * assinado, o orçamento vira um documento oficial e só pode ser cancelado
+ * por um admin (ação "cancelar"), nunca excluído.
+ */
+export function assertCanDeleteOrcamento(
+  row: OrcamentoInternoRow,
+  actor: Actor,
+  aprovadores: Set<string>,
+) {
+  const actorEmail = normalizeEmail(actor.realEmail);
+  const isSolicitante = row.solicitante_id === actor.realUserId;
+  const isAprovador = actorEmail !== null && aprovadores.has(actorEmail);
+  if (!actor.realIsAdmin && !isSolicitante && !isAprovador) {
+    throw new HttpError(
+      403,
+      "Somente quem enviou o orçamento ou um aprovador pode excluí-lo.",
+    );
+  }
+  if (row.status === "aprovado_assinado") {
+    throw new HttpError(
+      400,
+      "Orçamentos já aprovados e assinados não podem ser excluídos. Use cancelar.",
+    );
+  }
+}
+
 export function assertCanManageSignedOrcamento(
   row: OrcamentoInternoRow,
   actor: Actor,

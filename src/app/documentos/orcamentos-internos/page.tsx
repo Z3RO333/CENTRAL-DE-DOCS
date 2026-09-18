@@ -17,6 +17,7 @@ import {
   Send,
   Signature,
   SlidersHorizontal,
+  Trash2,
   TriangleAlert,
   XCircle,
 } from "lucide-react";
@@ -526,6 +527,31 @@ export default function OrcamentosInternosPage() {
       void loadOrcamentos();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ação não concluída.");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const deleteOrcamento = async (orcamento: OrcamentoInterno) => {
+    setActionLoading("excluir");
+    setError(null);
+    try {
+      const token = await getToken();
+      const response = await fetch(`/api/orcamentos-internos/${orcamento.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const payload = (await response.json()) as { success?: boolean; error?: string };
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error ?? "Não foi possível excluir o orçamento.");
+      }
+      setSuccess("Orçamento excluído.");
+      setOrcamentos((current) => current.filter((item) => item.id !== orcamento.id));
+      setDetailId(null);
+      setDetail(null);
+      void loadOrcamentos();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível excluir o orçamento.");
     } finally {
       setActionLoading(null);
     }
@@ -1424,6 +1450,25 @@ export default function OrcamentosInternosPage() {
                     <CheckCircle2 className="h-4 w-4" />
                     Atualizar histórico
                   </button>
+                  {selectedDetail.status !== "aprovado_assinado" &&
+                  (selectedDetail.solicitante_id === user.id || isGestor) ? (
+                    <button
+                      type="button"
+                      disabled={Boolean(actionLoading)}
+                      onClick={async () => {
+                        const confirmed = await confirm({
+                          title: "Excluir orçamento",
+                          description: `Tem certeza que deseja excluir o orçamento de ${selectedDetail.prestador_nome}? Essa ação não pode ser desfeita.`,
+                          confirmLabel: "Excluir",
+                        });
+                        if (confirmed) void deleteOrcamento(selectedDetail);
+                      }}
+                      className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 font-semibold text-red-700 disabled:opacity-60"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {actionLoading === "excluir" ? "Excluindo..." : "Excluir"}
+                    </button>
+                  ) : null}
                 </div>
               </footer>
             ) : null}
